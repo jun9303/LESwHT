@@ -1,0 +1,28 @@
+IBMON   IHTRANS
+1       1
+2D_POST_OPTION
+IUNIGRID        ! FOR THE CLEAR VECTOR (0: OFF, 1: ON)
+0
+X_position
+0
+Y_position
+0
+Z_position
+1
+0.
+3D_POST_OPTION
+ITOT
+1
+ILD2    IUVWP    IWXYZ    IALL
+0       0        0        1
+ISKIP   JSKIP    KSKIP
+1       1        1
+ISTART  IEND
+1       320
+JSTART  JEND
+1       320
+KSTART  KEND
+1       50  
+ANIFLD  IND_FILM
+1       1
+fld001000

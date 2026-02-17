@@ -1,0 +1,23 @@
+SGS-CALC    X-PERIODIC  Z-PERIODIC  IBM-INTERP  HTRANSFR
+ON          ON          ON          ON          ON      
+CONJHTRANS  H.CAP_RAT(f/s)  COND._RATIO(s/f)
+ON          1.2             10.
+BODY-RECOGNITION (0: DIRECT CODING FROM lib_ibm_body_init.PY / 1: POINT EXTRACTION FROM STL FILE)
+0
+Debugging Options
+U_BODY_3D    V_BODY_3D    W_BODY_3D
+ON           OFF          OFF
+-----
+
+Explanation -
+LES-NUSGS  : Generate an array for SGS-eddy viscosity for LES. Set as NU_SGS(Inner body) == 0
+             (If you want to execute DNS, you do not need to turn on this option.)
+i-PERIODIC : Adjust grid settings for periodic boundary condition in i-direction.
+IBM-INTERP : Compute geometric factors for refining no-slip points on the solid body
+             (If you do not need to refine them, turn off this option.)
+
+BODY-RECOGNITION
+ If you select 'DIRECT CODING(0)' option, body information coded in the 'lib_ibm_body_init' module will be recognized.
+ If you select 'POINT EXTRACTION(1)' option, body information from a given STL file will be recognized.
+
+ (Ver.180108 - Only 'DIRECT CODING(0)' option is available)

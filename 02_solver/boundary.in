@@ -1,0 +1,25 @@
+BC_YBTM  BC_YTOP (Ignored when YPRDIC: ON at pre-processing step)
+0        0
+BC_ZBTM  BC_ZTOP (Ignored when ZPRDIC: ON at pre-processing step)
+1        1
+ICH      ICONJG
+1        1
+
+### Options
+
+BC_XBTM & BC_XTOP will be automatically set to velocity_inlet & convective outlet b.c.
+unless they were set periodic boundary condition at pre-processing step.
+
+--- For BC_YBTM ~ BC_ZTOP;
+0    : Solid wall boundary condition      (zero velocity components)
+1    : Far field boundary condition       (u_normal = 0, d(u_tangential)/dx_i = 0) 
+
+ICH  : Mean flow rate condition (0; Deactivate, 1; Activate)
+ITEMP: Conjugate heat transfer condition (0; Constant temp., 1; Conjugate heat transfer) 
+
+### Caution
+
+If periodic boundary condition(PRDIC) was already set at the ibm-preprocessing step, 
+this input will be IGNORED and the periodic b.c. will be imposed preferentially.
+
+Constant mass flow rate condition can be used for x-periodic channel flow problems.

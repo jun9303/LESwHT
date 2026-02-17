@@ -1,0 +1,33 @@
+N_x         N_y         N_z         L_x         L_y         L_z
+33          257         33          3.          2.          1.
+Dir.        Coord_i     Coord_f     Index_i     Index_f     Grid_opt     Factor1       Factor2
+X           -1.5        1.5         1           33          U            0             0
+Y           -1.         -.5         1           65          G            0             1.03
+Y           -.5          .5         65          193         H            0.5           3.05
+Y            .5         1.          193         257         G            1             1.03
+Z           -0.5        0.5         1           33          U            0             0
+----- (Do not remove this 5-slash line. Declaration of the end of the gridline inputs)
+Debugging Options
+Midpoints    XY-plane_grid   YZ-plane_grid   ZX-plane_grid   dx_plot     dy_plot     dz_plot
+ON           ON              ON              ON              ON          ON          ON
+
+Parameters:
+N_i       : Number of gridlines in i-direction (Desired cell number + 1)
+L_i       : Computational domain length in i-direction
+
+Dir.      : Grid direction (X : X-dir. , Y : Y-dir. , Z : Z-dir.)
+Coord_i   : Initial coordinate value of the current gridlines
+Coord_f   : Final coordinate value of the current gridlines
+Index_i   : Inital index of the current gridlines
+Index_f   : Final index of the current gridlines
+Grid_opt  : Options for grid arrangement (U : Uniform, G : Geometric, H : Hyperbolic tangent)
+Factor1   : Exp.(1) or Comp.(0) (for Geometric) / Exp.(1) or Comp.(0) or Symmetric(0.5) (for Hyperbolic tangent) 
+Factor2   : Geometric ratio (for Geometric) / Expansion ratio (for Hyperbolic tangent)
+
+*** Grid Input Rules
+1. Grid setting must be written in 'upward' order for each direction.
+(e.g., gridlines from (-5.0 ~ -2.0) -> gridlines from (-2.0 ~ 0.0) is okay, but the reverse is not.)
+2. The initial coordinate(index) value must be equal to the final coordinate(index) value of the previous line.
+3. The first index_i must be 1 in each direction
+4. The last index_f must be N_i in i-direction
+5. The last coord_f subtracted by the first coord_i must be L_i for i-direction
