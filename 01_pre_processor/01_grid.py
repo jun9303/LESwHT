@@ -1,58 +1,46 @@
-#!/bin/env python
+#!/usr/bin/env python3
 #-*- coding:utf-8 -*-
 #
 # GRID GENERATION PROGRAM FOR IMMERSED BOUNDARY METHOD
-# CODED BY SANGJOON LEE, RESEARCHER
-# FROM SNU ENERGY AND ENVIRONMENTAL FLOW LABORATORY
-# REFERENCE. LICA SOURCE BY SNU-TFC
-# IN-LAB USE ONLY. PLZ DO NOT DISTRIBUTE FOR COMMERCIAL USE.
+# CODED BY SANGJOON LEE
+# 
 #
-import sys, math
+
+import sys
+import os
 from local_lib import lib_gridfunc, lib_gridvalid, lib_griddebug
 
+# Ensure output directory exists
+if not os.path.exists('../output/grid'):
+    os.makedirs('../output/grid')
+
 # Read the input file
-file = open('grid.input', 'r')
-
-dummyline = file.readline()
-inputs = file.readline().split()
-N_x = int(inputs[0]); N_y = int(inputs[1]); N_z = int(inputs[2])
-L_x = float(inputs[3]); L_y = float(inputs[4]); L_z = float(inputs[5])
-dummyline = file.readline()
-
-gridlines = list()
-
-while True:
+with open('grid.input', 'r') as file:
+    dummyline = file.readline()
     inputs = file.readline().split()
-    if '-----' in inputs:
-        break
-    gridlines.append({'dir' : str(inputs[0]), 'coord_i' : float(inputs[1]), 'coord_f' : float(inputs[2]), \
-                      'index_i' : int(inputs[3]), 'index_f' : int(inputs[4]), 'grid_opt' : str(inputs[5]), \
-                      'factor1' : float(inputs[6]), 'factor2' : float(inputs[7])})
+    N_x = int(inputs[0]); N_y = int(inputs[1]); N_z = int(inputs[2])
+    L_x = float(inputs[3]); L_y = float(inputs[4]); L_z = float(inputs[5])
+    dummyline = file.readline()
 
-setnumber = len(gridlines)
+    gridlines = list()
 
-dummyline = file.readline(); dummyline = file.readline()
-inputs = file.readline().split()
-debugopt = {'Midpoints' : str(inputs[0]), 'XY_plane_grid' : str(inputs[1]), 'YZ_plane_grid' : str(inputs[2]), \
-            'ZX_plane_grid' : str(inputs[3]), 'dx_plot' : str(inputs[4]), 'dy_plot' : str(inputs[5]), 'dz_plot' : str(inputs[6])}
+    while True:
+        inputs = file.readline().split()
+        if not inputs or '-----' in inputs:
+            break
+        gridlines.append({'dir' : str(inputs[0]), 'coord_i' : float(inputs[1]), 'coord_f' : float(inputs[2]), \
+                          'index_i' : int(inputs[3]), 'index_f' : int(inputs[4]), 'grid_opt' : str(inputs[5]), \
+                          'factor1' : float(inputs[6]), 'factor2' : float(inputs[7])})
 
-del(dummyline, inputs)
-file.close()
+    dummyline = file.readline(); dummyline = file.readline()
+    inputs = file.readline().split()
+    debugopt = {'Midpoints' : str(inputs[0]), 'XY_plane_grid' : str(inputs[1]), 'YZ_plane_grid' : str(inputs[2]), \
+                'ZX_plane_grid' : str(inputs[3]), 'dx_plot' : str(inputs[4]), 'dy_plot' : str(inputs[5]), 'dz_plot' : str(inputs[6])}
 
 # Check the validity of the input
-gridlines_x = list(); gridlines_y = list(); gridlines_z = list()
-i = 0
-for gridline in gridlines:
-    i = i+1
-    if gridline['dir'] in ['X','x']:
-        gridlines_x.append(gridline)
-    elif gridline['dir'] in ['Y','y']:
-        gridlines_y.append(gridline)
-    elif gridline['dir'] in ['Z','z']:
-        gridlines_z.append(gridline)
-    else:
-        print('[Error] Unavailable grid direction at %d. check the direction(X,Y,Z) again.' %(i))
-        sys.exit(1)
+gridlines_x = [line for line in gridlines if line['dir'] in ['X','x']]
+gridlines_y = [line for line in gridlines if line['dir'] in ['Y','y']]
+gridlines_z = [line for line in gridlines if line['dir'] in ['Z','z']]
 
 error = list()
 lib_gridvalid.isValid(gridlines_x, N_x, L_x, error)
@@ -64,37 +52,32 @@ if error:
         print(err)
     sys.exit(1)
 
-del(error, gridlines_x, gridlines_y, gridlines_z)
+# Generate Grid
+x_coord = dict(); y_coord = dict(); z_coord = dict() 
 
-x_coord = dict(); y_coord = dict(); z_coord = dict() # grid intervals in x,y,z directions 
-i = 0
-
-# Call the grid functions from the 'gridfunc' library.
-for gridline in gridlines:
-    i = i+1
-    if gridline['grid_opt'] in ['U','u']: # unifrom gridlines
+for i, gridline in enumerate(gridlines, 1):
+    if gridline['grid_opt'] in ['U','u']:
         lib_gridfunc.uniform(x_coord,y_coord,z_coord,gridline)
-    elif gridline['grid_opt'] in ['G','g']: # geometric progression gridlines
+    elif gridline['grid_opt'] in ['G','g']:
         lib_gridfunc.geometric(x_coord,y_coord,z_coord,gridline)
-    elif gridline['grid_opt'] in ['H','h']: # hyperbolic tangent gridlines
+    elif gridline['grid_opt'] in ['H','h']:
         lib_gridfunc.hypertan(x_coord,y_coord,z_coord,gridline)
     else:
-        print('[Error] Unavailable grid option at line %d. only U, G, H are recognized.' %(i))
+        print(f'[Error] Unavailable grid option at line {i}. only U, G, H are recognized.')
         sys.exit(1)
 
-# Generate the output 'grid.dat' at /output/grid/ folder
-file = open('../output/grid/grid.dat', 'w')
-file.write('%23d %22d %22d\n' %(N_x, N_y, N_z))
-file.write('%23.15f %22.15f %22.15f\n' %(L_x, L_y, L_z))
-for i in range(1,N_x+1):
-    file.write('%23.15f' %(x_coord[i]))
-file.write('\n')
-for i in range(1,N_y+1):
-    file.write('%23.15f' %(y_coord[i]))
-file.write('\n')
-for i in range(1,N_z+1):
-    file.write('%23.15f' %(z_coord[i]))
-file.close()
+# Generate the output 'grid.dat'
+with open('../output/grid/grid.dat', 'w') as file:
+    file.write('%23d %22d %22d\n' %(N_x, N_y, N_z))
+    file.write('%23.15f %22.15f %22.15f\n' %(L_x, L_y, L_z))
+    for i in range(1,N_x+1):
+        file.write('%23.15f' %(x_coord[i]))
+    file.write('\n')
+    for i in range(1,N_y+1):
+        file.write('%23.15f' %(y_coord[i]))
+    file.write('\n')
+    for i in range(1,N_z+1):
+        file.write('%23.15f' %(z_coord[i]))
 
 # Debugging
 if debugopt['Midpoints'] == 'ON':

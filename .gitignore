@@ -1,0 +1,33 @@
+# Compiled Object files and Modules
+*.o
+*.mod
+*.so
+
+# Executables
+*.out
+*.exe
+02_solver/solver_exec
+04_post_avg_processor/postavgcomb
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Simulation Output Directories & Files
+output/
+field/
+field_avg/
+ftr/
+grid/
+ibmpre/
+post/
+post_avg/
+*.dat
+*.plt
+fort.*
+
+# System Files
+.DS_Store
+Thumbs.db
+*~
+*.bak
