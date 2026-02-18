@@ -1,5 +1,10 @@
-FC = ifort -r8 -i8 -O3 -qopenmp -mcmodel=medium -warn nounused
+# Compiler & Flags
+FC = ifort -r8 -i8 -O3 -qopenmp -mcmodel=medium -warn nounused -fpp
 
+# Libraries (FFTW, MKL, etc. - Assuming environment sets these or they are empty)
+LIB = 
+
+# Object List
 OBJS =  mod_common.o \
         mod_flowarray.o \
         mod_poiss.o \
@@ -10,13 +15,21 @@ OBJS =  mod_common.o \
         slv_engy.o \
         slv_cont.o \
         slv_auxi.o \
+        poiss_mgrd.o \
+        poiss_x_ft.o \
+        poiss_z_ft.o \
         poiss_ftft.o \
-        ibm_body.o \
         funcbody.o \
-        
-solver: $(OBJS)
-	$(FC) ./f90/$@.f90 -o solver_exec $(OBJS) $(LIB)
+        ibm_body.o \
+        ibm_forcing.o
 
+# Main Solver Executable Linkage
+solver: $(OBJS)
+	$(FC) ./f90/solver.f90 -o solver_exec $(OBJS) $(LIB)
+
+#-----------------------------------------------------------------------
+#     Module Dependencies
+#-----------------------------------------------------------------------
 mod_common.o: ./f90/mod_common.f90
 	$(FC) ./f90/mod_common.f90 -c $(LIB)
 
@@ -26,6 +39,9 @@ mod_flowarray.o: ./f90/mod_flowarray.f90
 mod_poiss.o: ./f90/mod_poiss.f90
 	$(FC) ./f90/mod_poiss.f90 -c $(LIB)
 
+#-----------------------------------------------------------------------
+#     Solver Libraries
+#-----------------------------------------------------------------------
 misc_init.o: ./f90/lib/misc_init.f90
 	$(FC) ./f90/lib/misc_init.f90 -c $(LIB)
 
@@ -47,6 +63,9 @@ slv_cont.o: ./f90/lib/slv_cont.f90
 slv_auxi.o: ./f90/lib/slv_auxi.f90
 	$(FC) ./f90/lib/slv_auxi.f90 -c $(LIB)
 
+#-----------------------------------------------------------------------
+#     Poisson Solver
+#-----------------------------------------------------------------------
 poiss_mgrd.o: ./f90/lib/poiss/poiss_mgrd.f90
 	$(FC) ./f90/lib/poiss/poiss_mgrd.f90 -c $(LIB)
 
@@ -59,20 +78,25 @@ poiss_z_ft.o: ./f90/lib/poiss/poiss_z_ft.f90
 poiss_ftft.o: ./f90/lib/poiss/poiss_ftft.f90
 	$(FC) ./f90/lib/poiss/poiss_ftft.f90 -c $(LIB)
 
-poiss.o: ./f90/lib/poiss/poiss.f90
-	$(FC) ./f90/lib/poiss/poiss.f90 -c $(LIB)
+#-----------------------------------------------------------------------
+#     Global Library Linkage (The Critical Update)
+#-----------------------------------------------------------------------
+funcbody.o: ../global_lib/f90/funcbody.f90
+	$(FC) ../global_lib/f90/funcbody.f90 -c $(LIB)
 
 ibm_body.o: ../global_lib/f90/ibm_body.f90
 	$(FC) ../global_lib/f90/ibm_body.f90 -c $(LIB)
 
-funcbody.o: ../global_lib/f90/funcbody.f90
-	$(FC) ../global_lib/f90/funcbody.f90 -c $(LIB)
+ibm_forcing.o: ../global_lib/f90/ibm_forcing.f90 mod_common.o mod_flowarray.o
+	$(FC) ../global_lib/f90/ibm_forcing.f90 -c $(LIB)
 
+#-----------------------------------------------------------------------
+#     Utilities
+#-----------------------------------------------------------------------
 clean:
-	rm -f *.o *.mod *.e core
+	rm -f *.o *.mod *.e core solver_exec
 	rm -rf coredir.*
 
 new:
 	make clean
 	make
-	make clean

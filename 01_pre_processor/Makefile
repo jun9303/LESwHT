@@ -1,18 +1,44 @@
-MKLROOT = /opt/intel/compilers_and_libraries_2018.1.163/linux
-FC = f2py3 --fcompiler=intelem -L$(MKLROOT)/mkl/lib/intel64 -lmkl_rt -L$(MKLROOT)/lib/intel64 -liomp5
-OUTPUT = lib_ibm_body
+# Compiler Settings
+PYTHON ?= python3
+F2PY = $(PYTHON) -m numpy.f2py
 
-OBJS =  ../global_lib/f90/ibm_body.f90 \
-        ../global_lib/f90/funcbody.f90 \
+# Intel Compiler Configuration
+FCOMPILER = intelem
+# Force C Compiler to Intel C (icc)
+CC = icc
 
-flib: $(OBJS)
-	  $(FC) -c $(OBJS) -m $(OUTPUT)
+# Optimization & OpenMP Flags
+OPT_FLAGS = -O3 -qopenmp -fpp
+
+# Linker Flags
+LIBS = -liomp5
+
+# Target Definitions
+OUTPUT_NAME = lib_ibm_body
+GLOBAL_LIB_DIR = ../global_lib
+SRCS = ../global_lib/f90/ibm_body.f90 \
+       ../global_lib/f90/funcbody.f90
+
+.PHONY: all flib clean
+
+all: flib
+
+flib:
+	@echo "----------------------------------------------------------"
+	@echo "Building $(OUTPUT_NAME) using $(FCOMPILER) via f2py..."
+	@echo "----------------------------------------------------------"
+	# CC=$(CC) passes the 'icc' command to distutils/f2py
+	CC=$(CC) $(F2PY) -c $(SRCS) \
+		-m $(OUTPUT_NAME) \
+		--fcompiler=$(FCOMPILER) \
+		--opt="$(OPT_FLAGS)" \
+		$(LIBS)
+	@echo "----------------------------------------------------------"
+	@echo "Installing $(OUTPUT_NAME).so to $(GLOBAL_LIB_DIR)..."
+	@echo "----------------------------------------------------------"
+	mv $(OUTPUT_NAME).*.so $(GLOBAL_LIB_DIR)/$(OUTPUT_NAME).so
 
 clean:
-	rm -f *.o *.mod *.e core
-	rm -rf coredir.*
-
-new:
-	make clean
-	make
-	mv $(OUTPUT).* ../global_lib/$(OUTPUT).so
+	@echo "Cleaning up build artifacts..."
+	rm -f *.o *.mod *.so
+	rm -f $(GLOBAL_LIB_DIR)/$(OUTPUT_NAME).so

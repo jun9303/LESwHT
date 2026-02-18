@@ -7,7 +7,7 @@
 # REFERENCE. LICA SOURCE BY SNU-TFC
 # IN-LAB USE ONLY. PLZ DO NOT DISTRIBUTE FOR COMMERCIAL USE.
 #
-import os, sys, math
+import os, sys
 import numpy as np
 from local_lib import lib_ibmpre
 
@@ -261,7 +261,7 @@ else:
 lib_ibmpre.ibm_preprocessing_data(NINTP,NINNER,FCP,INTPINDX,GEOMFAC)
 if HTRNFR == 'ON':
 	lib_ibmpre.ibm_preprocessing_data_htransfer(NINTP,NINNER,FCP,INTPINDX,GEOMFAC)
-np.set_printoptions(threshold=np.nan)
+np.set_printoptions(threshold=sys.maxsize)
 
 if LESSGS == 'ON':
 

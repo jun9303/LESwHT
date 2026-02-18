@@ -10,7 +10,7 @@
 04_post_avg_processor/postavgcomb
 
 # Python Cache
-__pycache__/
+**/__pycache__/
 *.pyc
 
 # Simulation Output Directories & Files

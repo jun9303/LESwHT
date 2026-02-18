@@ -7,7 +7,7 @@
 # REFERENCE. LICA SOURCE BY SNU-TFC
 # IN-LAB USE ONLY. PLZ DO NOT DISTRIBUTE FOR COMMERCIAL USE.
 #
-import sys, math
+import sys
 from local_lib import lib_gridfunc, lib_gridvalid, lib_griddebug
 
 # Read the input file
@@ -55,9 +55,9 @@ for gridline in gridlines:
         sys.exit(1)
 
 error = list()
-lib_gridvalid.isValid(gridlines_x, N_x, L_x, error)
-lib_gridvalid.isValid(gridlines_y, N_y, L_y, error)
-lib_gridvalid.isValid(gridlines_z, N_z, L_z, error)
+lib_gridvalid.is_valid(gridlines_x, N_x, L_x, error)
+lib_gridvalid.is_valid(gridlines_y, N_y, L_y, error)
+lib_gridvalid.is_valid(gridlines_z, N_z, L_z, error)
 
 if error:
     for err in error:
@@ -102,14 +102,14 @@ if debugopt['Midpoints'] == 'ON':
     lib_griddebug.midpoints(y_coord,N_y, 'y', '../output/grid/')
     lib_griddebug.midpoints(z_coord,N_z, 'z', '../output/grid/')
 if debugopt['XY_plane_grid'] == 'ON':
-    lib_griddebug.plane_grid(x_coord,y_coord,N_x,N_y, 'xy')
+    lib_griddebug.plane_grid(x_coord,y_coord,N_x,N_y, 'xy', '../output/grid/')
 if debugopt['YZ_plane_grid'] == 'ON':
-    lib_griddebug.plane_grid(y_coord,z_coord,N_y,N_z, 'yz')
+    lib_griddebug.plane_grid(y_coord,z_coord,N_y,N_z, 'yz', '../output/grid/')
 if debugopt['ZX_plane_grid'] == 'ON':
-    lib_griddebug.plane_grid(z_coord,x_coord,N_z,N_x, 'zx')
+    lib_griddebug.plane_grid(z_coord,x_coord,N_z,N_x, 'zx', '../output/grid/')
 if debugopt['dx_plot'] == 'ON':
-    lib_griddebug.deltaplot(x_coord,N_x, 'x')
+    lib_griddebug.deltaplot(x_coord,N_x, 'x', '../output/grid/')
 if debugopt['dy_plot'] == 'ON':
-    lib_griddebug.deltaplot(y_coord,N_y, 'y')
+    lib_griddebug.deltaplot(y_coord,N_y, 'y', '../output/grid/')
 if debugopt['dz_plot'] == 'ON':
-    lib_griddebug.deltaplot(z_coord,N_z, 'z')
+    lib_griddebug.deltaplot(z_coord,N_z, 'z', '../output/grid/')
