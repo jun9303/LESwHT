@@ -16,7 +16,7 @@ PROGRAM SOLVER
     USE MOD_FLOWARRAY
     IMPLICIT NONE
     
-    INTEGER(8) :: I, J, K, N
+    ! INTEGER(8) :: I, J, K, N
     REAL(8)    :: OMP_GET_WTIME
 
     !===================================================================
@@ -144,7 +144,7 @@ PROGRAM SOLVER
         ENDIF
 
         IF ((NTRACE .GT. 0) .AND. (MOD(M, NTR) .EQ. 0)) CALL TRACER()
-        IF (IBMON .EQ. 1) CALL DRAGLIFT()
+        ! IF (IBMON .EQ. 1) CALL DRAGLIFT()
         ! IF (IHTRANS .EQ. 1) CALL NUSSELT()
 
         IF (MOD(NTIME, NPRINT) .EQ. 0) CALL WRITEFIELD()
@@ -164,7 +164,7 @@ PROGRAM SOLVER
     IF (IAVG .EQ. 1) CALL FIELD_AVG()
 
     CALL CPU_TIME(TOTAL_TIME_E)
-    CALL TOTAL_TIME()
+    ! CALL TOTAL_TIME()
 
     CALL PRINT_REAL_TIME()
     CALL DEALLO_ARRAY()

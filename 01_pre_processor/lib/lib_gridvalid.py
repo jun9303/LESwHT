@@ -1,4 +1,4 @@
-import sys, math
+import math
 
 def is_valid(gridlines_i, totalline, totaldomain, error):
     """Validate the gridlines in a specific direction."""

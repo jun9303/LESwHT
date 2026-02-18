@@ -1,4 +1,3 @@
-import sys
 import numpy as np
 
 def uniform(x, y, z, line):

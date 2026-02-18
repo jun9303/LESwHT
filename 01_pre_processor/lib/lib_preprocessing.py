@@ -1,5 +1,4 @@
 import numpy as np
-import time
 
 def GFIDebug(geomfac, intptype, intpindx, fcp, x, y, z):
     gfimax = [0, 0, 0]

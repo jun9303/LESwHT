@@ -2,21 +2,17 @@
 #-*- coding:utf-8 -*-
 #
 # PRE-DETERMINATION OF IMMERSED BODIES 
-# CODED BY SANGJOON LEE, RESEARCHER
-# FROM SNU ENERGY AND ENVIRONMENTAL FLOW LABORATORY
-# REFERENCE. LICA SOURCE BY SNU-TFC
-# IN-LAB USE ONLY. PLZ DO NOT DISTRIBUTE FOR COMMERCIAL USE.
 #
-import os, sys
+import sys
 import numpy as np
-from local_lib import lib_ibmpre
 
-sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-from global_lib import lib_setgrid
-from global_lib import lib_ibm_body
+from lib import lib_setgrid, lib_preprocessing
+
+# Import the compiled Fortran extension (located in current dir)
+import lib_ibm_body
 
 # Read the input file
-file = open('ibmpre.input', 'r')
+file = open('preprocessing.input', 'r')
 
 dummyline = file.readline()
 inputs = file.readline().split()
@@ -66,7 +62,7 @@ file.close()
 
 # Check the input
 print('Checking input options ----------')
-print('LESSGS = %s, X_PERIODIC = %s, Y_PERIODICPRAN= %s, Z_PERIODIC = %s, IBM_INTERPOLATION = %s\n' \
+print('LESSGS = %s, X_PERIODIC = %s, Y_PERIODIC = %s, Z_PERIODIC = %s, IBM_INTERPOLATION = %s\n' \
       %(LESSGS, XPRDIC, YPRDIC, ZPRDIC, IBMINT))
 
 print('Body recognization ---------')
@@ -94,7 +90,7 @@ grid = lib_setgrid.setgrid('../output/grid/grid.dat', XPRDIC, YPRDIC, ZPRDIC)
 #                    [j]['upperfix'] : 1 if upper end without periodic condition
 #                    [j]['lowerfix'] : 1 if lower end without periodic condition
 
-lib_ibmpre.grid_preprocessing_data(grid)
+lib_preprocessing.grid_preprocessing_data(grid)
 
 N_x = grid['N_x']; N_y = grid['N_y']; N_z = grid['N_z']
 Cell_x = grid['Cell_x']; Cell_y = grid['Cell_y']; Cell_z = grid['Cell_z']
@@ -231,7 +227,7 @@ if IBMINT == 'ON':
         GEOMFAC['t'] = lib_ibm_body.geomfac_intp(XX[:,2], YY[:,2], ZZ[:,2], FCP['t'], INTPINDX['t'], .0)
 
     print('\n*** GEOMETRIC FACTOR CALCULATION FINISHED ***')
-    lib_ibmpre.GFIDebug(GEOMFAC, INTPTYPE, INTPINDX, FCP, X, Y, Z)
+    lib_preprocessing.GFIDebug(GEOMFAC, INTPTYPE, INTPINDX, FCP, X, Y, Z)
 
 elif IBMINT == 'OFF':
     # interpolation scheme is off
@@ -258,9 +254,9 @@ else:
     print('Wrong IBMINT input(ON/OFF only). Plz check again.')
     sys.exit(1)
 
-lib_ibmpre.ibm_preprocessing_data(NINTP,NINNER,FCP,INTPINDX,GEOMFAC)
+lib_preprocessing.ibm_preprocessing_data(NINTP,NINNER,FCP,INTPINDX,GEOMFAC)
 if HTRNFR == 'ON':
-	lib_ibmpre.ibm_preprocessing_data_htransfer(NINTP,NINNER,FCP,INTPINDX,GEOMFAC)
+	lib_preprocessing.ibm_preprocessing_data_htransfer(NINTP,NINNER,FCP,INTPINDX,GEOMFAC)
 np.set_printoptions(threshold=sys.maxsize)
 
 if LESSGS == 'ON':
@@ -274,7 +270,7 @@ if LESSGS == 'ON':
 
     print('\n# of zero-eddy-visocisy pts = %d' %(NZERO))
 
-    lib_ibmpre.les_preprocessing_data(NZERO,ISZERO)
+    lib_preprocessing.les_preprocessing_data(NZERO,ISZERO)
 
     if CONJGHTRANS == 'ON':
     
@@ -286,18 +282,17 @@ if LESSGS == 'ON':
         [CSTAR, KSTAR] = lib_ibm_body.conjg_intp(CRATIO,KRATIO,XM,YM,ZM,X,Y,Z,ISZERO,0)
         # np.set_printoptions(threshold=np.nan)
         # print(KSTAR[:,:,1,5])
-        lib_ibmpre.conjg_preprocessing_data(CSTAR,KSTAR)
+        lib_preprocessing.conjg_preprocessing_data(CSTAR,KSTAR)
 
 print('\n***** PRE-PROCESSING FINISHED. *****')
 
 # Debugging options
 if debugopt['U_surf_3D'] == 'ON':
     print('\nDebug -- Printing surface forcing pts for U')
-    lib_ibmpre.surf3D(X,YM,ZM,INOUT['u'], 'u')
+    lib_preprocessing.surf3D(X,YM,ZM,INOUT['u'], 'u')
 if debugopt['V_surf_3D'] == 'ON':
     print('Debug -- Printing surface forcing pts for V')
-    lib_ibmpre.surf3D(XM,Y,ZM,INOUT['v'], 'v')
+    lib_preprocessing.surf3D(XM,Y,ZM,INOUT['v'], 'v')
 if debugopt['W_surf_3D'] == 'ON':
     print('Debug -- Printing surface forcing pts for W')
-    lib_ibmpre.surf3D(XM,YM,Z,INOUT['w'], 'w')
-
+    lib_preprocessing.surf3D(XM,YM,Z,INOUT['w'], 'w')

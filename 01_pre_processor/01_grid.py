@@ -8,7 +8,7 @@
 # IN-LAB USE ONLY. PLZ DO NOT DISTRIBUTE FOR COMMERCIAL USE.
 #
 import sys
-from local_lib import lib_gridfunc, lib_gridvalid, lib_griddebug
+from lib import lib_gridfunc, lib_gridvalid, lib_griddebug
 
 # Read the input file
 file = open('grid.input', 'r')

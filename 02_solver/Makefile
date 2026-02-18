@@ -1,7 +1,5 @@
 # Compiler & Flags
-FC = ifort -r8 -i8 -O3 -qopenmp -mcmodel=medium -warn nounused -fpp
-
-# Libraries (FFTW, MKL, etc. - Assuming environment sets these or they are empty)
+FC = ifort -r8 -i8 -O3 -qopenmp -mcmodel=medium -warn nounused
 LIB = 
 
 # Object List
@@ -15,9 +13,6 @@ OBJS =  mod_common.o \
         slv_engy.o \
         slv_cont.o \
         slv_auxi.o \
-        poiss_mgrd.o \
-        poiss_x_ft.o \
-        poiss_z_ft.o \
         poiss_ftft.o \
         funcbody.o \
         ibm_body.o \
@@ -79,24 +74,28 @@ poiss_ftft.o: ./f90/lib/poiss/poiss_ftft.f90
 	$(FC) ./f90/lib/poiss/poiss_ftft.f90 -c $(LIB)
 
 #-----------------------------------------------------------------------
-#     Global Library Linkage (The Critical Update)
+#     External & Geometry Linkage
 #-----------------------------------------------------------------------
-funcbody.o: ../global_lib/f90/funcbody.f90
-	$(FC) ../global_lib/f90/funcbody.f90 -c $(LIB)
+# User Body Definition (Geometry)
+funcbody.o: ../geometry/f90/funcbody.f90
+	$(FC) ../geometry/f90/funcbody.f90 -c $(LIB)
 
-ibm_body.o: ../global_lib/f90/ibm_body.f90
-	$(FC) ../global_lib/f90/ibm_body.f90 -c $(LIB)
+# IBM Logic
+ibm_body.o: ./f90/lib/ibm_body.f90
+	$(FC) ./f90/lib/ibm_body.f90 -c $(LIB)
 
-ibm_forcing.o: ../global_lib/f90/ibm_forcing.f90 mod_common.o mod_flowarray.o
-	$(FC) ../global_lib/f90/ibm_forcing.f90 -c $(LIB)
+# IBM Forcing
+ibm_forcing.o: ./f90/lib/ibm_forcing.f90 mod_common.o mod_flowarray.o
+	$(FC) ./f90/lib/ibm_forcing.f90 -c $(LIB)
 
 #-----------------------------------------------------------------------
 #     Utilities
 #-----------------------------------------------------------------------
 clean:
-	rm -f *.o *.mod *.e core solver_exec
-	rm -rf coredir.*
+	rm -f *.o *.mod *.e core coredir.*
+	rm -f solver_exec
 
 new:
 	make clean
 	make
+	rm -rf *.o *.mod *.e core coredir.*
