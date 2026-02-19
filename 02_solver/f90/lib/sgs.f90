@@ -1215,7 +1215,7 @@
             ENDIF
           ELSE IF (ITEMDL .EQ. 1) THEN
             WRITE(*,*) 'OTHER MODEL IS NOT IMPLEMENTED IN THIS VERSION'
-            WRITE(*,*) 'SGS.F90 LINE ***'            
+            WRITE(*,*) 'SGS.F90 LINE ***'
             STOP
           ENDIF
         ENDIF

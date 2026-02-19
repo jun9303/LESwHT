@@ -2,7 +2,19 @@
 FC = ifort -r8 -i8 -O3 -qopenmp -mcmodel=medium -warn nounused
 LIB = 
 
-# Object List
+# Directory for FFTE (Adjust if the folder is named just 'ffte')
+FFTE_DIR = ./f90/lib/poiss/ffte-7.0
+
+# FFTE Object List
+FFTE_OBJS = $(FFTE_DIR)/zfft1d.o \
+            $(FFTE_DIR)/zfft2d.o \
+            $(FFTE_DIR)/zfft3d.o \
+            $(FFTE_DIR)/fft235.o \
+            $(FFTE_DIR)/kernel.o \
+            $(FFTE_DIR)/mfft235.o \
+            $(FFTE_DIR)/factor.o
+
+# Solver Object List
 OBJS =  mod_common.o \
         mod_flowarray.o \
         mod_poiss.o \
@@ -13,14 +25,21 @@ OBJS =  mod_common.o \
         slv_engy.o \
         slv_cont.o \
         slv_auxi.o \
-        poiss_ftft.o \
+        poiss_x_ft.o \
         funcbody.o \
         ibm_body.o \
         ibm_forcing.o
 
 # Main Solver Executable Linkage
-solver: $(OBJS)
-	$(FC) ./f90/solver.f90 -o solver_exec $(OBJS) $(LIB)
+solver: $(FFTE_OBJS) $(OBJS)
+	$(FC) ./f90/solver.f90 -o solver_exec $(OBJS) $(FFTE_OBJS) $(LIB)
+
+#-----------------------------------------------------------------------
+#     FFTE Compilation Rules (Fortran 77)
+#-----------------------------------------------------------------------
+# The -I$(FFTE_DIR) flag ensures param.h is found during compilation
+$(FFTE_DIR)/%.o: $(FFTE_DIR)/%.f
+	$(FC) -fPIC -I$(FFTE_DIR) -c $< -o $@
 
 #-----------------------------------------------------------------------
 #     Module Dependencies
@@ -76,15 +95,12 @@ poiss_ftft.o: ./f90/lib/poiss/poiss_ftft.f90
 #-----------------------------------------------------------------------
 #     External & Geometry Linkage
 #-----------------------------------------------------------------------
-# User Body Definition (Geometry)
 funcbody.o: ../geometry/f90/funcbody.f90
 	$(FC) ../geometry/f90/funcbody.f90 -c $(LIB)
 
-# IBM Logic
 ibm_body.o: ./f90/lib/ibm_body.f90
 	$(FC) ./f90/lib/ibm_body.f90 -c $(LIB)
 
-# IBM Forcing
 ibm_forcing.o: ./f90/lib/ibm_forcing.f90 mod_common.o mod_flowarray.o
 	$(FC) ./f90/lib/ibm_forcing.f90 -c $(LIB)
 
@@ -94,8 +110,8 @@ ibm_forcing.o: ./f90/lib/ibm_forcing.f90 mod_common.o mod_flowarray.o
 clean:
 	rm -f *.o *.mod *.e core coredir.*
 	rm -f solver_exec
+	rm -f $(FFTE_DIR)/*.o
 
 new:
 	make clean
-	make
-	rm -rf *.o *.mod *.e core coredir.*
+	make solver

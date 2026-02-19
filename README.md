@@ -7,8 +7,8 @@
 * **Immersed Boundary Method (IBM):** Handles complex geometries and solid boundaries on a Cartesian grid.
 * **Conjugate Heat Transfer (CHT):** Solves coupled heat conduction (solid) and convection (fluid) equations simultaneously.
 * **Subgrid-Scale Models:**
-    * **Turbulence:** Dynamic Vreman model.
-    * **Heat Flux:** Linear eddy viscosity model (Moin et al.).
+    * **Turbulence:** Vreman model.
+    * **Heat Flux:** Linear Eddy viscosity model.
 * **Buoyancy:** Includes Boussinesq approximation (Grashof number) for natural convection.
 
 ## Directory Structure

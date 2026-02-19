@@ -18,6 +18,10 @@ else
     export OMP_NUM_THREADS=4
 fi
 
+export OMP_STACKSIZE=1G
+export OMP_SCHEDULE="dynamic"
+export OMP_DYNAMIC=TRUE
+
 # 4. Compilation
 echo "Compiling Solver (make new)..."
 make new

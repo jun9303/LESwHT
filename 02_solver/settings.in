@@ -53,7 +53,7 @@ WWSOR  : Overrelaxation acceleration factor for the SOR method
 
 ILES   : Activate SGS term for large eddy simultaion (0; Deactivate, 1; Activate) 
 ITSMDL : SGS turbulent stress model (1: Vreman)
-IHFMDL : SGS heat flux model (1: Moin)
+ITEMDL : SGS heat flux model (0: Moin)
 IDVMON : Dynamic CSGS determination with Germano identity model (0; Off, 1; On)
 CSGSTS : SGS_TS coefficient (Only valid when IDVMON: 0)
 CSGSHF : SGS_HF coefficient (Only valid when IDVMON: 0)
@@ -69,8 +69,7 @@ FILES  : grid.dat & previous field file (Only valid for IREAD: 1)
 
 TRACE  : Trace for u,v,w,p at the particular position
 NTR    : Time steps for writing tracing points data
-
-ex)
+(EXAMPLE)
 5       2        : 5 POSITION, EVERY 2 TIME STEP WRITE
 5    30   40     : I,J,K                                 
 10   60   80     : I,J,K  
