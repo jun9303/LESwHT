@@ -14,8 +14,8 @@ unless they were set periodic boundary condition at pre-processing step.
 0    : Solid wall boundary condition      (zero velocity components)
 1    : Far field boundary condition       (u_normal = 0, d(u_tangential)/dx_i = 0) 
 
-ICH  : Mean flow rate condition (0; Deactivate, 1; Activate)
-ITEMP: Conjugate heat transfer condition (0; Constant temp., 1; Conjugate heat transfer) 
+ICH   : Mean flow rate condition (0; Deactivate, 1; Activate)
+ICONJG: Conjugate heat transfer condition (0; Constant temp., 1; Conjugate heat transfer) 
 
 ### Caution
 
