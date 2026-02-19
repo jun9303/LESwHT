@@ -7,16 +7,15 @@
        IF (ILES .EQ. 1) CALL RHSSGS_T    ! SubGrid-Scale computations (LES case)
        CALL RHS_T
        IF ((IBMON .NE. 0) .AND. ICONJG .EQ. 0) CALL RHS_IBM_T  ! IB method computation
-       ! IF ((IBMON .NE. 0) .AND. ICONJG .EQ. 1) CALL RHS_IBM_CONJG_T  ! CONJUGATE H.TRANS
 
        CALL CONVBC_T                     
        IF (ICH .NE. 1) CALL RHSINCORPBC_T
 
        CALL LHS_T
 
-       ! WHEN DO BLOWING/SUCTION RETRV_UVW SHOULD BE TURNED ON
        CALL RETRV_T
-       ! CALL PRDIC_ADJ_T
+       CALL PRDIC_ADJ_T
+       CALL WALLBC_T
 
        RETURN
        END
@@ -28,17 +27,17 @@
 !     Computing intermediate velocity, u hat, step in delta form
 !
 !     variables in common:
-!           x, y, z         : coordinate direction
-!           u, v, w         : velocity for x, y, z direction
-!           n, s, e, w, c, f: + & - for each x, y, z direction
-!           AN, AL, TAL     : Non-linear, linear, turbulent (SGS)
+!     x, y, z         : coordinate direction
+!     u, v, w         : velocity for x, y, z direction
+!     n, s, e, w, c, f: + & - for each x, y, z direction
+!     AN, AL, TAL     : Non-linear, linear, turbulent (SGS)
 !
 !     RHS1(x,y,z,L):
 !           RHS term consists of Non-linear/Linear/SGS terms
 !           Components for IB method will be added in RHS_IBM subroutine
 !
 !-----------------------------------------------------------------------
-       USE MOD_COMMON
+USE MOD_COMMON
        USE MOD_FLOWARRAY, ONLY : U,V,W,P,T,ALSGS,ALSGS1,RHS1   &
                                 ,RK3TO,RK3TOO,NWALL_DVM,CSTAR,KSTAR
        IMPLICIT NONE
@@ -52,13 +51,12 @@
        REAL*8      :: ALT1,ALT2,ALT3,ALT4,ALT5,ALT6,ALTX,ALTY,ALTZ,ALT
        REAL*8      :: TALTX,TALTY,TALTZ
 
-
 !-----RHS1 calculation for T -----------------
 !$OMP PARALLEL DO  &
 !$OMP private(TE,TW,TN,TS,TC,TF)   &
 !$OMP private(ANT1,ANT2,ANT3,RK3T) &
 !$OMP private(ALT1,ALT2,ALT3,ALT4,ALT5,ALT6,ALTX,ALTY,ALTZ,ALT) &
-!$OMP private(TALTX,TALTY,TALTZ)
+!$OMP private(TALTX,TALTY,TALTZ,OMEGA)
        DO K=1,N3M
        DO J=1,N2M
        DO I=1,N1M
@@ -89,7 +87,12 @@
        ANT2=(TN*V(I,JPLUS,K)-TS*V(I,J,K))*F2FYI(J)
        ANT3=(TC*W(I,J,KPLUS)-TF*W(I,J,K))*F2FZI(K)
 
-       IF ((ICONJG .EQ. 1) .AND. (NWALL_DVM(I,J,K) .EQ. 0)) THEN
+       ! OMEGA acts as a switch for the convective term.
+       ! For stationary Conjugate Heat Transfer (IMOVINGON = 0), velocity inside the solid is zero,
+       ! so we force OMEGA = 0. to guarantee pure conduction and suppress numerical noise.
+       ! For a MOVING solid (IMOVINGON = 1), the solid has a rigid-body velocity, 
+       ! and therefore advects its own temperature. We must leave OMEGA = 1.
+       IF ((ICONJG .EQ. 1) .AND. (NWALL_DVM(I,J,K) .EQ. 0) .AND. (IMOVINGON .EQ. 0)) THEN
          OMEGA = 0.
        ELSE
          OMEGA = 1.
@@ -146,20 +149,20 @@
        END
 !=======================================================================
 !=======================================================================
-      SUBROUTINE RHS_IBM_T
+       SUBROUTINE RHS_IBM_T
 !=======================================================================
 !
 !     Calculate momentum forcing
 !
 !     Option
-!       IMOVINGON = 0, Stationary body => UBODY,VBODY,WBODY for translational vel.
-!       IMOVINGON = 1, Moving body     => UBD,VBD,WBD in lica_cylinder.f90
+!     IMOVINGON = 0, Stationary body => UBODY,VBODY,WBODY for translational vel.
+!     IMOVINGON = 1, Moving body     => UBD,VBD,WBD in lica_cylinder.f90
 !
 !     Variables
-!       UTARG,VTARG,WTARG: Target velocity to satisfy no-slip b.c.
+!     UTARG,VTARG,WTARG: Target velocity to satisfy no-slip b.c.
 !       FCV   : Momentum forcing from the target velocity
-!       FCVAVG: Averaging forcing values    to calculate the force on a body
-!       DUDTR : Time derivative of velocity to calculate the force on a body
+!     FCVAVG: Averaging forcing values    to calculate the force on a body
+!     DUDTR : Time derivative of velocity to calculate the force on a body
 !               Ref. Lee et al., 2011, Sources of spurious force
 !               oscillations from an immersed boundary method for moving
 !               -body problems, J. Comp. Phys., 230, 2677-2695.
@@ -255,108 +258,33 @@
       END
 !=======================================================================
 !=======================================================================
-      SUBROUTINE RHS_IBM_CONJG_T
-!=======================================================================
-!
-!     Calculate momentum forcing
-!
-!     Option
-!       IMOVINGON = 0, Stationary body => UBODY,VBODY,WBODY for translational vel.
-!       IMOVINGON = 1, Moving body     => UBD,VBD,WBD in lica_cylinder.f90
-!
-!     Variables
-!       UTARG,VTARG,WTARG: Target velocity to satisfy no-slip b.c.
-!       FCV   : Momentum forcing from the target velocity
-!       FCVAVG: Averaging forcing values    to calculate the force on a body
-!       DUDTR : Time derivative of velocity to calculate the force on a body
-!               Ref. Lee et al., 2011, Sources of spurious force
-!               oscillations from an immersed boundary method for moving
-!               -body problems, J. Comp. Phys., 230, 2677-2695.
-!
-!-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : RHS1,U,V,W,T,IFC,JFC,KFC,INTPINDX,GEOMFAC,&
-                                FCV,FCVAVG,DUDTR,NWALL_DVM
-      IMPLICIT NONE
-      INTEGER*8 :: I,J,K,N,KPLUS,KMINUS,JPLUS,JMINUS,IPLUS,IMINUS
-      REAL*8    :: TP,TM,HEATS
-      REAL*8    :: RHSTMP(N1M,N2M,N3M)
-
-!---- Compute target velocities & forcing values at forcing points
-
-!$OMP PARALLEL DO &
-!$OMP private(TP,TM,HEATS,KPLUS,KMINUS,JPLUS,JMINUS,IPLUS,IMINUS)
-      DO K= 1,N3M 
-      DO J= 1,N2M
-      DO I= 1,N1M
-        IF (NWALL_DVM(I,J,K).EQ.0) THEN
-
-          HEATS = 0.
-
-          KPLUS=KPV(K)
-          KMINUS=KMV(K)
-          JPLUS=JPV(J)
-          JMINUS=JMV(J)
-          IPLUS=IPV(I)
-          IMINUS=IMV(I)
-
-          TP=0.5*(F2FX(I)*T(IPLUS,J,K)+F2FX(IPLUS)*T(I,J,K))*C2CXI(IPLUS) &
-             *(1.-FIXIU(I))+T(IPLUS,J,K)*FIXIU(I)
-          TM=0.5*(F2FX(IMINUS)*T(I,J,K)+F2FX(I)*T(IMINUS,J,K))*C2CXI(I)   &
-             *(1.-FIXIL(I))+T(IMINUS,J,K)*FIXIL(I)
-          HEATS = HEATS + (TP*U(IPLUS,J,K) - TM*U(I,J,K)) * F2FXI(I)
-
-          TP=0.5*(F2FY(J)*T(I,JPLUS,K)+F2FY(JPLUS)*T(I,J,K))*C2CYI(JPLUS) &
-             *(1.-FIXJU(J))+T(I,JPLUS,K)*FIXJU(J)
-          TM=0.5*(F2FY(JMINUS)*T(I,J,K)+F2FY(J)*T(I,JMINUS,K))*C2CYI(J)   &
-             *(1.-FIXJL(J))+T(I,JMINUS,K)*FIXJL(J)
-          HEATS = HEATS + (TP*V(I,JPLUS,K) - TM*V(I,J,K)) * F2FYI(J)
-
-          TP=0.5*(F2FZ(K)*T(I,J,KPLUS)+F2FZ(KPLUS)*T(I,J,K))*C2CZI(KPLUS) &
-             *(1.-FIXKU(K))+T(I,J,KPLUS)*FIXKU(K)
-          TM=0.5*(F2FZ(KMINUS)*T(I,J,K)+F2FZ(K)*T(I,J,KMINUS))*C2CZI(K)   &
-             *(1.-FIXKL(K))+T(I,J,KMINUS)*FIXKL(K)
-          HEATS = HEATS + (TP*W(I,J,KPLUS) - TM*W(I,J,K)) * F2FZI(K)
-
-          RHS1(I,J,K,4) = RHS1(I,J,K,4) + 2.*ALPHA*DT*HEATS
-        ENDIF
-      ENDDO
-      ENDDO
-      ENDDO
-
-      RETURN
-      END
-!=======================================================================
-!=======================================================================
         SUBROUTINE CONVBC_T
 !=======================================================================
       USE MOD_COMMON
       USE MOD_FLOWARRAY, ONLY : U,V,W,T
       IMPLICIT NONE
-      INTEGER*8     :: I,J,K
+      INTEGER*8   :: I,J,K
       REAL*8      :: QIN,QOUT,QRATIO
       REAL*8      :: UBAR,UCOEF,VWCOEF
+      REAL*8      :: FUNCBODY
 
       IF (ICH .NE. 1) THEN
 
 !-----CALCULATE INFLUX
       QIN=0.
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:QIN)
+!$OMP PARALLEL DO REDUCTION(+:QIN)
       DO K=1,N3M
         DO J=1,N2M
           QIN=U(1,J,K)*F2FY(J)*F2FZ(K)+QIN
         ENDDO
       ENDDO
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:QIN)
+!$OMP PARALLEL DO REDUCTION(+:QIN)
       DO K=1,N3M
         DO I=1,N1M
           QIN=(V(I,1,K)-V(I,N2,K))*F2FX(I)*F2FZ(K)+QIN
         ENDDO
       ENDDO
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:QIN)
+!$OMP PARALLEL DO REDUCTION(+:QIN)
       DO J=1,N2M
         DO I=1,N1M
          QIN=(W(I,J,1)-W(I,J,N3))*F2FX(I)*F2FY(J)+QIN
@@ -365,8 +293,7 @@
 
 !-----CALCULATE CONVECTIVE VELOCITY Uc
       UBAR = 0.
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:UBAR)
+!$OMP PARALLEL DO REDUCTION(+:UBAR)
       DO K=1,N3M
         DO J=1,N2M
           UBAR=U(N1,J,K)*F2FY(J)*F2FZ(K)+UBAR
@@ -377,12 +304,19 @@
       VWCOEF= UBAR*DTCONST*C2CXI(N1)
 
       QOUT = 0.
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:QOUT)
+!$OMP PARALLEL DO REDUCTION(+:QOUT)
       DO K=1,N3M
         DO J=1,N2M
           UOUT(J,K)=U(N1,J,K)-UCOEF*(U(N1,J,K)-U(N1M,J,K))
-          TOUT(J,K)=T(N1,J,K)-VWCOEF*(T(N1,J,K)-T(N1M,J,K))
+          
+          IF (FUNCBODY(XMP(N1M),YMP(J),ZMP(K),TIME) .LE. 1.E-10 .AND. IMOVINGON .EQ. 0) THEN
+            ! Solid Phase: Zero-gradient conduction boundary
+            TOUT(J,K) = T(N1M,J,K)
+          ELSE
+            ! Fluid Phase: Convective advection
+            TOUT(J,K) = T(N1,J,K)-VWCOEF*(T(N1,J,K)-T(N1M,J,K))
+          ENDIF
+          
           QOUT=UOUT(J,K)*F2FY(J)*F2FZ(K)+QOUT
         ENDDO
       ENDDO
@@ -392,7 +326,10 @@
 !$OMP PARALLEL DO
       DO K=1,N3M
         DO J=1,N2M
-          TOUT(J,K)=TOUT(J,K)*QRATIO
+          ! Only scale the fluid phase by the mass flux error
+          IF (FUNCBODY(XMP(N1M),YMP(J),ZMP(K),TIME) .GT. 1.E-10) THEN
+             TOUT(J,K)=TOUT(J,K)*QRATIO
+          ENDIF
           DTOUT(J,K)=TOUT(J,K)-T(N1,J,K)
         ENDDO
       ENDDO
@@ -617,22 +554,53 @@
       SUBROUTINE PRDIC_ADJ_T
 !=======================================================================
       USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : T
+      USE MOD_FLOWARRAY, ONLY : T, CSTAR
       IMPLICIT NONE
       INTEGER*8    :: I,J,K
+      REAL*8       :: T_AVG_IN, T_AVG_OUT, AREA_C_IN, AREA_C_OUT, DEL_T
+      REAL*8       :: CS_IN, CS_OUT
 
-!     X PERIODICITY
+! X PERIODICITY WITH CSTAR-WEIGHTED THERMAL GRADIENT CORRECTION
       IF (XPRDIC .EQ. 1) THEN
+        T_AVG_IN   = 0.D0
+        T_AVG_OUT  = 0.D0
+        AREA_C_IN  = 0.D0
+        AREA_C_OUT = 0.D0
+
+!$OMP PARALLEL DO private(CS_IN, CS_OUT) reduction(+:T_AVG_IN, T_AVG_OUT, AREA_C_IN, AREA_C_OUT)
+        DO K=1,N3M
+        DO J=1,N2M
+           IF (ICONJG .EQ. 1) THEN
+              CS_IN  = CSTAR(1,J,K)
+              CS_OUT = CSTAR(N1M,J,K)
+           ELSE
+              CS_IN  = 1.0D0
+              CS_OUT = 1.0D0
+           ENDIF
+           
+           AREA_C_IN  = AREA_C_IN  + CS_IN  * F2FY(J)*F2FZ(K)
+           AREA_C_OUT = AREA_C_OUT + CS_OUT * F2FY(J)*F2FZ(K)
+           
+           T_AVG_IN   = T_AVG_IN   + T(1,J,K)   * CS_IN  * F2FY(J)*F2FZ(K)
+           T_AVG_OUT  = T_AVG_OUT  + T(N1M,J,K) * CS_OUT * F2FY(J)*F2FZ(K)
+        ENDDO
+        ENDDO
+!$OMP END PARALLEL DO
+
+        T_AVG_IN  = T_AVG_IN / AREA_C_IN
+        T_AVG_OUT = T_AVG_OUT / AREA_C_OUT
+        DEL_T     = T_AVG_OUT - T_AVG_IN
+
 !$OMP PARALLEL DO
-      DO K=0,N3
-      DO J=0,N2
-         T(0 ,J,K)=T(N1M,J,K)
-         T(N1,J,K)=T(1  ,J,K)
-      ENDDO
-      ENDDO
+        DO K=0,N3
+        DO J=0,N2
+           T(0 ,J,K) = T(N1M,J,K) - DEL_T
+           T(N1,J,K) = T(1  ,J,K) + DEL_T
+        ENDDO
+        ENDDO
       ENDIF
 
-!     Y PERIODICITY
+! Y PERIODICITY
       IF (YPRDIC .EQ. 1) THEN
 !$OMP PARALLEL DO
       DO K=1,N3
@@ -643,7 +611,7 @@
       ENDDO
       ENDIF
 
-!     Z PERIODICITY
+! Z PERIODICITY
       IF (ZPRDIC .EQ. 1) THEN
 !$OMP PARALLEL DO
       DO J=0,N2
@@ -656,4 +624,80 @@
 
       RETURN
       END SUBROUTINE PRDIC_ADJ_T
+!=======================================================================
+!=======================================================================
+      SUBROUTINE WALLBC_T
+!=======================================================================
+      USE MOD_COMMON
+      USE MOD_FLOWARRAY, ONLY : T
+      IMPLICIT NONE
+      INTEGER*8    :: I,J,K
+      REAL*8       :: T_SOLID
+      REAL*8       :: FUNCBODY
+
+      IF (T_INF .EQ. 0) THEN
+        T_SOLID = -1.0D0
+      ELSE
+        T_SOLID = 1.0D0
+      ENDIF
+
+      IF (XPRDIC .EQ. 0) THEN
+!$OMP PARALLEL DO
+        DO K=0,N3
+        DO J=0,N2
+          ! Bottom X (I=0): Separate Solid vs Fluid Dirichlets unconditionally
+          IF (FUNCBODY(XMP(0), YMP(J), ZMP(K), TIME) .LE. 1.E-10) THEN
+             T(0,J,K) = T_SOLID   ! Solid Body
+          ELSE
+             T(0,J,K) = 0.0D0     ! Fluid
+          ENDIF
+          
+          ! Top X (I=N1): Convective Outlet is actively mapped by RETRV_T.
+        ENDDO
+        ENDDO
+!$OMP END PARALLEL DO
+      ENDIF
+
+      IF (YPRDIC .EQ. 0) THEN
+!$OMP PARALLEL DO
+        DO K=0,N3
+        DO I=0,N1
+          IF (BC_T_YBTM .EQ. 0) THEN
+            T(I,0,K) = VAL_T_YBTM
+          ELSE IF (BC_T_YBTM .EQ. 1) THEN
+            T(I,0,K) = T(I,1,K) - VAL_T_YBTM / C2CYI(1)
+          ENDIF
+
+          IF (BC_T_YTOP .EQ. 0) THEN
+            T(I,N2,K) = VAL_T_YTOP
+          ELSE IF (BC_T_YTOP .EQ. 1) THEN
+            T(I,N2,K) = T(I,N2M,K) + VAL_T_YTOP / C2CYI(N2)
+          ENDIF
+        ENDDO
+        ENDDO
+!$OMP END PARALLEL DO
+      ENDIF
+
+      IF (ZPRDIC .EQ. 0) THEN
+!$OMP PARALLEL DO
+        DO J=0,N2
+        DO I=0,N1
+          IF (BC_T_ZBTM .EQ. 0) THEN
+            T(I,J,0) = VAL_T_ZBTM
+          ELSE IF (BC_T_ZBTM .EQ. 1) THEN
+            T(I,J,0) = T(I,J,1) - VAL_T_ZBTM / C2CZI(1)
+          ENDIF
+
+          IF (BC_T_ZTOP .EQ. 0) THEN
+            T(I,J,N3) = VAL_T_ZTOP
+          ELSE IF (BC_T_ZTOP .EQ. 1) THEN
+            T(I,J,N3) = T(I,J,N3M) + VAL_T_ZTOP / C2CZI(N3)
+          ENDIF
+        ENDDO
+        ENDDO
+!$OMP END PARALLEL DO
+      ENDIF
+
+      RETURN
+      END SUBROUTINE WALLBC_T
 !=======================================================================

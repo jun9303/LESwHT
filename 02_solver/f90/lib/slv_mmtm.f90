@@ -798,30 +798,28 @@
       USE MOD_COMMON
       USE MOD_FLOWARRAY, ONLY : U,V,W
       IMPLICIT NONE
-      INTEGER*8     :: I,J,K
+      INTEGER*8   :: I,J,K
       REAL*8      :: QIN,QOUT,QRATIO
       REAL*8      :: UBAR,UCOEF,VWCOEF
+      REAL*8      :: FUNCBODY
 
       IF (ICH .NE. 1) THEN
 
 !-----CALCULATE INFLUX
       QIN=0.
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:QIN)
+!$OMP PARALLEL DO REDUCTION(+:QIN)
       DO K=1,N3M
         DO J=1,N2M
           QIN=U(1,J,K)*F2FY(J)*F2FZ(K)+QIN
         ENDDO
       ENDDO
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:QIN)
+!$OMP PARALLEL DO REDUCTION(+:QIN)
       DO K=1,N3M
         DO I=1,N1M
           QIN=(V(I,1,K)-V(I,N2,K))*F2FX(I)*F2FZ(K)+QIN
         ENDDO
       ENDDO
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:QIN)
+!$OMP PARALLEL DO REDUCTION(+:QIN)
       DO J=1,N2M
         DO I=1,N1M
          QIN=(W(I,J,1)-W(I,J,N3))*F2FX(I)*F2FY(J)+QIN
@@ -830,8 +828,7 @@
 
 !-----CALCULATE CONVECTIVE VELOCITY Uc
       UBAR = 0.
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:UBAR)
+!$OMP PARALLEL DO REDUCTION(+:UBAR)
       DO K=1,N3M
         DO J=1,N2M
           UBAR=U(N1,J,K)*F2FY(J)*F2FZ(K)+UBAR
@@ -842,13 +839,21 @@
       VWCOEF= UBAR*DTCONST*C2CXI(N1)
 
       QOUT = 0.
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:QOUT)
+!$OMP PARALLEL DO REDUCTION(+:QOUT)
       DO K=1,N3M
         DO J=1,N2M
-          UOUT(J,K)=U(N1,J,K)-UCOEF*(U(N1,J,K)-U(N1M,J,K))
-          VOUT(J,K)=V(N1,J,K)-VWCOEF*(V(N1,J,K)-V(N1M,J,K))
-          WOUT(J,K)=W(N1,J,K)-VWCOEF*(W(N1,J,K)-W(N1M,J,K))
+          IF (FUNCBODY(XMP(N1M),YMP(J),ZMP(K),TIME) .LE. 1.E-10 .AND. IMOVINGON .EQ. 0) THEN
+             ! Solid Phase: Zero-gradient (preserves solid velocity = 0)
+             UOUT(J,K) = U(N1M,J,K)
+             VOUT(J,K) = V(N1M,J,K)
+             WOUT(J,K) = W(N1M,J,K)
+          ELSE
+             ! Fluid Phase: Convective advection
+             UOUT(J,K)=U(N1,J,K)-UCOEF*(U(N1,J,K)-U(N1M,J,K))
+             VOUT(J,K)=V(N1,J,K)-VWCOEF*(V(N1,J,K)-V(N1M,J,K))
+             WOUT(J,K)=W(N1,J,K)-VWCOEF*(W(N1,J,K)-W(N1M,J,K))
+          ENDIF
+          
           QOUT=UOUT(J,K)*F2FY(J)*F2FZ(K)+QOUT
         ENDDO
       ENDDO
@@ -858,9 +863,12 @@
 !$OMP PARALLEL DO
       DO K=1,N3M
         DO J=1,N2M
-          UOUT(J,K)=UOUT(J,K)*QRATIO
-          VOUT(J,K)=VOUT(J,K)*QRATIO
-          WOUT(J,K)=WOUT(J,K)*QRATIO
+          ! Only scale the fluid phase by the mass flux error
+          IF (FUNCBODY(XMP(N1M),YMP(J),ZMP(K),TIME) .GT. 1.E-10) THEN
+             UOUT(J,K)=UOUT(J,K)*QRATIO
+             VOUT(J,K)=VOUT(J,K)*QRATIO
+             WOUT(J,K)=WOUT(J,K)*QRATIO
+          ENDIF
           DUOUT(J,K)=UOUT(J,K)-U(N1,J,K)
           DVOUT(J,K)=VOUT(J,K)-V(N1,J,K)
           DWOUT(J,K)=WOUT(J,K)-W(N1,J,K)

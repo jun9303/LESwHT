@@ -10,14 +10,17 @@ ON           OFF          OFF
 -----
 
 Explanation -
-LES-NUSGS  : Generate an array for SGS-eddy viscosity for LES. Set as NU_SGS(Inner body) == 0
+SGS-CALC   : Generate an array for SGS-eddy viscosity for LES. Set as NU_SGS(Inner body) == 0
              (If you want to execute DNS, you do not need to turn on this option.)
 i-PERIODIC : Adjust grid settings for periodic boundary condition in i-direction.
 IBM-INTERP : Compute geometric factors for refining no-slip points on the solid body
              (If you do not need to refine them, turn off this option.)
+HTRNASFR   : Extract points for the temp field on the immersed body, and calculate the necessary
+             interpolation geometric factors to enforce boundary constraints on the body surface
+CONJHTRANS : Activate calculation for heat capacity ratio (H.CAP_RAT; fluid over solid) and thermal 
+             conductivity ratio (COND._RATIO; solid over fluid) across the fluid-solid interfaces.
 
-BODY-RECOGNITION
+BODY-RECOGNITION :
  If you select 'DIRECT CODING(0)' option, body information coded in the 'lib_ibm_body_init' module will be recognized.
  If you select 'POINT EXTRACTION(1)' option, body information from a given STL file will be recognized.
-
  (Ver.180108 - Only 'DIRECT CODING(0)' option is available)

@@ -14,6 +14,8 @@ MODULE MOD_COMMON
       INTEGER*8              :: XPRDIC, YPRDIC, ZPRDIC, IINTP
       INTEGER*8              :: BC_XBTM, BC_XTOP, BC_YBTM, BC_YTOP,        &
                                 BC_ZBTM, BC_ZTOP
+      INTEGER*8              :: BC_T_YBTM, BC_T_YTOP, BC_T_ZBTM, BC_T_ZTOP
+      REAL*8                 :: VAL_T_YBTM, VAL_T_YTOP, VAL_T_ZBTM, VAL_T_ZTOP
       INTEGER*8              :: I_BGPX, J_BGPY, K_BGPZ
       REAL*8, DIMENSION(:,:), ALLOCATABLE  :: DUOUT,DVOUT,DWOUT,DTOUT
       REAL*8, DIMENSION(:,:), ALLOCATABLE  :: UOUT,VOUT,WOUT,TOUT

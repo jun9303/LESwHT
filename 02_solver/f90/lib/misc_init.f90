@@ -98,6 +98,14 @@
       READ(10,*) DUMMY
       READ(10,*) BC_ZBTM,BC_ZTOP
       READ(10,*) DUMMY
+      READ(10,*) BC_T_YBTM, BC_T_YTOP
+      READ(10,*) DUMMY
+      READ(10,*) VAL_T_YBTM, VAL_T_YTOP
+      READ(10,*) DUMMY
+      READ(10,*) BC_T_ZBTM, BC_T_ZTOP
+      READ(10,*) DUMMY
+      READ(10,*) VAL_T_ZBTM, VAL_T_ZTOP
+      READ(10,*) DUMMY
       READ(10,*) ICH,ICONJG
       CLOSE(10)
 
@@ -377,6 +385,7 @@
       INTEGER*8     :: I,J,K
       REAL*8        :: FUNCBODY
       REAL*8        :: FLOWAREA(N1), FL, FL_S, ADJ
+      REAL*8        :: T_SOLID
 
       IHIST = 0
       TIME = 0.
@@ -439,9 +448,11 @@
 
       IF (IHTRANS .EQ. 1) THEN
         IF (T_INF .EQ. 0) THEN
-          T = -1.
+          T_SOLID = -1.0D0
+          T = -1.0D0
         ELSE
-          T = 1.
+          T_SOLID = 1.0D0
+          T = 1.0D0
         ENDIF
 
 !$OMP PARALLEL DO
@@ -449,13 +460,69 @@
           DO J = 1,N2M
             DO K = 0,N3
               IF(FUNCBODY(XMP(I),YMP(J),ZMP(K),TIME).GE.1.E-10) THEN
-                T(I,J,K) = 0.
+                T(I,J,K) = 0.0D0  ! Fluid Domain
               ENDIF
             ENDDO
           ENDDO
         ENDDO
 !$OMP END PARALLEL DO
 
+        ! --- APPLY INITIAL THERMAL BOUNDARY CONDITIONS ---
+        IF (XPRDIC .EQ. 0) THEN
+!$OMP PARALLEL DO
+          DO K = 0,N3
+            DO J = 0,N2
+              ! Separate Solid vs Fluid Dirichlets geometrically
+              IF(FUNCBODY(XMP(0),YMP(J),ZMP(K),TIME).GE.1.E-10) THEN
+                T(0,J,K) = 0.0D0
+              ELSE
+                T(0,J,K) = T_SOLID
+              ENDIF
+            ENDDO
+          ENDDO
+!$OMP END PARALLEL DO
+        ENDIF
+
+        IF (YPRDIC .EQ. 0) THEN
+!$OMP PARALLEL DO
+          DO K = 0,N3
+            DO I = 0,N1
+              IF (BC_T_YBTM .EQ. 0) THEN
+                T(I,0,K) = VAL_T_YBTM
+              ELSE IF (BC_T_YBTM .EQ. 1) THEN
+                T(I,0,K) = T(I,1,K) - VAL_T_YBTM / C2CYI(1)
+              ENDIF
+
+              IF (BC_T_YTOP .EQ. 0) THEN
+                T(I,N2,K) = VAL_T_YTOP
+              ELSE IF (BC_T_YTOP .EQ. 1) THEN
+                T(I,N2,K) = T(I,N2M,K) + VAL_T_YTOP / C2CYI(N2)
+              ENDIF
+            ENDDO
+          ENDDO
+!$OMP END PARALLEL DO
+        ENDIF
+
+        IF (ZPRDIC .EQ. 0) THEN
+!$OMP PARALLEL DO
+          DO J = 0,N2
+            DO I = 0,N1
+              IF (BC_T_ZBTM .EQ. 0) THEN
+                T(I,J,0) = VAL_T_ZBTM
+              ELSE IF (BC_T_ZBTM .EQ. 1) THEN
+                T(I,J,0) = T(I,J,1) - VAL_T_ZBTM / C2CZI(1)
+              ENDIF
+
+              IF (BC_T_ZTOP .EQ. 0) THEN
+                T(I,J,N3) = VAL_T_ZTOP
+              ELSE IF (BC_T_ZTOP .EQ. 1) THEN
+                T(I,J,N3) = T(I,J,N3M) + VAL_T_ZTOP / C2CZI(N3)
+              ENDIF
+            ENDDO
+          ENDDO
+!$OMP END PARALLEL DO
+        ENDIF
+        ! -------------------------------------------------
       ENDIF
 
       RETURN

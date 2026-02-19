@@ -25,7 +25,7 @@ RE#    : Reynolds number
 PR#    : Prandtl number (* Only meaningful when IHTRANS: 1)
 GR#    : Grashof number (* Only meaningful when IHTRANS: 1)
 GRDIR  : Gravity direction (0; No gravity (eq. to GR# == 0), 1; -x, 2; -y, 3; -z)
-T_INF  : Determine whether the external flow is cool or hot (0; cool, 1; hot)
+T_INF  : Determine whether initially the solid is cooler or hotter (0; cool, 1; hot)
 
 IRESET : Reset the time (0; not reset, 1; reset)
 IREAD  : Read the previous field (0; make initial field, 1; read previous field)

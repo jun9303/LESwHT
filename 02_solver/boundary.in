@@ -1,25 +1,35 @@
-BC_YBTM  BC_YTOP (Ignored when YPRDIC: ON at pre-processing step)
-0        0
-BC_ZBTM  BC_ZTOP (Ignored when ZPRDIC: ON at pre-processing step)
-1        1
-ICH      ICONJG
-1        1
+BC_YBTM    BC_YTOP    (Ignored when YPRDIC: ON at pre-processing step)
+0          0
+BC_ZBTM    BC_ZTOP    (Ignored when ZPRDIC: ON at pre-processing step)
+1          1
+BC_T_YBTM  BC_T_YTOP  (Thermal Y BC: 0=Dirichlet, 1=Neumann. Ignored if YPRDIC: ON)
+0          0
+VAL_T_YBTM VAL_T_YTOP (Dirichlet: Temp, Neumann: dT/dn)
+1.0        -1.0
+BC_T_ZBTM  BC_T_ZTOP  (Thermal Z BC: 0=Dirichlet, 1=Neumann. Ignored if ZPRDIC: ON)
+1          1
+VAL_T_ZBTM VAL_T_ZTOP (Dirichlet: Temp, Neumann: dT/dn)
+0.0        0.0
+ICH        ICONJG
+1          1
 
-### Options
+### For Momentum BC_XBTM & BC_XTOP
+BC_XBTM & BC_XTOP (Momentum) will be automatically set to velocity_inlet (2) & convective outlet (3)
+unless they were set to periodic (4) boundary conditions at the pre-processing step.
 
-BC_XBTM & BC_XTOP will be automatically set to velocity_inlet & convective outlet b.c.
-unless they were set periodic boundary condition at pre-processing step.
+### For Thermal BC_T_XBTM & BC_T_XTOP:
+* If XPRDIC is OFF: The inlet (XBTM) is set to Dirichlet using the mapped T_INF (from settings.in)
+                    The outlet (XTOP) defaults to a convective outlet boundary.
+* If XPRDIC is ON: The solver tracks the mean bulk temperature rise/fall (delta_T = T_avg_out - T_avg_in)
+                   and applies it as an offset to the periodic ghost cells to balance the global heat flux.
 
---- For BC_YBTM ~ BC_ZTOP;
+### For Momentum BC_YBTM ~ BC_ZTOP;
 0    : Solid wall boundary condition      (zero velocity components)
 1    : Far field boundary condition       (u_normal = 0, d(u_tangential)/dx_i = 0) 
 
+### For Thermal BC_T_YBTM ~ BC_T_ZTOP;
+0    : Dirichlet (Constant Temperature). Use VAL_T to specify the target temperature.
+1    : Neumann (Constant Heat Flux). Use VAL_T to specify the temperature gradient (dT/dn).
+
 ICH   : Mean flow rate condition (0; Deactivate, 1; Activate)
 ICONJG: Conjugate heat transfer condition (0; Constant temp., 1; Conjugate heat transfer) 
-
-### Caution
-
-If periodic boundary condition(PRDIC) was already set at the ibm-preprocessing step, 
-this input will be IGNORED and the periodic b.c. will be imposed preferentially.
-
-Constant mass flow rate condition can be used for x-periodic channel flow problems.
