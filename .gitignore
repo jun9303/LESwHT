@@ -15,13 +15,6 @@
 
 # Simulation Output Directories & Files
 output/
-field/
-field_avg/
-ftr/
-grid/
-ibmpre/
-post/
-post_avg/
 *.dat
 *.plt
 fort.*

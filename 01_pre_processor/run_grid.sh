@@ -22,6 +22,6 @@ rm -rf ../output/grid/*
 
 # 4. Execution
 echo "Running Grid Generator..."
-python3 01_grid.py
+python3 grid.py
 
 echo "Done."

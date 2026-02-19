@@ -31,6 +31,6 @@ fi
 
 # 5. Execution
 echo "Running IBM Pre-processor..."
-python3 02_preprocessing.py
+python3 preprocessing.py
 
 echo "Done."

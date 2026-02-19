@@ -2,13 +2,15 @@
 #-*- coding:utf-8 -*-
 #
 # PRE-DETERMINATION OF IMMERSED BODIES 
+# CODED BY SANGJOON LEE 2026
+# IN-LAB USE ONLY. PLZ DO NOT DISTRIBUTE FOR COMMERCIAL USE.
 #
 import sys
 import numpy as np
 
 from lib import lib_setgrid, lib_preprocessing
 
-# Import the compiled Fortran extension (located in current dir)
+# Import the compiled Fortran extension (compiled by f2py)
 import lib_ibm_body
 
 # Read the input file
