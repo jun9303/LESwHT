@@ -2,7 +2,7 @@
 FC = ifort -r8 -i8 -O3 -qopenmp -mcmodel=medium -warn nounused
 LIB = 
 
-# Directory for FFTE (Adjust if the folder is named just 'ffte')
+# Directory for FFTE
 FFTE_DIR = ./f90/lib/poiss/ffte-7.0
 
 # FFTE Object List
@@ -15,6 +15,7 @@ FFTE_OBJS = $(FFTE_DIR)/zfft1d.o \
             $(FFTE_DIR)/factor.o
 
 # Solver Object List
+# For the Poisson solver, choose one among poiss_[mgrd, x_ft, z_ft, ftft].o depending on simulation setups
 OBJS =  mod_common.o \
         mod_flowarray.o \
         mod_poiss.o \
@@ -25,7 +26,7 @@ OBJS =  mod_common.o \
         slv_engy.o \
         slv_cont.o \
         slv_auxi.o \
-        poiss_x_ft.o \
+        poiss_z_ft.o \
         funcbody.o \
         ibm_body.o \
         ibm_forcing.o
@@ -108,7 +109,7 @@ ibm_forcing.o: ./f90/lib/ibm_forcing.f90 mod_common.o mod_flowarray.o
 #     Utilities
 #-----------------------------------------------------------------------
 clean:
-	rm -f *.o *.mod *.e core coredir.*
+	rm -f *.o *.mod *.e core coredir.* fort.*
 	rm -f solver_exec
 	rm -f $(FFTE_DIR)/*.o
 

@@ -32,6 +32,7 @@ fi
 
 # 5. Execution
 echo "Running Solver..."
+rm -f *.o *.mod *.e core coredir.* fort.*
 ./solver_exec
 
 echo "Solver finished."
