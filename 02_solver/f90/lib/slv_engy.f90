@@ -602,8 +602,8 @@ USE MOD_COMMON
            ! 1. Inlet gets the scaled outlet profile (Source of the developed shape)
            T(0 ,J,K) = T_WALL - (T_WALL - T(N1M,J,K)) * RATIO
            
-           ! 2. Outlet ghost cell uses Zero-Gradient (Sponge to flush noise)
-           T(N1,J,K) = T(N1M,J,K)
+           ! 2. Outlet ghost cell uses inversely scaled inlet profile to preserve derivatives
+           T(N1,J,K) = T_WALL - (T_WALL - T(1,J,K)) / RATIO
         ENDDO
         ENDDO
 !$OMP END PARALLEL DO

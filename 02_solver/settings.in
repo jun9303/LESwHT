@@ -1,13 +1,13 @@
 RE#     PR#     GR#     GRDIR   T_INF
-5500.   0.71    0.      2       1
+2800.   0.71    0.      2       1
 IRESET  IREAD   IAVG    IPZERO  EPS_PTR UBULK_I 
-1       0       1       0       0.      1.      
+1       0       1       0       0.5     1.      
 NTST    NPRINT  NPRIAVG NPIN
 10000   100     10000   1
 IDTOPT  DT_SIZE CFLFAC
 1       .005    1.0
 RESID1  NLEV    NBLI    IOLDV   MGITR   IMGSOR  WWSOR
-1.0E-5  3       3       0       500     170     1.8
+1.0E-5  5       3       0       500     170     1.8
 ILES    INSMDL  ITEMDL  IDVMON  CSGSTS  CSGSHF  FILTER
 1       1       0       1       0.035   0.035   3
 IBMON   MASSON  IMOVING IHTRANS

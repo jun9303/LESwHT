@@ -87,19 +87,21 @@
         STOP
       ELSE
         TMP = 0.
-        VOLUME = 0.
 !$OMP PARALLEL DO reduction(+:TMP,VOLUME)
         DO N=1,NBODY(1)
           TMP = TMP + FCV(N,1)*C2CX(IFC(N,1))*F2FY(JFC(N,1))&
                               *F2FZ(KFC(N,1))
-          VOLUME = VOLUME + C2CX(IFC(N,1))*F2FY(JFC(N,1))*F2FZ(KFC(N,1))
         ENDDO
 !$OMP END PARALLEL DO
         PMI(0) = PMI(0) + TMP
-        VOLUME = XL*YL*ZL - VOLUME
+        VOLUME = XL*YL*ZL
 
         DO I = 0,4
           PMI(I) = PMI(I) / VOLUME
+          ! Remove the fractional RK3 scaling so PMI evaluates to the true full-step force
+          IF (ALPHA .GT. 0.0D0) THEN
+             PMI(I) = PMI(I) / (2.0D0 * ALPHA)
+          ENDIF
         ENDDO
       ENDIF
 

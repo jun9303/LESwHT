@@ -47,10 +47,14 @@ PROGRAM SOLVER
         CALL PREFLD()                        ! AT MISC_INIT LIBRARY
     ELSE
         CALL MAKEFLD()                       ! AT MISC_INIT LIBRARY
+        IF (EPS_PTR .NE. 0.0d0) THEN
+            CALL ADDPERTURB() 
+            ! Synchronize ghost cells so the Poisson solver doesn't blow up
+            CALL PRDIC_ADJ_UVW(0) 
+        ENDIF
         CALL WRITEFIELD()
     ENDIF
 
-    IF (EPS_PTR .NE. 0.0d0) CALL ADDPERTURB() ! AT MISC_INIT LIBRARY
     IF (ICH .EQ. 1) CALL MEANPG()             ! AT SLV_MMTM LIBRARY
 
     ! --- MISCELLANEOUS SETTINGS ---
@@ -145,7 +149,7 @@ PROGRAM SOLVER
         ENDIF
 
         IF ((NTRACE .GT. 0) .AND. (MOD(M, NTR) .EQ. 0)) CALL TRACER()
-        ! IF (IBMON .EQ. 1) CALL DRAGLIFT()
+        IF (IBMON .EQ. 1) CALL DRAGLIFT()
         IF (IHTRANS .EQ. 1) CALL CALC_BOUNDARY_HEAT_FLUX()
 
         IF (MOD(NTIME, NPRINT) .EQ. 0) CALL WRITEFIELD()

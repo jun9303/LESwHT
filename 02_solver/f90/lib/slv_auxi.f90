@@ -192,6 +192,7 @@
       REAL*8                   :: CVOL
       INTEGER*8                :: I,J,K
 
+      THCAP = 0.
       CVOL = 0.
 
 !$OMP PARALLEL DO reduction(+:CVOL)
@@ -264,59 +265,6 @@
 
       IDUM = IHIST
       FLXCR = 0.
-
-! !$OMP PARALLEL DO
-!       DO K=1,N3M
-!       DO J=1,N2M
-!       CALL RANDOM_NUMBER(IDUM)
-!       U(1,J,K)=UBULK_I + UBULK_I*EPS_PTR*((IDUM * 2. ) - 1.)/50.
-!       FLXCR = FLXCR + (U(1,J,K)-UBULK_I)
-!       ENDDO
-!       ENDDO
-
-! !$OMP PARALLEL DO
-!       DO K=1,N3M
-!       DO J=1,N2M
-!       U(1,J,K) = U(1,J,K) - FLXCR / (N2M*N3M)
-!       ENDDO
-!       ENDDO
-
-!       FLXCR = 0.
-
-! !$OMP PARALLEL DO
-!       DO K=1,N3M
-!       DO J=2,N2M
-!       CALL RANDOM_NUMBER(IDUM)
-!       V(1,J,K)=0. + EPS_PTR*((IDUM * 2. ) - 1.)/50.
-!       FLXCR = FLXCR + (V(1,J,K)-0.)
-!       ENDDO
-!       ENDDO
-
-! !$OMP PARALLEL DO
-!       DO K=1,N3M
-!       DO J=2,N2M
-!       V(1,J,K) = V(1,J,K) - FLXCR / ((N2M-1)*N3M)
-!       ENDDO
-!       ENDDO
-
-!     FLXCR = 0.
-
-! !$OMP PARALLEL DO
-!       DO K=K_BGPZ,N3M
-!       DO J=1,N2M
-!       CALL RANDOM_NUMBER(IDUM)
-!       W(1,J,K)=0. + EPS_PTR*(IDUM*.3557 - .3557/2.)
-!       FLXCR = FLXCR + (W(1,J,K)-0.)
-!       ENDDO
-!       ENDDO
-
-! !$OMP PARALLEL DO
-!       DO K=K_BGPZ,N3M
-!       DO J=1,N2M
-!       W(1,J,K) = W(1,J,K) - FLXCR / (N2M * (N3M-K_BGPZ))
-!       ENDDO
-!       ENDDO
-
 
 !!!!!!     NEUMANN & DIRICHLET BOUNDARY CONDITION
       IF (JUT.EQ.1) THEN
@@ -524,7 +472,7 @@
        INTEGER*8     :: I,J,K
        REAL*8        :: FUNCBODY,HFLUX,TTEMP
 
-       IF (ICH .EQ. 1) THEN
+       IF ((ICH .EQ. 1) .AND. (XPRDIC .EQ. 0)) THEN
 !$OMP PARALLEL DO
          DO 31 K=1,N3M
          DO 31 J=1,N2M                       
@@ -532,20 +480,6 @@
             T(I,J,K)=T(I,J,K)-THCAP
    31    CONTINUE
        ENDIF
-
-!        HFLUX = 1.
-
-!        TTEMP = T(1,0,1)
-
-! !$OMP PARALLEL DO
-!          DO K=0,N3
-!          DO I=0,N1
-!            T(I,0,K)=T(I,1,K)+HFLUX*C2CY(1)
-!            T(I,N2,K)=T(I,N2M,K)+HFLUX*C2CY(N2)
-!          ENDDO
-!          ENDDO
-
-!          T = T - (T(1,0,1) - TTEMP)
 
       RETURN
       END
@@ -653,4 +587,86 @@
 
       RETURN
       END SUBROUTINE CALC_BOUNDARY_HEAT_FLUX
+!=======================================================================
+!=======================================================================
+      SUBROUTINE DRAGLIFT
+!=======================================================================
+!     Calculates the total x, y, z aerodynamic forces acting on the
+!     Immersed Boundary (IB) bodies.
+!
+!     Requires DUDTA, DVDTA, DWDTA to be pre-calculated by the 
+!     LAGFORCE subroutine during the RK3 substeps.
+!-----------------------------------------------------------------------
+      USE MOD_COMMON
+      USE MOD_FLOWARRAY
+      IMPLICIT NONE
+      INTEGER*8 :: I, J, K, N, L, II, JJ, KK
+      REAL*8    :: CD(3), VOL_SOLID_GEOM, VOL_CELL
+      REAL*8    :: DTI, FUNCBODY
+
+      DTI = 1.0D0 / DT
+
+      CD = 0.0D0
+      VOL_SOLID_GEOM = 0.0D0
+
+      ! 1. Calculate the EXACT geometric solid volume using FUNCBODY.
+      !    This perfectly isolates the fluid volume from the solid slabs 
+      !    so the global PMIAVG penalty can be neutralized.
+!$OMP PARALLEL DO reduction(+:VOL_SOLID_GEOM)
+      DO K = 1, N3M
+        DO J = 1, N2M
+          DO I = 1, N1M
+            IF (FUNCBODY(X(I), YMP(J), ZMP(K), TIME) .LT. 1.D-10) THEN
+               VOL_SOLID_GEOM = VOL_SOLID_GEOM + C2CX(I)*F2FY(J)*F2FZ(K)
+            ENDIF
+          ENDDO
+        ENDDO
+      ENDDO
+!$OMP END PARALLEL DO
+
+      ! 2. Integrate the raw IBM forcing (FCVAVG) over the active IBM nodes
+!$OMP PARALLEL DO private(N, L, II, JJ, KK, VOL_CELL) reduction(-:CD)
+      DO L = 1, 3
+        DO N = 1, NBODY(L)
+           II = IFC(N,L)
+           JJ = JFC(N,L)
+           KK = KFC(N,L)
+           
+           VOL_CELL = C2CX(II) * F2FY(JJ) * F2FZ(KK)
+
+           ! Raw IBM Force (Term 1 of Eq. 11)
+           CD(L) = CD(L) - FCVAVG(N,L) * VOL_CELL
+        ENDDO
+      ENDDO
+!$OMP END PARALLEL DO
+
+      ! 3. Add the material derivative (Term 2 of Eq. 11)
+      !    These are directly supplied by your existing LAGFORCE subroutine.
+      CD(1) = CD(1) + DUDTA
+      CD(2) = CD(2) + DVDTA
+      CD(3) = CD(3) + DWDTA
+
+      ! 4. Apply explicit mass-flux corrections (ICH) using the geometric solid volume
+      IF (ICH .EQ. 1) THEN
+         ! A. Remove artificial PMIAVG acceleration absorbed by the solid
+         CD(1) = CD(1) - PMIAVG * VOL_SOLID_GEOM
+
+         ! B. Remove artificial PHCAP acceleration absorbed by the solid
+         CD(1) = CD(1) + (PHCAP * DTI) * VOL_SOLID_GEOM
+      ENDIF
+
+      ! 5. Non-dimensionalize Total Force to evaluate Wall Shear Stress (tau_w)
+      !    Divide by the total wetted surface area: 2 walls * (L_x * L_z)
+      CD(1) = CD(1) / (2.0D0 * XL * ZL)
+      CD(2) = CD(2) / (2.0D0 * XL * ZL)
+      CD(3) = CD(3) / (2.0D0 * XL * ZL)
+
+      ! 6. Output to history file
+      IF (MOD(NTIME, NPIN) .EQ. 0) THEN
+         WRITE(2001, 110) TIME, CD(1), CD(2), CD(3)
+      ENDIF
+  110 FORMAT(F13.5, 3ES15.6)
+
+      RETURN
+      END SUBROUTINE DRAGLIFT
 !=======================================================================

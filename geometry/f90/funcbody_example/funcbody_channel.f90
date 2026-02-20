@@ -9,8 +9,8 @@ FUNCTION FUNCBODY(X, Y, Z, T) RESULT(VAL)
     ! VAL >  0 : Outside Body (Fluid)
     !-------------------------------------------------------------------
 
-    ! Example: A channel (-0.5 < Y < 0.5) of the slab thickness of 0.5
-    VAL = 0.5d0 - ABS(Y)
+    ! Example: A channel (-1. < Y < 1.)
+    VAL = 1.d0 - ABS(Y)
 
     RETURN
 END FUNCTION FUNCBODY

@@ -401,10 +401,15 @@
       WRITE(*,*) ''
 
 !$OMP PARALLEL DO
-      DO I = 1,N1
+      DO I = 0,N1    ! Start from 0 to cover the inlet ghost cell
         DO J = 0,N2
           DO K = 0,N3
-             U(I,J,K) = UBULK_I
+            ! Apply profile ONLY in the fluid domain
+            IF(FUNCBODY(X(I),YMP(J),ZMP(K),TIME).GE.1.E-10) THEN
+               U(I,J,K) = 1.5D0 * UBULK_I * (1.0D0 - YMP(J)**2)
+            ELSE
+               U(I,J,K) = 0.0D0
+            ENDIF
           ENDDO
         ENDDO
       ENDDO
@@ -724,7 +729,7 @@
       REAL*8        :: FLOWAREA, PERTB_RATE, ADJ, FLOWRATE
 
       CALL RANDOM_NUMBER(PTB_ARRAY)
-      PTB_ARRAY = (PTB_ARRAY - 1.) * 2. * EPS_PTR
+      PTB_ARRAY = (PTB_ARRAY - .5D0) * 2.D0 * EPS_PTR
       ! NOW PTB_ARRAY ~ UNIFORMDIST.(-EPS_PTR, +EPS_PTR)
 
       DO I = 2,N1M
@@ -819,7 +824,40 @@
           ENDDO
         ENDDO
 !$OMP END PARALLEL DO
-      ! WRITE(*,*)FLOWRATE
+      ENDDO
+
+! --- ENFORCE EXACT DISCRETE BULK VELOCITY ON EVERY X-PLANE ---
+      DO I = 0,N1
+        FLOWAREA = 0.0D0
+        FLOWRATE = 0.0D0
+        
+!$OMP PARALLEL DO reduction(+:FLOWAREA, FLOWRATE)
+        DO J = 1,N2M
+          DO K = 1,N3M
+              ! Compute the actual discrete cross-sectional area and flow rate
+              IF (FUNCBODY(X(I),YMP(J),ZMP(K),TIME).GT.1.E-10) THEN
+                FLOWAREA = FLOWAREA + F2FY(J) * F2FZ(K)
+                FLOWRATE = FLOWRATE + U(I,J,K) * F2FY(J) * F2FZ(K)
+              ENDIF
+          ENDDO
+        ENDDO
+!$OMP END PARALLEL DO
+
+        IF (FLOWAREA .GT. 0.0D0) THEN
+            ! Calculate the multiplicative scaling factor needed to hit UBULK_I
+            ADJ = (UBULK_I * FLOWAREA) / FLOWRATE
+            
+!$OMP PARALLEL DO
+            DO J = 0,N2
+              DO K = 0,N3
+                  ! Apply scaling only to the fluid phase
+                  IF (FUNCBODY(X(I),YMP(J),ZMP(K),TIME).GT.1.E-10) THEN
+                    U(I,J,K) = U(I,J,K) * ADJ
+                  ENDIF
+              ENDDO
+            ENDDO
+!$OMP END PARALLEL DO
+        ENDIF
       ENDDO
 
       WRITE(*,*) '--- ADDING ISOTROPIC PERTURBATION FROM THE UNIFORM DIST.'

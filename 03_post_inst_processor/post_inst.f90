@@ -1378,7 +1378,7 @@ END MODULE
         REAL*8     :: FUNCBODY
         INTEGER*8  :: IS  ! IS : Section variable
 
-        IF (ABS(YY) .GE. 0.5) THEN
+        IF (ABS(YY) .GE. 1.) THEN
           FUNCBODY = -1.
         ELSE
           FUNCBODY = 1.
