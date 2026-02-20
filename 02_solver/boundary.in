@@ -1,11 +1,11 @@
 BC_YBTM    BC_YTOP    (Ignored when YPRDIC: ON at pre-processing step)
 0          0
 BC_ZBTM    BC_ZTOP    (Ignored when ZPRDIC: ON at pre-processing step)
-1          1
+0          0
 BC_T_YBTM  BC_T_YTOP  (Thermal Y BC: 0=Dirichlet, 1=Neumann. Ignored if YPRDIC: ON)
 0          0
 VAL_T_YBTM VAL_T_YTOP (Dirichlet: Temp, Neumann: dT/dn)
-1.0        -1.0
+1.0        1.0
 BC_T_ZBTM  BC_T_ZTOP  (Thermal Z BC: 0=Dirichlet, 1=Neumann. Ignored if ZPRDIC: ON)
 1          1
 VAL_T_ZBTM VAL_T_ZTOP (Dirichlet: Temp, Neumann: dT/dn)

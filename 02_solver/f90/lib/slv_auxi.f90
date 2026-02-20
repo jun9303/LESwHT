@@ -606,3 +606,51 @@
       RETURN
       END SUBROUTINE LAGFORCE
 !=======================================================================
+!=======================================================================
+      SUBROUTINE CALC_BOUNDARY_HEAT_FLUX
+!=======================================================================
+      USE MOD_COMMON
+      USE MOD_FLOWARRAY, ONLY : T, KSTAR
+      IMPLICIT NONE
+      INTEGER*8 :: I, K
+      REAL*8    :: DTDY_BTM, DTDY_TOP
+      REAL*8    :: Q_BTM, Q_TOP, Q_TOTAL
+      REAL*8    :: AREA, K_SOLID_BTM, K_SOLID_TOP
+
+      Q_BTM = 0.D0
+      Q_TOP = 0.D0
+
+!$OMP PARALLEL DO private(DTDY_BTM, DTDY_TOP, AREA, K_SOLID_BTM, K_SOLID_TOP) reduction(+:Q_BTM, Q_TOP)
+      DO K=1,N3M
+      DO I=1,N1M
+         AREA = F2FX(I) * F2FZ(K)
+         
+         ! Extract the solid thermal conductivity at the boundaries
+         K_SOLID_BTM = KSTAR(I, 1, K, 4)   ! South face of J=1
+         K_SOLID_TOP = KSTAR(I, N2M, K, 3) ! North face of J=N2M
+
+         ! --- Bottom Wall (J=0 to J=1) ---
+         ! Gradient: dT/dy at the bottom wall
+         DTDY_BTM = (T(I,1,K) - T(I,0,K)) * C2CYI(1)
+         ! Heat flows UP (+y) into the domain. Fourier's Law: q = -k * dT/dy
+         Q_BTM = Q_BTM - (K_SOLID_BTM / (RE * PR)) * DTDY_BTM * AREA
+
+         ! --- Top Wall (J=N2M to J=N2) ---
+         ! Gradient: dT/dy at the top wall
+         DTDY_TOP = (T(I,N2,K) - T(I,N2M,K)) * C2CYI(N2)
+         ! Heat flows DOWN (-y) into the domain, so the sign is flipped.
+         Q_TOP = Q_TOP + (K_SOLID_TOP / (RE * PR)) * DTDY_TOP * AREA
+         
+      ENDDO
+      ENDDO
+!$OMP END PARALLEL DO
+
+      Q_TOTAL = Q_BTM + Q_TOP
+
+      ! Write to the fnusselt.dat tracker
+      WRITE(2002, 110) TIME, Q_BTM, Q_TOP, Q_TOTAL
+ 110  FORMAT(F12.5, 3ES15.6)
+
+      RETURN
+      END SUBROUTINE CALC_BOUNDARY_HEAT_FLUX
+!=======================================================================

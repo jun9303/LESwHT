@@ -3,17 +3,22 @@
 !=======================================================================
        USE MOD_COMMON
        IMPLICIT NONE
-
-       IF (ILES .EQ. 1) CALL RHSSGS_T    ! SubGrid-Scale computations (LES case)
+       
+       IF (ILES .EQ. 1) CALL RHSSGS_T    
        CALL RHS_T
-       IF ((IBMON .NE. 0) .AND. ICONJG .EQ. 0) CALL RHS_IBM_T  ! IB method computation
+       IF ((IBMON .NE. 0) .AND. ICONJG .EQ. 0) CALL RHS_IBM_T 
 
-       CALL CONVBC_T                     
-       IF (ICH .NE. 1) CALL RHSINCORPBC_T
+       ! BYPASS CONVECTIVE OUTLET FOR SCALING METHOD
+       IF (XPRDIC .EQ. 0) THEN
+          CALL CONVBC_T                     
+          IF (ICH .NE. 1) CALL RHSINCORPBC_T
+       ENDIF
 
        CALL LHS_T
 
-       CALL RETRV_T
+       ! BYPASS CONVECTIVE RETRIEVAL FOR SCALING METHOD
+       IF (XPRDIC .EQ. 0) CALL RETRV_T
+       
        CALL PRDIC_ADJ_T
        CALL WALLBC_T
 
@@ -67,6 +72,12 @@ USE MOD_COMMON
        JMINUS=JMV(J)
        IPLUS=IPV(I)
        IMINUS=IMV(I)
+      
+       ! DECOUPLE PERIODIC WRAP-AROUND FOR TEMPERATURE SCALING
+       IF (XPRDIC .EQ. 1) THEN
+         IF (I .EQ. N1M) IPLUS = N1
+         IF (I .EQ. 1)   IMINUS = 0
+       ENDIF
 
        TE=0.5*(F2FX(I)*T(IPLUS,J,K)+F2FX(IPLUS)*T(I,J,K))*C2CXI(IPLUS) &
           *(1.-FIXIU(I))+T(IPLUS,J,K)*FIXIU(I)
@@ -123,13 +134,13 @@ USE MOD_COMMON
       IF (ILES.EQ.1) THEN
        TALTX=F2FXI(I)*                                           &
              (ALSGS1(IPLUS,J,K,1)*C2CXI(IPLUS)*(T(IPLUS,J,K)-T(I,J,K)) &
-             -ALSGS1(I,J,K,1)*C2CXI(I)*(T(I,J,K)-T(I-1,J,K))) 
+             -ALSGS1(I,J,K,1)*C2CXI(I)*(T(I,J,K)-T(IMINUS,J,K))) 
        TALTY=F2FYI(J)*                                           &
              (ALSGS1(I,JPLUS,K,2)*C2CYI(JPLUS)*(T(I,JPLUS,K)-T(I,J,K)) &
-             -ALSGS1(I,J,K,2)*C2CYI(J)*(T(I,J,K)-T(I,J-1,K)))
+             -ALSGS1(I,J,K,2)*C2CYI(J)*(T(I,J,K)-T(I,JMINUS,K)))
        TALTZ=F2FZI(K)*                                           &
              (ALSGS1(I,J,KPLUS,3)*C2CZI(KPLUS)*(T(I,J,KPLUS)-T(I,J,K)) &
-             -ALSGS1(I,J,K,3)*C2CZI(K)*(T(I,J,K)-T(I,J,K-1)))
+             -ALSGS1(I,J,K,3)*C2CZI(K)*(T(I,J,K)-T(I,J,KMINUS)))
        ALT=ALT+FLOAT(ILES)*(TALTX+TALTY+TALTZ)
        RK3T=RK3T+FLOAT(ILES)*RHS1(I,J,K,4)
       ENDIF
@@ -506,12 +517,8 @@ USE MOD_COMMON
       GI(J,I)=ACOEFI*PR*GJ(I,J)
    51 CONTINUE
 
-      IF (XPRDIC .EQ. 0) THEN
-         CALL TRDIAG1(AI,BI,CI,GI,GI,1,N1M,1,N2M)
-      ELSE IF (XPRDIC .EQ. 1) THEN
-         CALL TRDIAG1P(AI,BI,CI,GI,1,N1M,1,N2M)
-      ENDIF
-
+      CALL TRDIAG1(AI,BI,CI,GI,GI,1,N1M,1,N2M)
+     
       DO 61 J=1,N2M
       DO 61 I=1,N1M
         T(I,J,K)=GI(J,I)+T(I,J,K)
@@ -554,50 +561,53 @@ USE MOD_COMMON
       SUBROUTINE PRDIC_ADJ_T
 !=======================================================================
       USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : T, CSTAR
+      USE MOD_FLOWARRAY, ONLY : U, T
       IMPLICIT NONE
       INTEGER*8    :: I,J,K
-      REAL*8       :: T_AVG_IN, T_AVG_OUT, AREA_C_IN, AREA_C_OUT, DEL_T
-      REAL*8       :: CS_IN, CS_OUT
+      REAL*8       :: T_B_OUT, M_DOT
+      REAL*8       :: T_WALL, T_B_IN, RATIO
+      REAL*8       :: FUNCBODY
 
-! X PERIODICITY WITH CSTAR-WEIGHTED THERMAL GRADIENT CORRECTION
+! X PERIODICITY WITH DIRICHLET SCALING (RECYCLING METHOD)
       IF (XPRDIC .EQ. 1) THEN
-        T_AVG_IN   = 0.D0
-        T_AVG_OUT  = 0.D0
-        AREA_C_IN  = 0.D0
-        AREA_C_OUT = 0.D0
+        
+        IF (T_INF .EQ. 0) THEN
+           T_WALL = -1.0D0
+        ELSE
+           T_WALL = 1.0D0
+        ENDIF
+        T_B_IN = 0.0D0   
 
-!$OMP PARALLEL DO private(CS_IN, CS_OUT) reduction(+:T_AVG_IN, T_AVG_OUT, AREA_C_IN, AREA_C_OUT)
+        T_B_OUT = 0.0D0
+        M_DOT   = 0.0D0
+
+!$OMP PARALLEL DO reduction(+:T_B_OUT, M_DOT)
         DO K=1,N3M
         DO J=1,N2M
-           IF (ICONJG .EQ. 1) THEN
-              CS_IN  = CSTAR(1,J,K)
-              CS_OUT = CSTAR(N1M,J,K)
-           ELSE
-              CS_IN  = 1.0D0
-              CS_OUT = 1.0D0
+           ! Check geometry at Outlet (N1M)
+           IF (FUNCBODY(XMP(N1M),YMP(J),ZMP(K),TIME) .GE. 1.E-10) THEN
+              M_DOT   = M_DOT   + U(N1M,J,K) * F2FY(J) * F2FZ(K)
+              T_B_OUT = T_B_OUT + T(N1M,J,K) * U(N1M,J,K) * F2FY(J) * F2FZ(K)
            ENDIF
-           
-           AREA_C_IN  = AREA_C_IN  + CS_IN  * F2FY(J)*F2FZ(K)
-           AREA_C_OUT = AREA_C_OUT + CS_OUT * F2FY(J)*F2FZ(K)
-           
-           T_AVG_IN   = T_AVG_IN   + T(1,J,K)   * CS_IN  * F2FY(J)*F2FZ(K)
-           T_AVG_OUT  = T_AVG_OUT  + T(N1M,J,K) * CS_OUT * F2FY(J)*F2FZ(K)
         ENDDO
         ENDDO
 !$OMP END PARALLEL DO
 
-        T_AVG_IN  = T_AVG_IN / AREA_C_IN
-        T_AVG_OUT = T_AVG_OUT / AREA_C_OUT
-        DEL_T     = T_AVG_OUT - T_AVG_IN
+        T_B_OUT = T_B_OUT / M_DOT
+        RATIO = (T_WALL - T_B_IN) / (T_WALL - T_B_OUT)
 
 !$OMP PARALLEL DO
         DO K=0,N3
         DO J=0,N2
-           T(0 ,J,K) = T(N1M,J,K) - DEL_T
-           T(N1,J,K) = T(1  ,J,K) + DEL_T
+           ! 1. Inlet gets the scaled outlet profile (Source of the developed shape)
+           T(0 ,J,K) = T_WALL - (T_WALL - T(N1M,J,K)) * RATIO
+           
+           ! 2. Outlet ghost cell uses Zero-Gradient (Sponge to flush noise)
+           T(N1,J,K) = T(N1M,J,K)
         ENDDO
         ENDDO
+!$OMP END PARALLEL DO
+
       ENDIF
 
 ! Y PERIODICITY
