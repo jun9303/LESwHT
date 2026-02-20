@@ -98,10 +98,6 @@
 
         DO I = 0,4
           PMI(I) = PMI(I) / VOLUME
-          ! Remove the fractional RK3 scaling so PMI evaluates to the true full-step force
-          IF (ALPHA .GT. 0.0D0) THEN
-             PMI(I) = PMI(I) / (2.0D0 * ALPHA)
-          ENDIF
         ENDDO
       ENDIF
 

@@ -94,10 +94,10 @@
       ALPHA    = 0.5*(GAMMA(SUBSTEP)+RO(SUBSTEP))
       DTCONST  = DT *(GAMMA(SUBSTEP)+RO(SUBSTEP))
       DTCONSTI = 1./DTCONST
-      TEST1    = RESID1*DTCONSTI              ! POISS. CONVG. CRITERION
+      TEST1    = RESID1*DTCONSTI               ! POISS. CONVG. CRITERION
       ACOEF    = ALPHA*DT/RE
       ACOEFI   = 1./ACOEF
-      PMIAVG   = PMIAVG + 2.*ALPHA*PMI(0)
+      PMIAVG   = PMIAVG + PMI(0) !*2.*ALPHA
       SUBDT    = SUBDT + DTCONST               ! SUBTIME FOR RK3 METHOD
       MSUB     = SUBSTEP
 
@@ -178,7 +178,8 @@
       ENDDO
 !$OMP END PARALLEL DO
 
-      PHCAP = (QVOL(2) - QVOL(1)) / FLOWVOL
+      ! PHCAP = (QVOL(2) - QVOL(1)) / FLOWVOL
+      PHCAP = (QVOL(2) - UBULK_I*FLOWVOL) / FLOWVOL
 
       RETURN
       END SUBROUTINE QVOLCORR
@@ -642,24 +643,16 @@
 
       ! 3. Add the material derivative (Term 2 of Eq. 11)
       !    These are directly supplied by your existing LAGFORCE subroutine.
+      !    For stationary bodies, DUDT are effectively zero, so this might have a negligible contribution.
       CD(1) = CD(1) + DUDTA
       CD(2) = CD(2) + DVDTA
       CD(3) = CD(3) + DWDTA
 
-      ! 4. Apply explicit mass-flux corrections (ICH) using the geometric solid volume
-      IF (ICH .EQ. 1) THEN
-         ! A. Remove artificial PMIAVG acceleration absorbed by the solid
-         CD(1) = CD(1) - PMIAVG * VOL_SOLID_GEOM
-
-         ! B. Remove artificial PHCAP acceleration absorbed by the solid
-         CD(1) = CD(1) + (PHCAP * DTI) * VOL_SOLID_GEOM
-      ENDIF
-
-      ! 5. Non-dimensionalize Total Force to evaluate Wall Shear Stress (tau_w)
+      ! 4. Non-dimensionalize Total Force to evaluate Wall Shear Stress (tau_w)
       !    Divide by the total wetted surface area: 2 walls * (L_x * L_z)
-      CD(1) = CD(1) / (2.0D0 * XL * ZL)
-      CD(2) = CD(2) / (2.0D0 * XL * ZL)
-      CD(3) = CD(3) / (2.0D0 * XL * ZL)
+      CD(1) = CD(1) / (XL * ZL * 2.D0)
+      CD(2) = CD(2) / (XL * ZL * 2.D0)
+      CD(3) = CD(3) / (XL * ZL * 2.D0)
 
       ! 6. Output to history file
       IF (MOD(NTIME, NPIN) .EQ. 0) THEN
