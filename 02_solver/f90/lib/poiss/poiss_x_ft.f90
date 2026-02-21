@@ -2,240 +2,240 @@
 !
 !     MAIN SOLVER OF POISSON EQUATION
 !
-!     AX=b
-!     A: coefficient of discretized poisson equation
-!     X: PHI: Pseudo pressure, Output of subroutine POISSON
-!     b: DIVGSUM: OUTPUT of subroutine DIVGS.
+!     AX=B
+!     A: COEFFICIENT OF DISCRETIZED POISSON EQUATION
+!     X: PHI: PSEUDO PRESSURE, OUTPUT OF SUBROUTINE POISSON
+!     B: DIVGSUM: OUTPUT OF SUBROUTINE DIVGS.
 !
-!     x-direction: Fourier transform
-!     y-direction: TDMA
-!     z-direction: MULTI-GRID iteration/GSOR method
+!     X-DIRECTION: FOURIER TRANSFORM
+!     Y-DIRECTION: TDMA
+!     Z-DIRECTION: MULTI-GRID ITERATION/GSOR METHOD
 !
-!     Jun. 2017, J. Park   
-!     Feb. 2026, S. Lee (Several bug fixes)
+!     JUN. 2017, J. PARK
+!     FEB. 2026, S. LEE (SEVERAL BUG FIXES)
 !
 !=======================================================================
-      SUBROUTINE POISINIT
+      subroutine poisinit
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)   :: I, J, K, ILEV
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k, ilev
 
-       CALL X_FT_ALLO
+        call x_ft_allo
 
-       ALLOCATE(AC(N3MD, N2M, N1MH))
-       ALLOCATE(GAM(N3MD, N2M, N1MH))
-       ALLOCATE(BET(N3MD, N2M, N1MH))
- 
-       CALL PMAT
+        allocate (ac(n3md, n2m, n1mh))
+        allocate (gam(n3md, n2m, n1mh))
+        allocate (bet(n3md, n2m, n1mh))
+
+        call pmat
 !------MULTIGRID METHOD
-       CALL COEFMG
+        call coefmg
 
-       DO ILEV = 0, NLEV
-           DO I = 1, N1MH
-               DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                   BET(K, 1, I) = 1.0_8 / AC(K, 1, I)
-               END DO
-               DO J = 2, N2M
-                   DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                       GAM(K, J, I) = AN(J - 1) * BET(K, J - 1, I)
-                       BET(K, J, I) = 1.0_8 / (AC(K, J, I) - AS(J) * GAM(K, J, I))
-                   END DO
-               END DO
-           END DO
-       END DO
+        do ilev = 0, nlev
+          do i = 1, n1mh
+            do k = kkmg(ilev, 1), kkmg(ilev, 2)
+              bet(k, 1, i) = 1.0_8 / ac(k, 1, i)
+            end do
+            do j = 2, n2m
+              do k = kkmg(ilev, 1), kkmg(ilev, 2)
+                gam(k, j, i) = an(j - 1) * bet(k, j - 1, i)
+                bet(k, j, i) = 1.0_8 / (ac(k, j, i) - as(j) * gam(k, j, i))
+              end do
+            end do
+          end do
+        end do
 
-      OPEN(77, FILE='../output/ftr/mgftresiduemax.dat')
+        open (77, file='../output/ftr/mgftresiduemax.dat')
 
-      RETURN
-      END SUBROUTINE POISINIT
+        return
+      end subroutine poisinit
 !=======================================================================
-      SUBROUTINE PMAT
+      subroutine pmat
 !=======================================================================
 ! --- CONSTRUCT MATRIX FOR POISSON EQ. ---------------------------------
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I, J, K, JP, KP
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k, jp, kp
 
 !-----FOR TOP LEVEL
-      DO K = 1, N3M
-          KP = KPV(K)
-          AB(K) = (1.0_8 - FIXKL(K)) * C2CZI(K) * F2FZI(K)
-          AF(K) = (1.0_8 - FIXKU(K)) * C2CZI(KP) * F2FZI(K)
-      END DO
+        do k = 1, n3m
+          kp = kpv(k)
+          ab(k) = (1.0_8 - fixkl(k)) * c2czi(k) * f2fzi(k)
+          af(k) = (1.0_8 - fixku(k)) * c2czi(kp) * f2fzi(k)
+        end do
 
-      DO J = 1, N2M
-          JP = JPV(J)
-          AS(J) = (1.0_8 - FIXJL(J)) * C2CYI(J) * F2FYI(J)
-          AN(J) = (1.0_8 - FIXJU(J)) * C2CYI(JP) * F2FYI(J)
-      END DO
+        do j = 1, n2m
+          jp = jpv(j)
+          as(j) = (1.0_8 - fixjl(j)) * c2cyi(j) * f2fyi(j)
+          an(j) = (1.0_8 - fixju(j)) * c2cyi(jp) * f2fyi(j)
+        end do
 
-      DO J = 1, N2M
-          DO K = 1, N3M
-              AC(K, J, 1) = -1.0_8 * (AB(K) + AF(K) + AS(J) + AN(J))
-          END DO
-      END DO
+        do j = 1, n2m
+          do k = 1, n3m
+            ac(k, j, 1) = -1.0_8 * (ab(k) + af(k) + as(j) + an(j))
+          end do
+        end do
 
-      N1MH = N1M / 2 + 1
+        n1mh = n1m / 2 + 1
 
-      CALL MWAVENUMBER     ! INIT. MODIFIED WAVE #.
+        call mwavenumber     ! INIT. MODIFIED WAVE #.
 
-      DO I = 2, N1MH
-          DO J = 1, N2M
-              DO K = 1, N3M
-                  AC(K, J, I) = AC(K, J, 1) - AI3(I)
-              END DO
-          END DO
-      END DO
+        do i = 2, n1mh
+          do j = 1, n2m
+            do k = 1, n3m
+              ac(k, j, i) = ac(k, j, 1) - ai3(i)
+            end do
+          end do
+        end do
 
-      RETURN
-      END SUBROUTINE PMAT
+        return
+      end subroutine pmat
 !=======================================================================
-      SUBROUTINE MWAVENUMBER
+      subroutine mwavenumber
 !=======================================================================
 ! --- MODIFIED WAVE NUMBER DEFINITION
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I
-       REAL(8)     :: PI
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i
+        real(8) :: pi
 
-       PI = ACOS(-1.0_8)
+        pi = acos(-1.0_8)
 
-      DO I = 1, N1MH
-          AI3(I) = 2.0_8 * (1.0_8 - COS(2.0_8 * PI * FLOAT(I - 1) / FLOAT(N1M))) * F2FXI(1) * F2FXI(1)
-      END DO
+        do i = 1, n1mh
+          ai3(i) = 2.0_8 * (1.0_8 - cos(2.0_8 * pi * float(i - 1) / float(n1m))) * f2fxi(1) * f2fxi(1)
+        end do
 
-      RETURN
-      END SUBROUTINE MWAVENUMBER
+        return
+      end subroutine mwavenumber
 
 !=======================================================================
-      SUBROUTINE POISSON(PHI, DIVGSUM)
+      subroutine poisson(phi, divgsum)
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I, J, K, III
-       REAL(8)     :: PHI(0:N1,0:N2,0:N3), DIVGSUM(0:N1,0:N2,0:N3)
-       COMPLEX(8)  :: CCAP(N3,N2,N1MH)
-       COMPLEX(8), DIMENSION(:,:), ALLOCATABLE :: XXX, CP
-       COMPLEX(8), DIMENSION(:),   ALLOCATABLE :: XXXX, XXXX_B
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k, iii
+        real(8) :: phi(0:n1, 0:n2, 0:n3), divgsum(0:n1, 0:n2, 0:n3)
+        complex(8) :: ccap(n3, n2, n1mh)
+        complex(8), dimension(:, :), allocatable :: xxx, cp
+        complex(8), dimension(:), allocatable :: xxxx, xxxx_b
 
-       REAL(8)     :: TEST, PHIREF
+        real(8) :: test, phiref
 
 ! --- DO THE FORWARD FFT
-!$OMP PARALLEL private(XXX, XXXX, XXXX_B)
-      ALLOCATE(XXX(N1M, N3M))
-      ALLOCATE(XXXX(N1M), XXXX_B(N1M*2))
-      CALL ZFFT1D(XXXX, N1M, 0, XXXX_B)
+!$OMP PARALLEL PRIVATE(XXX, XXXX, XXXX_B)
+        allocate (xxx(n1m, n3m))
+        allocate (xxxx(n1m), xxxx_b(n1m * 2))
+        call zfft1d(xxxx, n1m, 0, xxxx_b)
 !$OMP DO
-      DO J = 1, N2M
+        do j = 1, n2m
 
-          DO I = 1, N1M
-              DO K = 1, N3M
-                  XXX(I, K) = DIVGSUM(I, J, K)
-              END DO
-          END DO
+          do i = 1, n1m
+            do k = 1, n3m
+              xxx(i, k) = divgsum(i, j, k)
+            end do
+          end do
 
-          DO K = 1, N3M
-              CALL ZFFT1D(XXX(1, K), N1M, -1, XXXX_B)
-          END DO
+          do k = 1, n3m
+            call zfft1d(xxx(1, k), n1m, -1, xxxx_b)
+          end do
 
-          DO I = 1, N1MH
-              DO K = 1, N3M
-                  CCAP(K, J, I) = XXX(I, K)
-              END DO
-          END DO
+          do i = 1, n1mh
+            do k = 1, n3m
+              ccap(k, j, i) = xxx(i, k)
+            end do
+          end do
 
-      END DO
+        end do
 !$OMP END DO
-      DEALLOCATE(XXX, XXXX, XXXX_B)
+        deallocate (xxx, xxxx, xxxx_b)
 !$OMP END PARALLEL
 
 ! --- SOLVE A SET OF POISSON EQS.
-       TEST = TEST1 / FLOAT(N1MH) * FLOAT(N1M) * 0.9_8
+        test = test1 / float(n1mh) * float(n1m) * 0.9_8
 
-!$OMP PARALLEL private(CP)
-      ALLOCATE(CP(0:N3, 0:N2))
+!$OMP PARALLEL PRIVATE(CP)
+        allocate (cp(0:n3, 0:n2))
 !$OMP DO
-      DO III = 1, N1MH
-          CP = 0.0_8
+        do iii = 1, n1mh
+          cp = 0.0_8
 
-          IF (III <= IMGSOR) THEN
-              CALL MG2D(CP, CCAP(1, 1, III), III, TEST, 0.0_8)
-          ELSE
-              CALL GSOR2D(CP, CCAP(1, 1, III), III, TEST, 0.0_8)
-          END IF
-        
-          DO J = 1, N2M
-              DO K = 1, N3M
-                  CCAP(K, J, III) = CP(K, J)
-              END DO
-          END DO
-      END DO
+          if (iii <= imgsor) then
+            call mg2d(cp, ccap(1, 1, iii), iii, test, 0.0_8)
+          else
+            call gsor2d(cp, ccap(1, 1, iii), iii, test, 0.0_8)
+          end if
+
+          do j = 1, n2m
+            do k = 1, n3m
+              ccap(k, j, iii) = cp(k, j)
+            end do
+          end do
+        end do
 !$OMP END DO
-      DEALLOCATE(CP)
+        deallocate (cp)
 !$OMP END PARALLEL
- 
+
 ! --- DO THE INVERSE FFT
-!$OMP PARALLEL private(XXX, XXXX, XXXX_B)
-      ALLOCATE(XXX(N1M, N3M))
-      ALLOCATE(XXXX(N1M), XXXX_B(N1M*2))
-      CALL ZFFT1D(XXXX, N1M, 0, XXXX_B)
+!$OMP PARALLEL PRIVATE(XXX, XXXX, XXXX_B)
+        allocate (xxx(n1m, n3m))
+        allocate (xxxx(n1m), xxxx_b(n1m * 2))
+        call zfft1d(xxxx, n1m, 0, xxxx_b)
 !$OMP DO
-      DO J = 1, N2M
-          DO I = 1, N1MH
-              DO K = 1, N3M
-                  XXX(I, K) = CCAP(K, J, I)
-              END DO
-          END DO
-        
-          DO I = N1MH + 1, N1M
-              DO K = 1, N3M  
-                  XXX(I, K) = CONJG(CCAP(K, J, N1M + 2 - I))
-              END DO
-          END DO
-        
-          DO K = 1, N3M
-              CALL ZFFT1D(XXX(1, K), N1M, 1, XXXX_B)
-          END DO
+        do j = 1, n2m
+          do i = 1, n1mh
+            do k = 1, n3m
+              xxx(i, k) = ccap(k, j, i)
+            end do
+          end do
 
-          DO I = 1, N1M        
-              DO K = 1, N3M
-                  PHI(I, J, K) = REAL(XXX(I, K), 8)
-              END DO
-          END DO
-      END DO
+          do i = n1mh + 1, n1m
+            do k = 1, n3m
+              xxx(i, k) = conjg(ccap(k, j, n1m + 2 - i))
+            end do
+          end do
+
+          do k = 1, n3m
+            call zfft1d(xxx(1, k), n1m, 1, xxxx_b)
+          end do
+
+          do i = 1, n1m
+            do k = 1, n3m
+              phi(i, j, k) = real(xxx(i, k), 8)
+            end do
+          end do
+        end do
 !$OMP END DO
-      DEALLOCATE(XXX, XXXX, XXXX_B)
+        deallocate (xxx, xxxx, xxxx_b)
 !$OMP END PARALLEL
 
-      IF (ICH == 1) THEN
+        if (ich == 1) then
 !     SET THE AVERAGE PHI AT THE UPPER WALL TO BE ZERO.
-          PHIREF = 0.0_8
-!$OMP PARALLEL DO reduction(+:PHIREF)
-          DO I = 1, N1M
-              PHIREF = PHIREF + PHI(I, N2M, 1) * F2FX(I)
-          END DO
-          PHIREF = PHIREF / XL
+          phiref = 0.0_8
+!$OMP PARALLEL DO REDUCTION(+:PHIREF)
+          do i = 1, n1m
+            phiref = phiref + phi(i, n2m, 1) * f2fx(i)
+          end do
+          phiref = phiref / xl
 
 !$OMP PARALLEL DO
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      PHI(I, J, K) = PHI(I, J, K) - PHIREF
-                  END DO
-              END DO
-          END DO
-      END IF
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                phi(i, j, k) = phi(i, j, k) - phiref
+              end do
+            end do
+          end do
+        end if
 
-      RETURN
-      END SUBROUTINE POISSON
+        return
+      end subroutine poisson
 
 !=======================================================================
-       SUBROUTINE MG2D(PC, RHS, IV, TEST, OLDV)
+      subroutine mg2d(pc, rhs, iv, test, oldv)
 !=======================================================================
 !     IV      : WAVE NUMBER INDEX
 !     MULTIGRID ENVIRONMENT VARIABLES
@@ -249,550 +249,546 @@
 !     IIMG(ILEV,2)  : END POINT OF INDEX AT ILEV LEVEL
 !     IIMG(ILEV,3)  : NUMBER OF ROW AT ILEV LEVEL
 !-----------------------------------------------------------------------
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: K, J, IV, II, ILEV
-       REAL(8)     :: TEST, SUMRES, OLDV
-       COMPLEX(8)  :: PC(0:N3,0:N2), RHS(N3,N2)
-       COMPLEX(8)  :: RESD(N3MD,N2M), GGII(0:N3MD,0:N2)
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: k, j, iv, ii, ilev
+        real(8) :: test, sumres, oldv
+        complex(8) :: pc(0:n3, 0:n2), rhs(n3, n2)
+        complex(8) :: resd(n3md, n2m), ggii(0:n3md, 0:n2)
 
-       II = 0
-       RESD = 0.0_8
-       GGII = 0.0_8
+        ii = 0
+        resd = 0.0_8
+        ggii = 0.0_8
 
-       CALL TOPLEVEL(0_8, PC, RHS, SUMRES, OLDV, TEST, IV, RESD, GGII)
-       IF (SUMRES < TEST) GOTO 2000
+        call toplevel(0_8, pc, rhs, sumres, oldv, test, iv, resd, ggii)
+        if (sumres < test) goto 2000
 
-       DO II = 1, MGITR            ! main iteration
-           DO ILEV = NLEV - 1, 1, -1
-               CALL RELAX(ILEV, 0.0_8, 1_8, IV, RESD, GGII)
-               CALL GODOWN(ILEV, IV, RESD, GGII)
-           END DO
+        do ii = 1, mgitr            ! MAIN ITERATION
+          do ilev = nlev - 1, 1, -1
+            call relax(ilev, 0.0_8, 1_8, iv, resd, ggii)
+            call godown(ilev, iv, resd, ggii)
+          end do
 
-           CALL RELAX(0_8, 0.0_8, NBLI, IV, RESD, GGII)
+          call relax(0_8, 0.0_8, nbli, iv, resd, ggii)
 
-           DO ILEV = 0, NLEV - 2
-               CALL GOUP(ILEV, RESD, GGII)
-               CALL RELAX(ILEV + 1, 1.0_8, 1_8, IV, RESD, GGII)
-           END DO
+          do ilev = 0, nlev - 2
+            call goup(ilev, resd, ggii)
+            call relax(ilev + 1, 1.0_8, 1_8, iv, resd, ggii)
+          end do
 
-           CALL TOPLEVEL(1_8, PC, RHS, SUMRES, 1.0_8, TEST, IV, RESD, GGII)
+          call toplevel(1_8, pc, rhs, sumres, 1.0_8, test, iv, resd, ggii)
 
-           IF (SUMRES < TEST) GOTO 2000
-       END DO
-       
-       WRITE(*,*) 'ITERATION LIMIT EXCEEDED.'
+          if (sumres < test) goto 2000
+        end do
 
- 2000  CONTINUE
+        write (*, *) 'ITERATION LIMIT EXCEEDED.'
 
-       IF (IV <= 2) WRITE(77, 201) ' MG, TIME = ', TIME, IV, II, SUMRES * DTCONST * FLOAT(N1MH) / FLOAT(N1M)
+2000    continue
 
-  201  FORMAT(A13, F13.5, ' IV=', I5, ' II=', I5, ' RG=', ES16.8)
+        if (iv <= 2) write (77, 201) ' mg, time = ', time, iv, ii, sumres * dtconst * float(n1mh) / float(n1m)
 
-      RETURN
-      END SUBROUTINE MG2D
+201     format(a13, f13.5, ' IV=', i5, ' II=', i5, ' RG=', es16.8)
+
+        return
+      end subroutine mg2d
 !=======================================================================
-      SUBROUTINE TOPLEVEL(ID, PC, RHS, SUMRES, OLDV, TEST, IV, RESD, GGII)    ! Zebra Version
+      subroutine toplevel(id, pc, rhs, sumres, oldv, test, iv, resd, ggii)    ! ZEBRA VERSION
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-        INTEGER(8)  :: K, J, KC
-        INTEGER(8)  :: ID, IV
-        REAL(8)     :: SUMRES, TEST, OLDV
-        COMPLEX(8)  :: TT
-        COMPLEX(8)  :: PC(0:N3,0:N2), RHS(N3,N2)
-        COMPLEX(8)  :: RESD(N3MD,N2M), GGII(0:N3MD,0:N2)
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: k, j, kc
+        integer(8) :: id, iv
+        real(8) :: sumres, test, oldv
+        complex(8) :: tt
+        complex(8) :: pc(0:n3, 0:n2), rhs(n3, n2)
+        complex(8) :: resd(n3md, n2m), ggii(0:n3md, 0:n2)
 
-      IF (ID == 1) THEN
+        if (id == 1) then
 !         INTERPOLATE & ADD
-          KC = 0
-          DO K = KKMG(NLEV - 1, 1), KKMG(NLEV - 1, 2)
-              KC = KC + 2
-              DO J = 1, N2M
-                  PC(KC, J) = PC(KC, J) + COI1(K) * GGII(K, J) + COI2(K) * GGII(KPM(K), J)
-              END DO
-          END DO
-      END IF
+          kc = 0
+          do k = kkmg(nlev - 1, 1), kkmg(nlev - 1, 2)
+            kc = kc + 2
+            do j = 1, n2m
+              pc(kc, j) = pc(kc, j) + coi1(k) * ggii(k, j) + coi2(k) * ggii(kpm(k), j)
+            end do
+          end do
+        end if
 
 !  RELAX
-      DO J = 1, N2M
-          DO K = 1, N3M, 2
-              GGII(K, J) = RHS(K, J) - OLDV * (AB(K) * PC(KMM(K), J) + AF(K) * PC(KPM(K), J))
-          END DO
-      END DO
+        do j = 1, n2m
+          do k = 1, n3m, 2
+            ggii(k, j) = rhs(k, j) - oldv * (ab(k) * pc(kmm(k), j) + af(k) * pc(kpm(k), j))
+          end do
+        end do
 
-      CALL TRDIAG1M(GGII, GGII, 1_8, N3M, 1_8, N2M, IV)
+        call trdiag1m(ggii, ggii, 1_8, n3m, 1_8, n2m, iv)
 
-      IF (IV == 1) THEN
-          TT = GGII(1, N2M)
-          DO J = 1, N2M
-              DO K = 1, N3M, 2
-                  GGII(K, J) = GGII(K, J) - TT
-              END DO
-          END DO
-      END IF
+        if (iv == 1) then
+          tt = ggii(1, n2m)
+          do j = 1, n2m
+            do k = 1, n3m, 2
+              ggii(k, j) = ggii(k, j) - tt
+            end do
+          end do
+        end if
 
-      DO J = 1, N2M
-          DO K = 2, N3M, 2
-              GGII(K, J) = RHS(K, J) - (AB(K) * GGII(KMM(K), J) + AF(K) * (GGII(KPM(K), J)))
-          END DO
-      END DO
+        do j = 1, n2m
+          do k = 2, n3m, 2
+            ggii(k, j) = rhs(k, j) - (ab(k) * ggii(kmm(k), j) + af(k) * (ggii(kpm(k), j)))
+          end do
+        end do
 
-      CALL TRDIAG1M(GGII, GGII, 2_8, N3M, 1_8, N2M, IV)
+        call trdiag1m(ggii, ggii, 2_8, n3m, 1_8, n2m, iv)
 
 !  CALCULATE RESIDUAL
-      SUMRES = 0.0_8
+        sumres = 0.0_8
 
-      DO J = 1, N2M
-          DO K = 1, N3M
-              RESD(K, J) = RHS(K, J) - AB(K) * GGII(KMM(K), J) - AF(K) * GGII(KPM(K), J)  &
-                           - AS(J) * GGII(K, J - 1) - AN(J) * GGII(K, J + 1)              &
-                           - AC(K, J, IV) * GGII(K, J)
-              SUMRES = MAX(SUMRES, ABS(RESD(K, J)))
-              PC(K, J) = GGII(K, J)
-          END DO
-      END DO
+        do j = 1, n2m
+          do k = 1, n3m
+            resd(k, j) = rhs(k, j) - ab(k) * ggii(kmm(k), j) - af(k) * ggii(kpm(k), j) &
+                         - as(j) * ggii(k, j - 1) - an(j) * ggii(k, j + 1) &
+                         - ac(k, j, iv) * ggii(k, j)
+            sumres = max(sumres, abs(resd(k, j)))
+            pc(k, j) = ggii(k, j)
+          end do
+        end do
 
-      IF (SUMRES < TEST) RETURN
-      IF (ID == 2) RETURN
+        if (sumres < test) return
+        if (id == 2) return
 
 !  RESTRICT
-      KC = -1
-      DO K = KKMG(NLEV - 1, 1), KKMG(NLEV - 1, 2)
-          KC = KC + 2
-          DO J = 1, N2M
-              RESD(K, J) = RESD(KC, J) * COR1(K) + RESD(KC + 1, J) * COR2(K)
-          END DO
-      END DO
+        kc = -1
+        do k = kkmg(nlev - 1, 1), kkmg(nlev - 1, 2)
+          kc = kc + 2
+          do j = 1, n2m
+            resd(k, j) = resd(kc, j) * cor1(k) + resd(kc + 1, j) * cor2(k)
+          end do
+        end do
 
-      RETURN
-      END SUBROUTINE TOPLEVEL
+        return
+      end subroutine toplevel
 !=======================================================================
-      SUBROUTINE TRDIAG1M(RR, UU, L1, L2, LL1, LL2, IV)
+      subroutine trdiag1m(rr, uu, l1, l2, ll1, ll2, iv)
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-        INTEGER(8)  :: K, J, L1, L2, LL1, LL2, IV
-        COMPLEX(8)  :: RR(0:N3MD,0:N2), UU(0:N3MD,0:N2)
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: k, j, l1, l2, ll1, ll2, iv
+        complex(8) :: rr(0:n3md, 0:n2), uu(0:n3md, 0:n2)
 
-      DO K = L1, L2, 2
-          UU(K, LL1) = RR(K, LL1) * BET(K, 1, IV)
-      END DO
+        do k = l1, l2, 2
+          uu(k, ll1) = rr(k, ll1) * bet(k, 1, iv)
+        end do
 
-      DO J = LL1 + 1, LL2
-          DO K = L1, L2, 2
-              UU(K, J) = (RR(K, J) - AS(J) * UU(K, J - 1)) * BET(K, J, IV)
-          END DO
-      END DO
+        do j = ll1 + 1, ll2
+          do k = l1, l2, 2
+            uu(k, j) = (rr(k, j) - as(j) * uu(k, j - 1)) * bet(k, j, iv)
+          end do
+        end do
 
-      DO J = LL2 - 1, LL1, -1
-          DO K = L1, L2, 2
-              UU(K, J) = UU(K, J) - GAM(K, J + 1, IV) * UU(K, J + 1)
-          END DO
-      END DO
+        do j = ll2 - 1, ll1, -1
+          do k = l1, l2, 2
+            uu(k, j) = uu(k, j) - gam(k, j + 1, iv) * uu(k, j + 1)
+          end do
+        end do
 
-      RETURN
-      END SUBROUTINE TRDIAG1M
-
-!=======================================================================
-      SUBROUTINE GOUP(ILEV, RESD, GGII)! INTERPOLATE RESIDUAL & ADD IT TO HIGH LEVEL
-!=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-        INTEGER(8)  :: K, J, ILEV, KBGH
-        COMPLEX(8)  :: RESD(N3MD,N2M), GGII(0:N3MD,0:N2)
-
-      KBGH = KKMG(ILEV + 1, 1) - 1
-
-      DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-          KBGH = KBGH + 2
-          DO J = 1, N2M
-              GGII(KBGH, J) = GGII(KBGH, J) + COI1(K) * GGII(K, J) + COI2(K) * GGII(KPM(K), J)
-          END DO
-      END DO
-
-      RETURN
-      END SUBROUTINE GOUP
+        return
+      end subroutine trdiag1m
 
 !=======================================================================
-      SUBROUTINE GODOWN(ILEV, IV, RESD, GGII)        ! COMPUTE RESIDUAL & RESTRICT IT
+      subroutine goup(ilev, resd, ggii)! INTERPOLATE RESIDUAL & ADD IT TO HIGH LEVEL
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-        INTEGER(8)  :: K, J, ILEV, IV, KBG
-        COMPLEX(8)  :: RESD(N3MD,N2M), GGII(0:N3MD,0:N2)
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: k, j, ilev, kbgh
+        complex(8) :: resd(n3md, n2m), ggii(0:n3md, 0:n2)
 
-      DO J = 1, N2M
-          DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-              RESD(K, J) = RESD(K, J) - AB(K) * GGII(KMM(K), J) - AF(K) * GGII(KPM(K), J)   &
-                           - AS(J) * GGII(K, J - 1) - AN(J) * GGII(K, J + 1) - AC(K, J, IV) * GGII(K, J)
-          END DO
-      END DO
+        kbgh = kkmg(ilev + 1, 1) - 1
 
-      KBG = KKMG(ILEV, 1) - 2
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          kbgh = kbgh + 2
+          do j = 1, n2m
+            ggii(kbgh, j) = ggii(kbgh, j) + coi1(k) * ggii(k, j) + coi2(k) * ggii(kpm(k), j)
+          end do
+        end do
 
-      DO K = KKMG(ILEV - 1, 1), KKMG(ILEV - 1, 2)
-          KBG = KBG + 2
-          DO J = 1, N2M
-              RESD(K, J) = RESD(KBG, J) * COR1(K) + RESD(KBG + 1, J) * COR2(K)
-          END DO
-      END DO
-
-      RETURN
-      END SUBROUTINE GODOWN
+        return
+      end subroutine goup
 
 !=======================================================================
-      SUBROUTINE RELAX(ILEV, OLDV, IITER, IV, RESD, GGII)   ! Zebra Version
+      subroutine godown(ilev, iv, resd, ggii)        ! COMPUTE RESIDUAL & RESTRICT IT
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-        INTEGER(8)  :: K, J, ILEV, IITER, IV, KK
-        COMPLEX(8)  :: RESD(N3MD,N2M), GGII(0:N3MD,0:N2)
-        REAL(8)     :: OLDV
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: k, j, ilev, iv, kbg
+        complex(8) :: resd(n3md, n2m), ggii(0:n3md, 0:n2)
 
-      DO J = 1, N2M
-          DO K = KKMG(ILEV, 1), KKMG(ILEV, 2), 2
-              GGII(K, J) = RESD(K, J) - OLDV * (AB(K) * GGII(KMM(K), J) + AF(K) * GGII(KPM(K), J))
-          END DO
-      END DO
+        do j = 1, n2m
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            resd(k, j) = resd(k, j) - ab(k) * ggii(kmm(k), j) - af(k) * ggii(kpm(k), j) &
+                         - as(j) * ggii(k, j - 1) - an(j) * ggii(k, j + 1) - ac(k, j, iv) * ggii(k, j)
+          end do
+        end do
 
-      CALL TRDIAG1M(GGII, GGII, KKMG(ILEV, 1), KKMG(ILEV, 2), 1_8, N2M, IV)
+        kbg = kkmg(ilev, 1) - 2
 
-      DO J = 1, N2M
-          DO K = KKMG(ILEV, 1) + 1, KKMG(ILEV, 2), 2
-              GGII(K, J) = RESD(K, J) - AB(K) * GGII(KMM(K), J) - AF(K) * GGII(KPM(K), J)
-          END DO
-      END DO
+        do k = kkmg(ilev - 1, 1), kkmg(ilev - 1, 2)
+          kbg = kbg + 2
+          do j = 1, n2m
+            resd(k, j) = resd(kbg, j) * cor1(k) + resd(kbg + 1, j) * cor2(k)
+          end do
+        end do
 
-      CALL TRDIAG1M(GGII, GGII, KKMG(ILEV, 1) + 1, KKMG(ILEV, 2), 1_8, N2M, IV)
+        return
+      end subroutine godown
 
-      DO KK = 1, IITER - 1
-
-          DO J = 1, N2M
-              DO K = KKMG(ILEV, 1), KKMG(ILEV, 2), 2
-                  GGII(K, J) = RESD(K, J) - (AB(K) * GGII(KMM(K), J) + AF(K) * GGII(KPM(K), J))
-              END DO
-          END DO
-
-          CALL TRDIAG1M(GGII, GGII, KKMG(ILEV, 1), KKMG(ILEV, 2), 1_8, N2M, IV)
-
-          DO J = 1, N2M
-              DO K = KKMG(ILEV, 1) + 1, KKMG(ILEV, 2), 2
-                  GGII(K, J) = RESD(K, J) - AB(K) * GGII(KMM(K), J) - AF(K) * GGII(KPM(K), J)
-              END DO
-          END DO
-
-          CALL TRDIAG1M(GGII, GGII, KKMG(ILEV, 1) + 1, KKMG(ILEV, 2), 1_8, N2M, IV)
-
-      END DO
-      RETURN
-      END SUBROUTINE RELAX
 !=======================================================================
-      SUBROUTINE GSOR2D(U, RHS, IV, TEST, OLDV)    ! 1 EQ. TYPE
+      subroutine relax(ilev, oldv, iiter, iv, resd, ggii)   ! ZEBRA VERSION
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)   :: K, J, IV
-       REAL(8)      :: TEST, OLDV
-       COMPLEX(8)   :: U(0:N3,0:N2), RHS(N3,N2)
-       COMPLEX(8)   :: GGII(0:N3MD,0:N2)
-       COMPLEX(8)   :: TT
-       INTEGER(8)   :: II
-       REAL(8)      :: WW, WW2, ERRMAX
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: k, j, ilev, iiter, iv, kk
+        complex(8) :: resd(n3md, n2m), ggii(0:n3md, 0:n2)
+        real(8) :: oldv
 
-      GGII = 0.0_8
-      WW   = WWSOR
-      WW2  = 1.0_8 - WW
-      II   = 0
+        do j = 1, n2m
+          do k = kkmg(ilev, 1), kkmg(ilev, 2), 2
+            ggii(k, j) = resd(k, j) - oldv * (ab(k) * ggii(kmm(k), j) + af(k) * ggii(kpm(k), j))
+          end do
+        end do
+
+        call trdiag1m(ggii, ggii, kkmg(ilev, 1), kkmg(ilev, 2), 1_8, n2m, iv)
+
+        do j = 1, n2m
+          do k = kkmg(ilev, 1) + 1, kkmg(ilev, 2), 2
+            ggii(k, j) = resd(k, j) - ab(k) * ggii(kmm(k), j) - af(k) * ggii(kpm(k), j)
+          end do
+        end do
+
+        call trdiag1m(ggii, ggii, kkmg(ilev, 1) + 1, kkmg(ilev, 2), 1_8, n2m, iv)
+
+        do kk = 1, iiter - 1
+
+          do j = 1, n2m
+            do k = kkmg(ilev, 1), kkmg(ilev, 2), 2
+              ggii(k, j) = resd(k, j) - (ab(k) * ggii(kmm(k), j) + af(k) * ggii(kpm(k), j))
+            end do
+          end do
+
+          call trdiag1m(ggii, ggii, kkmg(ilev, 1), kkmg(ilev, 2), 1_8, n2m, iv)
+
+          do j = 1, n2m
+            do k = kkmg(ilev, 1) + 1, kkmg(ilev, 2), 2
+              ggii(k, j) = resd(k, j) - ab(k) * ggii(kmm(k), j) - af(k) * ggii(kpm(k), j)
+            end do
+          end do
+
+          call trdiag1m(ggii, ggii, kkmg(ilev, 1) + 1, kkmg(ilev, 2), 1_8, n2m, iv)
+
+        end do
+        return
+      end subroutine relax
+!=======================================================================
+      subroutine gsor2d(u, rhs, iv, test, oldv)    ! 1 EQ. TYPE
+!=======================================================================
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: k, j, iv
+        real(8) :: test, oldv
+        complex(8) :: u(0:n3, 0:n2), rhs(n3, n2)
+        complex(8) :: ggii(0:n3md, 0:n2)
+        complex(8) :: tt
+        integer(8) :: ii
+        real(8) :: ww, ww2, errmax
+
+        ggii = 0.0_8
+        ww = wwsor
+        ww2 = 1.0_8 - ww
+        ii = 0
 
 !  HALF RELAX
 !  ----------
-      DO J = 1, N2M
-          DO K = 1, N3M, 2
-              GGII(K, J) = RHS(K, J) - OLDV * (AB(K) * U(KMM(K), J) + AF(K) * U(KPM(K), J))
-          END DO
-      END DO
+        do j = 1, n2m
+          do k = 1, n3m, 2
+            ggii(k, j) = rhs(k, j) - oldv * (ab(k) * u(kmm(k), j) + af(k) * u(kpm(k), j))
+          end do
+        end do
 
-      CALL TRDIAG1M(GGII, GGII, 1_8, N3M, 1_8, N2M, IV)
+        call trdiag1m(ggii, ggii, 1_8, n3m, 1_8, n2m, iv)
 
-      DO J = 1, N2M
-          DO K = 1, N3M, 2
-              U(K, J) = WW * GGII(K, J) + OLDV * WW2 * U(K, J)
-          END DO
-      END DO
+        do j = 1, n2m
+          do k = 1, n3m, 2
+            u(k, j) = ww * ggii(k, j) + oldv * ww2 * u(k, j)
+          end do
+        end do
 
 !  ANOTHER HALF
 !  ------------
-      IF (IV == 1) THEN
-          TT = U(1, N2M)
-          DO J = 1, N2M
-              DO K = 1, N3M, 2
-                  U(K, J) = U(K, J) - TT
-              END DO
-          END DO
-      END IF
+        if (iv == 1) then
+          tt = u(1, n2m)
+          do j = 1, n2m
+            do k = 1, n3m, 2
+              u(k, j) = u(k, j) - tt
+            end do
+          end do
+        end if
 
-      DO J = 1, N2M
-          DO K = 2, N3M, 2
-              GGII(K, J) = RHS(K, J) - (AB(K) * U(KMM(K), J) + AF(K) * U(KPM(K), J))
-          END DO
-      END DO
+        do j = 1, n2m
+          do k = 2, n3m, 2
+            ggii(k, j) = rhs(k, j) - (ab(k) * u(kmm(k), j) + af(k) * u(kpm(k), j))
+          end do
+        end do
 
-      CALL TRDIAG1M(GGII, GGII, 2_8, N3M, 1_8, N2M, IV)
+        call trdiag1m(ggii, ggii, 2_8, n3m, 1_8, n2m, iv)
 
-      DO J = 1, N2M
-          DO K = 2, N3M, 2
-              U(K, J) = WW * GGII(K, J) + OLDV * WW2 * U(K, J)
-          END DO
-      END DO
+        do j = 1, n2m
+          do k = 2, n3m, 2
+            u(k, j) = ww * ggii(k, j) + oldv * ww2 * u(k, j)
+          end do
+        end do
 
-      CALL RESID3(U, RHS, IV, ERRMAX)
-      IF (ERRMAX < TEST) GOTO 1000
+        call resid3(u, rhs, iv, errmax)
+        if (errmax < test) goto 1000
 
 !  MAIN ITERATION
 !  ==============
-      DO II = 1, MGITR
+        do ii = 1, mgitr
 
 !  HALF RELAX
 !  ----------
-          DO J = 1, N2M
-              DO K = 1, N3M, 2
-                  GGII(K, J) = RHS(K, J) - (AB(K) * U(KMM(K), J) + AF(K) * U(KPM(K), J))
-              END DO
-          END DO
+          do j = 1, n2m
+            do k = 1, n3m, 2
+              ggii(k, j) = rhs(k, j) - (ab(k) * u(kmm(k), j) + af(k) * u(kpm(k), j))
+            end do
+          end do
 
-          CALL TRDIAG1M(GGII, GGII, 1_8, N3M, 1_8, N2M, IV)
+          call trdiag1m(ggii, ggii, 1_8, n3m, 1_8, n2m, iv)
 
-          DO J = 1, N2M
-              DO K = 1, N3M, 2
-                  U(K, J) = WW * GGII(K, J) + WW2 * U(K, J)
-              END DO
-          END DO
+          do j = 1, n2m
+            do k = 1, n3m, 2
+              u(k, j) = ww * ggii(k, j) + ww2 * u(k, j)
+            end do
+          end do
 
 !  ANOTHER HALF
 !  ------------
 
-          IF (IV == 1) THEN
-              TT = U(1, N2M)
-              DO J = 1, N2M
-                  DO K = 1, N3M, 2
-                      U(K, J) = U(K, J) - TT
-                  END DO
-              END DO
-          END IF
- 
-          DO J = 1, N2M
-              DO K = 2, N3M, 2
-                  GGII(K, J) = RHS(K, J) - (AB(K) * U(KMM(K), J) + AF(K) * U(KPM(K), J))
-              END DO
-          END DO
+          if (iv == 1) then
+            tt = u(1, n2m)
+            do j = 1, n2m
+              do k = 1, n3m, 2
+                u(k, j) = u(k, j) - tt
+              end do
+            end do
+          end if
 
-          CALL TRDIAG1M(GGII, GGII, 2_8, N3M, 1_8, N2M, IV)
+          do j = 1, n2m
+            do k = 2, n3m, 2
+              ggii(k, j) = rhs(k, j) - (ab(k) * u(kmm(k), j) + af(k) * u(kpm(k), j))
+            end do
+          end do
 
-          DO J = 1, N2M
-              DO K = 2, N3M, 2
-                  U(K, J) = WW * GGII(K, J) + WW2 * U(K, J)
-              END DO
-          END DO
+          call trdiag1m(ggii, ggii, 2_8, n3m, 1_8, n2m, iv)
 
-          CALL RESID3(U, RHS, IV, ERRMAX)
-          IF (ERRMAX < TEST) GOTO 1000
+          do j = 1, n2m
+            do k = 2, n3m, 2
+              u(k, j) = ww * ggii(k, j) + ww2 * u(k, j)
+            end do
+          end do
 
-      END DO
+          call resid3(u, rhs, iv, errmax)
+          if (errmax < test) goto 1000
 
-      PRINT *, 'ITERATION LIMIT EXCEEDED.'
-      WRITE(77, 201) 'SOR', IV, II, ERRMAX * DTCONST * FLOAT(N1MH) / FLOAT(N1M)
- 1000 CONTINUE
+        end do
 
-201   FORMAT(A5, '  IV=', I5, '  II=', I5, '  RG=', ES23.15)
+        print *, 'ITERATION LIMIT EXCEEDED.'
+        write (77, 201) 'SOR', iv, ii, errmax * dtconst * float(n1mh) / float(n1m)
+1000    continue
 
-      RETURN
-      END SUBROUTINE GSOR2D
+201     format(a5, '  IV=', i5, '  II=', i5, '  RG=', es23.15)
+
+        return
+      end subroutine gsor2d
 
 !=======================================================================
-      SUBROUTINE RESID3(U, RHS, IV, ERRMAX)
+      subroutine resid3(u, rhs, iv, errmax)
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)   :: K, J, IV
-       REAL(8)      :: ERRMAX
-       COMPLEX(8)   :: U(0:N3,0:N2), RHS(N3,N2)
-       COMPLEX(8)   :: ERR
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: k, j, iv
+        real(8) :: errmax
+        complex(8) :: u(0:n3, 0:n2), rhs(n3, n2)
+        complex(8) :: err
 
-       ERRMAX = 0.0_8
+        errmax = 0.0_8
 
-      DO J = 1, N2M
-          DO K = 1, N3M
-              ERR = RHS(K, J) - AB(K) * U(KMM(K), J) - AF(K) * U(KPM(K), J)   &
-                              - AS(J) * U(K, J - 1) - AN(J) * U(K, J + 1)     &
-                              - AC(K, J, IV) * U(K, J)
-              ERRMAX = MAX(ERRMAX, ABS(ERR))
-          END DO
-      END DO
+        do j = 1, n2m
+          do k = 1, n3m
+            err = rhs(k, j) - ab(k) * u(kmm(k), j) - af(k) * u(kpm(k), j) &
+                  - as(j) * u(k, j - 1) - an(j) * u(k, j + 1) &
+                  - ac(k, j, iv) * u(k, j)
+            errmax = max(errmax, abs(err))
+          end do
+        end do
 
-      RETURN
-      END SUBROUTINE RESID3
+        return
+      end subroutine resid3
 !=======================================================================
-      SUBROUTINE COEFMG
+      subroutine coefmg
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I, J, K, ILEV
-       INTEGER(8)  :: MINROW, KBG, KEND, KSP, KC, KBGH
-       REAL(8)     :: KBZ(N3MD), KFZ(N3MD)
-       REAL(8)     :: ZMPM(0:N3MD)
-       REAL(8)     :: VDZ_KBG, VDZ_KEND, SDZ_KBG, SDZ_KEND
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k, ilev
+        integer(8) :: minrow, kbg, kend, ksp, kc, kbgh
+        real(8) :: kbz(n3md), kfz(n3md)
+        real(8) :: zmpm(0:n3md)
+        real(8) :: vdz_kbg, vdz_kend, sdz_kbg, sdz_kend
 
+        minrow = n3m / (2**nlev)
+        zmpm = 0.0_8
 
-       MINROW = N3M / (2**NLEV)
-       ZMPM = 0.0_8
+        levhalf = nint(nlev / 2.0_8)
+        kkmg(nlev, 1) = 1    ! START INDEX
+        kkmg(nlev, 2) = n3m  ! END INDEXT
+        kkmg(nlev, 3) = n3m  ! THE NUMBER OF POINTS AT THE ILEV
 
-       LEVHALF = NINT(NLEV / 2.0_8)
-       KKMG(NLEV, 1) = 1    ! START INDEX
-       KKMG(NLEV, 2) = N3M  ! END INDEXT
-       KKMG(NLEV, 3) = N3M  ! THE NUMBER OF POINTS AT THE ILEV
-
-       DO K = 1, N3M
-           ZMPM(K) = ZMP(K)
-           KBZ(K) = 1 - 1/K                  ! 0 only if K=1
-           KFZ(K) = 1 - K/N3M                ! 0 only if K=N3M
-       END DO
-
+        do k = 1, n3m
+          zmpm(k) = zmp(k)
+          kbz(k) = 1 - 1 / k                  ! 0 ONLY IF K=1
+          kfz(k) = 1 - k / n3m                ! 0 ONLY IF K=N3M
+        end do
 
 !  COMPUTE FOR LOWER LEVELS
-      DO ILEV = NLEV - 1, 0, -1
+        do ilev = nlev - 1, 0, -1
 
-          KKMG(ILEV, 1) = KKMG(ILEV + 1, 1) + KKMG(ILEV + 1, 3)
-          KKMG(ILEV, 3) = MINROW * (2**ILEV)
-          KKMG(ILEV, 2) = KKMG(ILEV, 1) + KKMG(ILEV, 3) - 1
+          kkmg(ilev, 1) = kkmg(ilev + 1, 1) + kkmg(ilev + 1, 3)
+          kkmg(ilev, 3) = minrow * (2**ilev)
+          kkmg(ilev, 2) = kkmg(ilev, 1) + kkmg(ilev, 3) - 1
 
-          KBG = KKMG(ILEV, 1)
-          KEND = KKMG(ILEV, 2)
+          kbg = kkmg(ilev, 1)
+          kend = kkmg(ilev, 2)
 
-          KSP = 2**(NLEV - ILEV)           ! width of one cell at low level
+          ksp = 2**(nlev - ilev)           ! WIDTH OF ONE CELL AT LOW LEVEL
 
-          KC = 0
-          DO K = KBG, KEND
-              KC = KC + 1
-              ZMPM(K) = 0.5_8 * (Z(KC * KSP + 1) + Z((KC - 1) * KSP + 1))
-              KBZ(K) = 1 - KBG/K                  ! 0 onlyif K=KBG
-              KFZ(K) = 1 - K/KEND                 ! 0 only if K=KEND
-          END DO
+          kc = 0
+          do k = kbg, kend
+            kc = kc + 1
+            zmpm(k) = 0.5_8 * (z(kc * ksp + 1) + z((kc - 1) * ksp + 1))
+            kbz(k) = 1 - kbg / k                  ! 0 ONLYIF K=KBG
+            kfz(k) = 1 - k / kend                 ! 0 ONLY IF K=KEND
+          end do
 
-          KC = 0
-          DO K = KBG, KEND
-              KC = KC + 1
-              AB(K) = KBZ(K) / ((ZMPM(K) - ZMPM(K - 1)) * (Z(KC * KSP + 1) - Z((KC - 1) * KSP + 1)))
-              AF(K) = KFZ(K) / ((ZMPM(K + 1) - ZMPM(K)) * (Z(KC * KSP + 1) - Z((KC - 1) * KSP + 1)))
-          END DO
+          kc = 0
+          do k = kbg, kend
+            kc = kc + 1
+            ab(k) = kbz(k) / ((zmpm(k) - zmpm(k - 1)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
+            af(k) = kfz(k) / ((zmpm(k + 1) - zmpm(k)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
+          end do
 
-          DO J = 1, N2M
-              DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                  AC(K, J, 1) = -1.0_8 * (AB(K) + AF(K) + AS(J) + AN(J))
-              END DO
-          END DO
+          do j = 1, n2m
+            do k = kkmg(ilev, 1), kkmg(ilev, 2)
+              ac(k, j, 1) = -1.0_8 * (ab(k) + af(k) + as(j) + an(j))
+            end do
+          end do
 
-          DO I = 2, N1MH
-              DO J = 1, N2M
-                  DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                      AC(K, J, I) = AC(K, J, 1) - AI3(I)
-                  END DO
-              END DO
-          END DO
+          do i = 2, n1mh
+            do j = 1, n2m
+              do k = kkmg(ilev, 1), kkmg(ilev, 2)
+                ac(k, j, i) = ac(k, j, 1) - ai3(i)
+              end do
+            end do
+          end do
 
-      END DO
+        end do
 
 !  CALCULATE RESTRICTION COEFFS
-       DO ILEV = NLEV, 1, -1
-           KBGH = KKMG(ILEV, 1)
-           DO K = KKMG(ILEV - 1, 1), KKMG(ILEV - 1, 2)
-               COR1(K) = (ZMPM(KBGH + 1) - ZMPM(K)) / (ZMPM(KBGH + 1) - ZMPM(KBGH))
-               COR2(K) = 1.0_8 - COR1(K)
-               KBGH = KBGH + 2
-           END DO
-       END DO
+        do ilev = nlev, 1, -1
+          kbgh = kkmg(ilev, 1)
+          do k = kkmg(ilev - 1, 1), kkmg(ilev - 1, 2)
+            cor1(k) = (zmpm(kbgh + 1) - zmpm(k)) / (zmpm(kbgh + 1) - zmpm(kbgh))
+            cor2(k) = 1.0_8 - cor1(k)
+            kbgh = kbgh + 2
+          end do
+        end do
 
 !  CALCULATE INTERPOLATION COEFFS
-       DO ILEV = 0, NLEV - 1
-           KBGH = KKMG(ILEV + 1, 1) + 1
-           DO K = KKMG(ILEV, 1), KKMG(ILEV, 2) - 1
-               COI1(K) = (ZMPM(K + 1) - ZMPM(KBGH)) / (ZMPM(K + 1) - ZMPM(K))  ! * lower value
-               COI2(K) = 1.0_8 - COI1(K)
-               KBGH = KBGH + 2
-           END DO
-           K = KKMG(ILEV, 2)
-           COI1(K) = 1.0_8                 ! use only one lower point at upper wall
-       END DO
-
+        do ilev = 0, nlev - 1
+          kbgh = kkmg(ilev + 1, 1) + 1
+          do k = kkmg(ilev, 1), kkmg(ilev, 2) - 1
+            coi1(k) = (zmpm(k + 1) - zmpm(kbgh)) / (zmpm(k + 1) - zmpm(k))  ! * LOWER VALUE
+            coi2(k) = 1.0_8 - coi1(k)
+            kbgh = kbgh + 2
+          end do
+          k = kkmg(ilev, 2)
+          coi1(k) = 1.0_8                 ! USE ONLY ONE LOWER POINT AT UPPER WALL
+        end do
 
 !===== FOR THE Z PERIODICIRY
 !       INTRODUCE KPM & KMM
-       IF (ZPRDIC == 1) THEN
-           DO ILEV = NLEV, 0, -1
-               KBG = KKMG(ILEV, 1)
-               KEND = KKMG(ILEV, 2)
-               DO K = KBG, KEND
-                   KPM(K) = K + 1
-                   KMM(K) = K - 1
-               END DO
-               KPM(KEND) = KBG
-               KMM(KBG) = KEND
-           END DO
+        if (zprdic == 1) then
+          do ilev = nlev, 0, -1
+            kbg = kkmg(ilev, 1)
+            kend = kkmg(ilev, 2)
+            do k = kbg, kend
+              kpm(k) = k + 1
+              kmm(k) = k - 1
+            end do
+            kpm(kend) = kbg
+            kmm(kbg) = kend
+          end do
 
-           DO ILEV = NLEV - 1, 0, -1
-               KBG = KKMG(ILEV, 1)
-               KEND = KKMG(ILEV, 2)
-               KSP = 2**(NLEV - ILEV)
-               VDZ_KBG  = ZMPM(KBG) - Z(1) + Z(N3) - ZMPM(KEND)
-               VDZ_KEND = ZMPM(KBG) - Z(1) + Z(N3) - ZMPM(KEND)
-               SDZ_KBG  = Z(1 + KSP) - Z(1)
-               SDZ_KEND = Z(N3) - Z(N3 - KSP)
-               AB(KBG)  = 1.0_8 / (VDZ_KBG * SDZ_KBG)
-               AF(KEND) = 1.0_8 / (VDZ_KEND * SDZ_KEND)
-           END DO
+          do ilev = nlev - 1, 0, -1
+            kbg = kkmg(ilev, 1)
+            kend = kkmg(ilev, 2)
+            ksp = 2**(nlev - ilev)
+            vdz_kbg = zmpm(kbg) - z(1) + z(n3) - zmpm(kend)
+            vdz_kend = zmpm(kbg) - z(1) + z(n3) - zmpm(kend)
+            sdz_kbg = z(1 + ksp) - z(1)
+            sdz_kend = z(n3) - z(n3 - ksp)
+            ab(kbg) = 1.0_8 / (vdz_kbg * sdz_kbg)
+            af(kend) = 1.0_8 / (vdz_kend * sdz_kend)
+          end do
 
-           DO ILEV = NLEV - 1, 0, -1
-               DO J = 1, N2M
-                   DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                       AC(K, J, 1) = -1.0_8 * (AB(K) + AF(K) + AS(J) + AN(J))
-                   END DO
-               END DO
-   
-               DO I = 2, N1MH
-                   DO J = 1, N2M
-                       DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                           AC(K, J, I) = AC(K, J, 1) - AI3(I)
-                       END DO
-                   END DO
-               END DO
-           END DO
+          do ilev = nlev - 1, 0, -1
+            do j = 1, n2m
+              do k = kkmg(ilev, 1), kkmg(ilev, 2)
+                ac(k, j, 1) = -1.0_8 * (ab(k) + af(k) + as(j) + an(j))
+              end do
+            end do
+
+            do i = 2, n1mh
+              do j = 1, n2m
+                do k = kkmg(ilev, 1), kkmg(ilev, 2)
+                  ac(k, j, i) = ac(k, j, 1) - ai3(i)
+                end do
+              end do
+            end do
+          end do
 
 !  CALCULATE INTERPOLATION COEFFS
-           DO ILEV = 0, NLEV - 1
-               KBG = KKMG(ILEV, 1)
-               KEND = KKMG(ILEV, 2)
-               VDZ_KEND = ZMPM(KBG) - Z(1) + Z(N3) - ZMPM(KEND)
-               COI2(KEND) = (ZMPM(KKMG(ILEV + 1, 2)) - ZMPM(KEND)) / VDZ_KEND
-               COI1(KEND) = 1.0_8 - COI2(KEND)
-           END DO
+          do ilev = 0, nlev - 1
+            kbg = kkmg(ilev, 1)
+            kend = kkmg(ilev, 2)
+            vdz_kend = zmpm(kbg) - z(1) + z(n3) - zmpm(kend)
+            coi2(kend) = (zmpm(kkmg(ilev + 1, 2)) - zmpm(kend)) / vdz_kend
+            coi1(kend) = 1.0_8 - coi2(kend)
+          end do
 
-       END IF
+        end if
 
+        do ilev = nlev, 0, -1
+          write (*, *) 'IIMG(1', ilev, ')=', kkmg(ilev, 1)
+          write (*, *) 'IIMG(2', ilev, ')=', kkmg(ilev, 2)
+          write (*, *) 'IIMG(3', ilev, ')=', kkmg(ilev, 3)
+        end do
 
-       DO ILEV = NLEV, 0, -1
-           WRITE(*,*) 'IIMG(1', ILEV, ')=', KKMG(ILEV, 1)
-           WRITE(*,*) 'IIMG(2', ILEV, ')=', KKMG(ILEV, 2)
-           WRITE(*,*) 'IIMG(3', ILEV, ')=', KKMG(ILEV, 3)
-       END DO
-
-      RETURN
-      END SUBROUTINE COEFMG
+        return
+      end subroutine coefmg

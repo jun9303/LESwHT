@@ -2,241 +2,243 @@
 !
 !     MAIN SOLVER OF POISSON EQUATION
 !
-!     AX=b
-!     A: coefficient of discretized poisson equation
-!     X: PHI: Pseudo pressure, Output of subroutine POISSON
-!     b: DIVGSUM: OUTPUT of subroutine DIVGS.
+!     AX=B
+!     A: COEFFICIENT OF DISCRETIZED POISSON EQUATION
+!     X: PHI: PSEUDO PRESSURE, OUTPUT OF SUBROUTINE POISSON
+!     B: DIVGSUM: OUTPUT OF SUBROUTINE DIVGS.
 !
-!     x & z direction: Fourier transform
-!     y-direction: TDMA
+!     X & Z DIRECTION: FOURIER TRANSFORM
+!     Y-DIRECTION: TDMA
 !
-!     AK3,AK1: matrix coefficient (modified wavenumber)
-!     N3MH,N1MH: The number of wavenumber index
+!     AK3,AK1: MATRIX COEFFICIENT (MODIFIED WAVENUMBER)
+!     N3MH,N1MH: THE NUMBER OF WAVENUMBER INDEX
 !
-!     Apr. 2010, J. Lee
-!     Jun. 2017, J. Park
-!     Feb. 2026, S. Lee (Several fixes)
+!     APR. 2010, J. LEE
+!     JUN. 2017, J. PARK
+!     FEB. 2026, S. LEE (SEVERAL FIXES)
 !
 !=======================================================================
-      SUBROUTINE POISSON(PHI, DIVGSUM)
+      subroutine poisson(phi, divgsum)
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
+        use mod_common
+        use mod_poiss
+        implicit none
 
-       INTEGER(8)  :: I, J, K, JJP
-       REAL(8)     :: PHI(0:N1,0:N2,0:N3), DIVGSUM(0:N1,0:N2,0:N3)
-       REAL(8)     :: CN1, CN3
-       REAL(8)     :: AJCREF, AJMREF, AJPREF
-       COMPLEX(8)  :: CCAP(N3MH,N1,N2)
-       COMPLEX(8)  :: CRHSREF, PHREF
+        integer(8) :: i, j, k, jjp
+        real(8) :: phi(0:n1, 0:n2, 0:n3), divgsum(0:n1, 0:n2, 0:n3)
+        real(8) :: cn1, cn3
+        real(8) :: ajcref, ajmref, ajpref
+        complex(8) :: ccap(n3mh, n1, n2)
+        complex(8) :: crhsref, phref
 
-       REAL(8), DIMENSION(:,:),     ALLOCATABLE :: AJC, AJM, AJP
-       COMPLEX(8), DIMENSION(:,:),  ALLOCATABLE :: ZZZ, CRHS
-       COMPLEX(8), DIMENSION(:),    ALLOCATABLE :: ZZZZ, ZZZZ_B, XXXX, XXXX_B
+        real(8), dimension(:, :), allocatable :: ajc, ajm, ajp
+        complex(8), dimension(:, :), allocatable :: zzz, crhs
+        complex(8), dimension(:), allocatable :: zzzz, zzzz_b, xxxx, xxxx_b
 
-      CN1 = 1.0_8 / FLOAT(N1M)
-      CN3 = 1.0_8 / FLOAT(N3M)
+        cn1 = 1.0_8 / float(n1m)
+        cn3 = 1.0_8 / float(n3m)
 
 ! --- FORWARD FOURIER TRANSFORM
-!!$OMP PARALLEL private(ZZZ, ZZZZ, XXXX, XXXX_B, ZZZZ_B)
-      ALLOCATE(ZZZ(N3M, N1M))
-      ALLOCATE(ZZZZ(N3M), ZZZZ_B(N3M*2))
-      ALLOCATE(XXXX(N1M), XXXX_B(N1M*2))
-      CALL ZFFT1D(XXXX, N1M, 0, XXXX_B)
-      CALL ZFFT1D(ZZZZ, N3M, 0, ZZZZ_B)
-!!$OMP DO
-      DO J = 1, N2M
-          DO K = 1, N3M
-              DO I = 1, N1M
-                  ZZZ(K, I) = DIVGSUM(I, J, K)
-              END DO
-          END DO
+!$OMP PARALLEL PRIVATE(ZZZ, ZZZZ, XXXX, XXXX_B, ZZZZ_B)
+        allocate (zzz(n3m, n1m))
+        allocate (zzzz(n3m), zzzz_b(n3m * 2))
+        allocate (xxxx(n1m), xxxx_b(n1m * 2))
+        call zfft1d(xxxx, n1m, 0, xxxx_b)
+        call zfft1d(zzzz, n3m, 0, zzzz_b)
+!$OMP DO
+        do j = 1, n2m
+          do k = 1, n3m
+            do i = 1, n1m
+              zzz(k, i) = divgsum(i, j, k)
+            end do
+          end do
 
-          DO I = 1, N1M
-              CALL ZFFT1D(ZZZ(1, I), N3M, -1, ZZZZ_B)
-          END DO
+          do i = 1, n1m
+            call zfft1d(zzz(1, i), n3m, -1, zzzz_b)
+          end do
 
-          DO K = 1, N3MH
-              DO I = 1, N1M
-                  XXXX(I) = ZZZ(K, I)
-              END DO
-              CALL ZFFT1D(XXXX, N1M, -1, XXXX_B)
-              DO I = 1, N1M
-                  CCAP(K, I, J) = XXXX(I) 
-              END DO
-          END DO
-      END DO
-!!$OMP END DO
-      DEALLOCATE(ZZZ, ZZZZ, ZZZZ_B, XXXX, XXXX_B)
-!!$OMP END PARALLEL
+          do k = 1, n3mh
+            do i = 1, n1m
+              xxxx(i) = zzz(k, i)
+            end do
+            call zfft1d(xxxx, n1m, -1, xxxx_b)
+            do i = 1, n1m
+              ccap(k, i, j) = xxxx(i)
+            end do
+          end do
+        end do
+!$OMP END DO
+        deallocate (zzz, zzzz, zzzz_b, xxxx, xxxx_b)
+!$OMP END PARALLEL
 
 ! --- SOLVE TDMA MATRIX
-!!$OMP PARALLEL private(AJM, AJP, AJC, CRHS, CRHSREF, AJCREF, AJMREF, AJPREF, PHREF)
-      ALLOCATE(CRHS(N2, N1))
-      ALLOCATE(AJM(N2, N1), AJP(N2, N1), AJC(N2, N1))
-!!$OMP DO
-      DO K = 1, N3MH
-          DO I = 1, N1M
-              DO J = 1, N2M
-                  JJP = JPV(J)
-                  AJM(J, I) = F2FYI(J) * C2CYI(J) * (1.0_8 - FIXJL(J))
-                  AJP(J, I) = F2FYI(J) * C2CYI(JJP) * (1.0_8 - FIXJU(J))
-                  AJC(J, I) = -((AJM(J, I) + AJP(J, I) + AK1(I) + AK3(K)) * &
-                                (1.0_8 - FIXJL(J)) * (1.0_8 - FIXJU(J)) + &
-                                (F2FYI(1) * C2CYI(2) + AK1(I) + AK3(K)) * FIXJL(J) + &
-                                (F2FYI(N2M) * C2CYI(N2M) + AK1(I) + AK3(K)) * FIXJU(J))
-                  CRHS(J, I) = CCAP(K, I, J)
-              END DO
-          END DO
+!$OMP PARALLEL PRIVATE(AJM, AJP, AJC, CRHS, CRHSREF, AJCREF, AJMREF, AJPREF, PHREF)
+        allocate (crhs(n2, n1))
+        allocate (ajm(n2, n1), ajp(n2, n1), ajc(n2, n1))
+!$OMP DO
+        do k = 1, n3mh
+          do i = 1, n1m
+            do j = 1, n2m
+              jjp = jpv(j)
+              ajm(j, i) = f2fyi(j) * c2cyi(j) * (1.0_8 - fixjl(j))
+              ajp(j, i) = f2fyi(j) * c2cyi(jjp) * (1.0_8 - fixju(j))
+              ajc(j, i) = -((ajm(j, i) + ajp(j, i) + ak1(i) + ak3(k)) * &
+                            (1.0_8 - fixjl(j)) * (1.0_8 - fixju(j)) + &
+                            (f2fyi(1) * c2cyi(2) + ak1(i) + ak3(k)) * fixjl(j) + &
+                            (f2fyi(n2m) * c2cyi(n2m) + ak1(i) + ak3(k)) * fixju(j))
+              crhs(j, i) = ccap(k, i, j)
+            end do
+          end do
 
-          IF (K == 1) THEN
-              CRHSREF = CRHS(N2M, 1)
-              AJCREF = AJC(N2M, 1)
-              AJMREF = AJM(N2M, 1)
-              AJPREF = AJP(N2M, 1)
-              CRHS(N2M, 1) = 0.0_8
-              AJC(N2M, 1)  = 1.0_8
-              AJM(N2M, 1)  = 0.0_8
-              AJP(N2M, 1)  = 0.0_8
-          END IF
+          if (k == 1) then
+            crhsref = crhs(n2m, 1)
+            ajcref = ajc(n2m, 1)
+            ajmref = ajm(n2m, 1)
+            ajpref = ajp(n2m, 1)
+            crhs(n2m, 1) = 0.0_8
+            ajc(n2m, 1) = 1.0_8
+            ajm(n2m, 1) = 0.0_8
+            ajp(n2m, 1) = 0.0_8
+          end if
 
-          CALL CTRDIAG(AJM, AJC, AJP, CRHS, 1_8, N2M, CRHS, N1M)
+          call ctrdiag(ajm, ajc, ajp, crhs, 1_8, n2m, crhs, n1m)
 
-          IF (K == 1) THEN
-              PHREF = (-AJMREF * CRHS(N2M-1, 1) + CRHSREF) / AJCREF
-              DO J = 1, N2M
-                  CRHS(J, 1) = CRHS(J, 1) - PHREF
-              END DO
-              CRHS(N2M, 1) = 0.0_8
-          END IF
+          if (k == 1) then
+            phref = (-ajmref * crhs(n2m - 1, 1) + crhsref) / ajcref
+            do j = 1, n2m
+              crhs(j, 1) = crhs(j, 1) - phref
+            end do
+            crhs(n2m, 1) = 0.0_8
+          end if
 
-          DO I = 1, N1M
-              DO J = 1, N2M
-                  CCAP(K, I, J) = CRHS(J, I)
-              END DO
-          END DO
-      END DO
-!!$OMP END DO
-      DEALLOCATE(CRHS, AJM, AJP, AJC)
-!!$OMP END PARALLEL
+          do i = 1, n1m
+            do j = 1, n2m
+              ccap(k, i, j) = crhs(j, i)
+            end do
+          end do
+        end do
+!$OMP END DO
+        deallocate (crhs, ajm, ajp, ajc)
+!$OMP END PARALLEL
 
 ! --- INVERSE FOURIER TRANSFORM
-!!$OMP PARALLEL private(ZZZ, ZZZZ, XXXX, XXXX_B, ZZZZ_B)
-      ALLOCATE(ZZZ(N3M, N1M))
-      ALLOCATE(ZZZZ(N3M), ZZZZ_B(N3M*2))
-      ALLOCATE(XXXX(N1M), XXXX_B(N1M*2))
-      CALL ZFFT1D(XXXX, N1M, 0, XXXX_B)
-      CALL ZFFT1D(ZZZZ, N3M, 0, ZZZZ_B)
-!!$OMP DO
-      DO J = 1, N2M
-          DO K = 1, N3MH
-              DO I = 1, N1M
-                  XXXX(I) = CCAP(K, I, J)
-              END DO
-              CALL ZFFT1D(XXXX, N1M, 1, XXXX_B)
-              DO I = 1, N1M
-                  ZZZ(K, I) = XXXX(I)
-              END DO
-          END DO
+!$OMP PARALLEL PRIVATE(ZZZ, ZZZZ, XXXX, XXXX_B, ZZZZ_B)
+        allocate (zzz(n3m, n1m))
+        allocate (zzzz(n3m), zzzz_b(n3m * 2))
+        allocate (xxxx(n1m), xxxx_b(n1m * 2))
+        call zfft1d(xxxx, n1m, 0, xxxx_b)
+        call zfft1d(zzzz, n3m, 0, zzzz_b)
+!$OMP DO
+        do j = 1, n2m
+          do k = 1, n3mh
+            do i = 1, n1m
+              xxxx(i) = ccap(k, i, j)
+            end do
+            call zfft1d(xxxx, n1m, 1, xxxx_b)
+            do i = 1, n1m
+              zzz(k, i) = xxxx(i)
+            end do
+          end do
 
-          DO I = 1, N1M
-              DO K = N3MH + 1, N3M
-                  ZZZ(K, I) = CONJG(ZZZ(N3M + 2 - K, I))
-              END DO
-          END DO
+          do i = 1, n1m
+            do k = n3mh + 1, n3m
+              zzz(k, i) = conjg(zzz(n3m + 2 - k, i))
+            end do
+          end do
 
-          DO I = 1, N1M
-              CALL ZFFT1D(ZZZ(1, I), N3M, 1, ZZZZ_B)
-              DO K = 1, N3M
-                  PHI(I, J, K) = REAL(ZZZ(K, I), 8)
-              END DO
-          END DO
-      END DO
-!!$OMP END DO
-      DEALLOCATE(ZZZ, ZZZZ, ZZZZ_B, XXXX, XXXX_B)
-!!$OMP END PARALLEL
+          do i = 1, n1m
+            call zfft1d(zzz(1, i), n3m, 1, zzzz_b)
+            do k = 1, n3m
+              phi(i, j, k) = real(zzz(k, i), 8)
+            end do
+          end do
+        end do
+!$OMP END DO
+        deallocate (zzz, zzzz, zzzz_b, xxxx, xxxx_b)
+!$OMP END PARALLEL
 
-      RETURN
-      END SUBROUTINE POISSON
+        return
+      end subroutine poisson
 
 !=======================================================================
-      SUBROUTINE POISINIT
+      subroutine poisinit
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I, J, K, KK
-       REAL(8)     :: PI
-       REAL(8)     :: SDZIS, SDXIS
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k, kk
+        real(8) :: pi
+        real(8) :: sdzis, sdxis
 
-       CALL FTFT_ALLO
+        call ftft_allo
 
 ! --- DEFINE MODIFIED WAVENUMBERS
-       PI = 2.0_8 * ASIN(1.0_8)
+        pi = 2.0_8 * asin(1.0_8)
 
-      DO K = 1, N3MH
-          AI3(K) = FLOAT(K - 1) * 2.0_8 * PI
-      END DO
-      AI3(1) = 0.0_8
-      
-      DO I = 1, N1M
-          AI1(I) = FLOAT(I - 1) * 2.0_8 * PI
-      END DO
-      AI1(1) = 0.0_8
+        do k = 1, n3mh
+          ai3(k) = float(k - 1) * 2.0_8 * pi
+        end do
+        ai3(1) = 0.0_8
 
-      SDZIS = F2FZI(1)
-      SDXIS = F2FXI(1)
+        do i = 1, n1m
+          ai1(i) = float(i - 1) * 2.0_8 * pi
+        end do
+        ai1(1) = 0.0_8
 
-      DO KK = 1, N3MH
-          AK3(KK) = 2.0_8 * (1.0_8 - COS(AI3(KK) / FLOAT(N3M))) * SDZIS * SDZIS
-      END DO
-      
-      DO KK = 1, N1MH
-          AK1(KK) = 2.0_8 * (1.0_8 - COS(AI1(KK) / FLOAT(N1M))) * SDXIS * SDXIS
-      END DO
-      
-      DO KK = N1M, N1MH + 1, -1
-          AK1(KK) = AK1(N1M + 2 - KK)
-      END DO
+        sdzis = f2fzi(1)
+        sdxis = f2fxi(1)
 
-      RETURN
-      END SUBROUTINE POISINIT
+        do kk = 1, n3mh
+          ak3(kk) = 2.0_8 * (1.0_8 - cos(ai3(kk) / float(n3m))) * sdzis * sdzis
+        end do
+
+        do kk = 1, n1mh
+          ak1(kk) = 2.0_8 * (1.0_8 - cos(ai1(kk) / float(n1m))) * sdxis * sdxis
+        end do
+
+        do kk = n1m, n1mh + 1, -1
+          ak1(kk) = ak1(n1m + 2 - kk)
+        end do
+
+        return
+      end subroutine poisinit
 
 !=======================================================================
-      SUBROUTINE CTRDIAG(A, B, C, R, NI, NF, UU, MF)
+      subroutine ctrdiag(a, b, c, r, ni, nf, uu, mf)
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I, J, K
-       INTEGER(8)  :: NI, NF, MF
-       REAL(8)     :: A(N2, N1), B(N2, N1), C(N2, N1)
-       COMPLEX(8)  :: R(N2, N1), UU(N2, N1)
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j
+        integer(8) :: ni, nf, mf
+        real(8) :: a(n2, n1), b(n2, n1), c(n2, n1)
+        complex(8) :: r(n2, n1), uu(n2, n1)
+        real(8), dimension(:, :), allocatable :: gam_l
+        real(8), dimension(:), allocatable :: bet_l
 
-       ALLOCATE(GAM(N2, N1, 1))
-       ALLOCATE(BET(N1, 1, 1))
+        allocate (gam_l(n2, n1))
+        allocate (bet_l(n1))
 
-      DO I = 1, MF
-          BET(I, 1, 1) = 1.0_8 / B(NI, I)
-          UU(NI, I) = R(NI, I) * BET(I, 1, 1)
-      END DO
+        do i = 1, mf
+          bet_l(i) = 1.0_8 / b(ni, i)
+          uu(ni, i) = r(ni, i) * bet_l(i)
+        end do
 
-      DO I = 1, MF
-          DO J = NI + 1, NF
-              GAM(J, I, 1) = C(J - 1, I) * BET(I, 1, 1)
-              BET(I, 1, 1) = 1.0_8 / (B(J, I) - A(J, I) * GAM(J, I, 1))
-              UU(J, I) = (R(J, I) - A(J, I) * UU(J - 1, I)) * BET(I, 1, 1)
-          END DO
-      END DO
+        do i = 1, mf
+          do j = ni + 1, nf
+            gam_l(j, i) = c(j - 1, i) * bet_l(i)
+            bet_l(i) = 1.0_8 / (b(j, i) - a(j, i) * gam_l(j, i))
+            uu(j, i) = (r(j, i) - a(j, i) * uu(j - 1, i)) * bet_l(i)
+          end do
+        end do
 
-      DO I = 1, MF
-          DO J = NF - 1, NI, -1
-              UU(J, I) = UU(J, I) - GAM(J + 1, I, 1) * UU(J + 1, I)
-          END DO
-      END DO
+        do i = 1, mf
+          do j = nf - 1, ni, -1
+            uu(j, i) = uu(j, i) - gam_l(j + 1, i) * uu(j + 1, i)
+          end do
+        end do
 
-      DEALLOCATE(GAM, BET)
+        deallocate (gam_l, bet_l)
 
-      RETURN
-      END SUBROUTINE CTRDIAG
+        return
+      end subroutine ctrdiag

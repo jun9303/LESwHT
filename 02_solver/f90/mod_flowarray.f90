@@ -1,343 +1,343 @@
-MODULE MOD_FLOWARRAY
-!!!!!!!!!!!!!!!!!!!!! BASIC VARIABLES 
-      REAL*8, DIMENSION (:,:,:),     ALLOCATABLE :: U,V,W,P,T
-      REAL*8, DIMENSION (:,:,:,:),   ALLOCATABLE :: RHS1
-      REAL*8, DIMENSION (:,:,:),     ALLOCATABLE :: RK3XO,RK3YO,RK3ZO,RK3TO
-!     U,V,W,P           : Velocity and Pressure
-!     RHS1              : Explicitly treated terms in Navier-Stokes equation
-!     RK3XO,RK3YO,RK3ZO : Previous step information for Runge-Kutta method (RK3)
+module mod_flowarray
+!!!!!!!!!!!!!!!!!!!!! BASIC VARIABLES
+  real(8), dimension(:, :, :), allocatable :: u, v, w, p, t
+  real(8), dimension(:, :, :, :), allocatable :: rhs1
+  real(8), dimension(:, :, :), allocatable :: rk3xo, rk3yo, rk3zo, rk3to
+!     U,V,W,P           : VELOCITY AND PRESSURE
+!     RHS1              : EXPLICITLY TREATED TERMS IN NAVIER-STOKES EQUATION
+!     RK3XO,RK3YO,RK3ZO : PREVIOUS STEP INFORMATION FOR RUNGE-KUTTA METHOD (RK3)
 
 !!!!!!!!!!!!!!!!!!!!! IBM VARIABLES
-      INTEGER*8, DIMENSION (:,:),    ALLOCATABLE :: IFC,JFC,KFC
-      INTEGER*8, DIMENSION (:,:,:),  ALLOCATABLE :: INTPINDX
-      INTEGER*8, DIMENSION (:,:,:,:),ALLOCATABLE :: INOUT
-      INTEGER*8, DIMENSION (:,:),    ALLOCATABLE :: INTPTYPE
-      REAL*8, DIMENSION (:,:),       ALLOCATABLE :: FCV,FCVAVG
-      REAL*8, DIMENSION (:,:),       ALLOCATABLE :: DUDTR
-      REAL*8, DIMENSION (:,:,:,:,:), ALLOCATABLE :: GEOMFAC
-      REAL*8, DIMENSION (:,:,:),     ALLOCATABLE :: QMASS
-      REAL*8, DIMENSION (:,:,:),     ALLOCATABLE :: DIVGSUM, PHI
-!     IFC,JFC,KFC : Index of interpolation point for IBM
-!     MPI         : Distinguish the solid-to-fluid direction
-!     INOUT       : 1 => Outside point, 0 => Inside point
-!     JTYPE       : The type of interpolation (1: 1D, 2: 2D, 3: 3D)
-!     FCV,FCVAVG  : Instantaneous and average forces obtained from the momentum forcing in IBM
-!     DUDTR       : Inertia contribution in IBM forcing
-!     GFI         : Geoetric factor for IBM interpolation
-!     QMASS       : Mass source and sink
+  integer(8), dimension(:, :), allocatable :: ifc, jfc, kfc
+  integer(8), dimension(:, :, :), allocatable :: intpindx
+  integer(8), dimension(:, :, :, :), allocatable :: inout
+  integer(8), dimension(:, :), allocatable :: intptype
+  real(8), dimension(:, :), allocatable :: fcv, fcvavg
+  real(8), dimension(:, :), allocatable :: dudtr
+  real(8), dimension(:, :, :, :, :), allocatable :: geomfac
+  real(8), dimension(:, :, :), allocatable :: qmass
+  real(8), dimension(:, :, :), allocatable :: divgsum, phi
+!     IFC,JFC,KFC : INDEX OF INTERPOLATION POINT FOR IBM
+!     MPI         : DISTINGUISH THE SOLID-TO-FLUID DIRECTION
+!     INOUT       : 1 => OUTSIDE POINT, 0 => INSIDE POINT
+!     JTYPE       : THE TYPE OF INTERPOLATION (1: 1D, 2: 2D, 3: 3D)
+!     FCV,FCVAVG  : INSTANTANEOUS AND AVERAGE FORCES OBTAINED FROM THE MOMENTUM FORCING IN IBM
+!     DUDTR       : INERTIA CONTRIBUTION IN IBM FORCING
+!     GFI         : GEOETRIC FACTOR FOR IBM INTERPOLATION
+!     QMASS       : MASS SOURCE AND SINK
 
 !!!!!!!!!!!!!!!!!!!!! LES VARIABLES
-      INTEGER*8, DIMENSION (:),      ALLOCATABLE :: INZ,JNZ,KNZ,ITZ,JTZ,KTZ
-      INTEGER*8, DIMENSION (:,:,:),  ALLOCATABLE :: NWALL_DVM,NHEAT_DVM
-      REAL*8, DIMENSION (:,:,:),     ALLOCATABLE :: NUSGS,ALSGS
-      REAL*8, DIMENSION (:,:,:,:),   ALLOCATABLE :: NUSGS1,ALSGS1
-      REAL*8, DIMENSION (:,:),       ALLOCATABLE :: CFX1,CFX2,CFY1,CFY2,CFZ1,CFZ2
-      REAL*8, DIMENSION (:,:,:,:),   ALLOCATABLE :: AALP,LLIJ,MMIJ,UUI
-!     INZ,JNZ,KNZ           : Index for zero turbulent viscosity point
-!     NWALL_DVM             : Zero turbulent viscosity in the IB body
-!     NUSGS,NUSGS1          : Eddy viscosity at each velocity control volume
-!     ALSGS,ALSGS1          : Eddy diffusivity at each velocity control volume
-!     CFX1,CFX2,CFZP1,CFZP2 : Coefficient for LES filtering
-!     AALP,LLIJ,MMIJ,UUI    : Dynamic coefficient modeling in SGS
+  integer(8), dimension(:), allocatable :: inz, jnz, knz, itz, jtz, ktz
+  integer(8), dimension(:, :, :), allocatable :: nwall_dvm, nheat_dvm
+  real(8), dimension(:, :, :), allocatable :: nusgs, alsgs
+  real(8), dimension(:, :, :, :), allocatable :: nusgs1, alsgs1
+  real(8), dimension(:, :), allocatable :: cfx1, cfx2, cfy1, cfy2, cfz1, cfz2
+  real(8), dimension(:, :, :, :), allocatable :: aalp, llij, mmij, uui
+!     INZ,JNZ,KNZ           : INDEX FOR ZERO TURBULENT VISCOSITY POINT
+!     NWALL_DVM             : ZERO TURBULENT VISCOSITY IN THE IB BODY
+!     NUSGS,NUSGS1          : EDDY VISCOSITY AT EACH VELOCITY CONTROL VOLUME
+!     ALSGS,ALSGS1          : EDDY DIFFUSIVITY AT EACH VELOCITY CONTROL VOLUME
+!     CFX1,CFX2,CFZP1,CFZP2 : COEFFICIENT FOR LES FILTERING
+!     AALP,LLIJ,MMIJ,UUI    : DYNAMIC COEFFICIENT MODELING IN SGS
 
 !!!!!!!!!!!!!!!!!!!!! CONJUGATE HEAT TRANSFER
-      REAL*8, DIMENSION (:,:,:),     ALLOCATABLE :: CSTAR
-      REAL*8, DIMENSION (:,:,:,:),   ALLOCATABLE :: KSTAR
+  real(8), dimension(:, :, :), allocatable :: cstar
+  real(8), dimension(:, :, :, :), allocatable :: kstar
 
 !!!!!!!!!!!!!!!!!!!!! SEMI_IMPLICIT
-      REAL*8, DIMENSION (:,:,:),     ALLOCATABLE :: RK3XOO,RK3YOO,RK3ZOO,RK3TOO
-!     RK3XOO,RK3YOO,RK3ZOO : Convection term from inertia contribution in IBM forcing
+  real(8), dimension(:, :, :), allocatable :: rk3xoo, rk3yoo, rk3zoo, rk3too
+!     RK3XOO,RK3YOO,RK3ZOO : CONVECTION TERM FROM INERTIA CONTRIBUTION IN IBM FORCING
 
-!!!!!!!!!!!!!!!!!!!!! FILED AVG. VARIABLES 
-      REAL*8, DIMENSION (:,:,:),     ALLOCATABLE :: UAVG,VAVG,WAVG,PAVG,TAVG
-      REAL*8, DIMENSION (:,:,:),     ALLOCATABLE :: P2AVG,T2AVG,SSAVG
-      REAL*8, DIMENSION (:,:,:,:),   ALLOCATABLE :: UIUJAVG,VORAVG,VOR2AVG
+!!!!!!!!!!!!!!!!!!!!! FILED AVG. VARIABLES
+  real(8), dimension(:, :, :), allocatable :: uavg, vavg, wavg, pavg, tavg
+  real(8), dimension(:, :, :), allocatable :: p2avg, t2avg, ssavg
+  real(8), dimension(:, :, :, :), allocatable :: uiujavg, voravg, vor2avg
 
 !     UAVG,VAVG,WAVG,PAVG,TAVG : AVERAGED VELOCITY, PRESSURE & TEMPERATURE
 !     P2AVG,T2AVG,SSAVG        : AVERAGED PRESSURE & TEMPERATURE FLUCTUATIONS, AVERAGED MAGNITUDE OF STRAIN
 !     UIUJAVG,VORAVG,VOR2AVG   : AVERAGED REYNOLDS STRESS, AVERAGED ROOT-MEAN-SQUARE OF VORTICITY
 
-CONTAINS
+contains
 
 !=======================================================================
-      SUBROUTINE BASIC_ALLO
+  subroutine basic_allo
 !=======================================================================
-      USE MOD_COMMON, ONLY : N1,N2,N3,N1M,N2M,N3M,NINTP,NBODY
-      IMPLICIT NONE
-      INTEGER*8         :: MINTP,MBODY
+    use mod_common, only: n1, n2, n3, n1m, n2m, n3m, nintp, nbody
+    implicit none
+    integer(8) :: mintp, mbody
 
-      MINTP = MAXVAL(NINTP)
-      MBODY = MAXVAL(NBODY)
+    mintp = maxval(nintp)
+    mbody = maxval(nbody)
 
-      ALLOCATE( U(0:N1,0:N2,0:N3))
-      ALLOCATE( V(0:N1,0:N2,0:N3))
-      ALLOCATE( W(0:N1,0:N2,0:N3))
-      ALLOCATE( P(0:N1,0:N2,0:N3))
-      ALLOCATE( RHS1(0:N1,0:N2,0:N3,3))
-      ALLOCATE( RK3XO(N1M,N2M,N3M))
-      ALLOCATE( RK3YO(N1M,N2M,N3M))
-      ALLOCATE( RK3ZO(N1M,N2M,N3M))
-      ALLOCATE(RK3XOO(N1M,N2M,N3M))
-      ALLOCATE(RK3YOO(N1M,N2M,N3M))
-      ALLOCATE(RK3ZOO(N1M,N2M,N3M))
-      ALLOCATE(INOUT(0:N1,0:N2,0:N3,3))
-      ALLOCATE(IFC(MBODY,3),JFC(MBODY,3),KFC(MBODY,3))
-      ALLOCATE(FCV(MBODY,3),FCVAVG(MBODY,3))
-      ALLOCATE(INTPTYPE(MINTP,3))
-      ALLOCATE(INTPINDX(MINTP,3,3))
-      ALLOCATE(GEOMFAC(MINTP,3,0:2,0:2,0:2))
-      ALLOCATE(QMASS(N1M,N2M,N3M))
-      ALLOCATE(DUDTR(MBODY,3))
+    allocate (u(0:n1, 0:n2, 0:n3))
+    allocate (v(0:n1, 0:n2, 0:n3))
+    allocate (w(0:n1, 0:n2, 0:n3))
+    allocate (p(0:n1, 0:n2, 0:n3))
+    allocate (rhs1(0:n1, 0:n2, 0:n3, 3))
+    allocate (rk3xo(n1m, n2m, n3m))
+    allocate (rk3yo(n1m, n2m, n3m))
+    allocate (rk3zo(n1m, n2m, n3m))
+    allocate (rk3xoo(n1m, n2m, n3m))
+    allocate (rk3yoo(n1m, n2m, n3m))
+    allocate (rk3zoo(n1m, n2m, n3m))
+    allocate (inout(0:n1, 0:n2, 0:n3, 3))
+    allocate (ifc(mbody, 3), jfc(mbody, 3), kfc(mbody, 3))
+    allocate (fcv(mbody, 3), fcvavg(mbody, 3))
+    allocate (intptype(mintp, 3))
+    allocate (intpindx(mintp, 3, 3))
+    allocate (geomfac(mintp, 3, 0:2, 0:2, 0:2))
+    allocate (qmass(n1m, n2m, n3m))
+    allocate (dudtr(mbody, 3))
 
-      U = 0.
-      V = 0.
-      W = 0.
-      P = 0.
-      RHS1 = 0.
-      RK3XO = 0.
-      RK3YO = 0.
-      RK3ZO = 0.
-      RK3XOO = 0.
-      RK3YOO = 0.
-      RK3ZOO = 0.
-      INOUT = 0
-      IFC = 0
-      JFC = 0
-      KFC = 0
-      FCV = 0.
-      FCVAVG = 0.
-      INTPTYPE = 0
-      INTPINDX = 0
-      GEOMFAC = 0.
-      QMASS = 0.
-      DUDTR = 0.
+    u = 0.
+    v = 0.
+    w = 0.
+    p = 0.
+    rhs1 = 0.
+    rk3xo = 0.
+    rk3yo = 0.
+    rk3zo = 0.
+    rk3xoo = 0.
+    rk3yoo = 0.
+    rk3zoo = 0.
+    inout = 0
+    ifc = 0
+    jfc = 0
+    kfc = 0
+    fcv = 0.
+    fcvavg = 0.
+    intptype = 0
+    intpindx = 0
+    geomfac = 0.
+    qmass = 0.
+    dudtr = 0.
 
-      RETURN
-      END SUBROUTINE BASIC_ALLO
+    return
+  end subroutine basic_allo
 !=======================================================================
-      SUBROUTINE BASIC_DEALLO
+  subroutine basic_deallo
 !=======================================================================
-      IMPLICIT NONE
+    implicit none
 
-      DEALLOCATE(U,V,W,P)
-      DEALLOCATE(RHS1,RK3XO,RK3YO,RK3ZO)
-      DEALLOCATE(RK3XOO,RK3YOO,RK3ZOO)
-      DEALLOCATE(INOUT,IFC,JFC,KFC)
-      DEALLOCATE(FCV,FCVAVG)
-      DEALLOCATE(INTPTYPE,INTPINDX,GEOMFAC)
-      DEALLOCATE(QMASS,DUDTR)
+    deallocate (u, v, w, p)
+    deallocate (rhs1, rk3xo, rk3yo, rk3zo)
+    deallocate (rk3xoo, rk3yoo, rk3zoo)
+    deallocate (inout, ifc, jfc, kfc)
+    deallocate (fcv, fcvavg)
+    deallocate (intptype, intpindx, geomfac)
+    deallocate (qmass, dudtr)
 
-      RETURN
-      END SUBROUTINE BASIC_DEALLO
+    return
+  end subroutine basic_deallo
 !=======================================================================
-      SUBROUTINE THERMAL_ALLO
+  subroutine thermal_allo
 !=======================================================================
-      USE MOD_COMMON, ONLY : N1,N2,N3,N1M,N2M,N3M,NINTP,NBODY
-      IMPLICIT NONE
-      INTEGER*8         :: MINTP,MBODY
+    use mod_common, only: n1, n2, n3, n1m, n2m, n3m, nintp, nbody
+    implicit none
+    integer(8) :: mintp, mbody
 
-      MINTP = MAXVAL(NINTP)
-      MBODY = MAXVAL(NBODY)
-      
-      ALLOCATE( U(0:N1,0:N2,0:N3))
-      ALLOCATE( V(0:N1,0:N2,0:N3))
-      ALLOCATE( W(0:N1,0:N2,0:N3))
-      ALLOCATE( P(0:N1,0:N2,0:N3))
-      ALLOCATE( T(0:N1,0:N2,0:N3))
-      ALLOCATE( RHS1(0:N1,0:N2,0:N3,4))
-      ALLOCATE( RK3XO(N1M,N2M,N3M))
-      ALLOCATE( RK3YO(N1M,N2M,N3M))
-      ALLOCATE( RK3ZO(N1M,N2M,N3M))
-      ALLOCATE( RK3TO(N1M,N2M,N3M))
-      ALLOCATE(RK3XOO(N1M,N2M,N3M))
-      ALLOCATE(RK3YOO(N1M,N2M,N3M))
-      ALLOCATE(RK3ZOO(N1M,N2M,N3M))
-      ALLOCATE(RK3TOO(N1M,N2M,N3M))
-      ALLOCATE(INOUT(0:N1,0:N2,0:N3,4))
-      ALLOCATE(IFC(MBODY,4),JFC(MBODY,4),KFC(MBODY,4))
-      ALLOCATE(FCV(MBODY,4),FCVAVG(MBODY,4))
-      ALLOCATE(INTPTYPE(MINTP,4))
-      ALLOCATE(INTPINDX(MINTP,4,3))
-      ALLOCATE(GEOMFAC(MINTP,4,0:2,0:2,0:2))
-      ALLOCATE(QMASS(N1M,N2M,N3M))
-      ALLOCATE(DUDTR(MBODY,3))
+    mintp = maxval(nintp)
+    mbody = maxval(nbody)
 
-      U = 0.
-      V = 0.
-      W = 0.
-      P = 0.
-      T = 0.
-      RHS1 = 0.
-      RK3XO = 0.
-      RK3YO = 0.
-      RK3ZO = 0.
-      RK3XOO = 0.
-      RK3YOO = 0.
-      RK3ZOO = 0.
-      INOUT = 0
-      IFC = 0
-      JFC = 0
-      KFC = 0
-      FCV = 0.
-      FCVAVG = 0.
-      INTPTYPE = 0
-      INTPINDX = 0
-      GEOMFAC = 0.
-      QMASS = 0.
-      DUDTR = 0.
+    allocate (u(0:n1, 0:n2, 0:n3))
+    allocate (v(0:n1, 0:n2, 0:n3))
+    allocate (w(0:n1, 0:n2, 0:n3))
+    allocate (p(0:n1, 0:n2, 0:n3))
+    allocate (t(0:n1, 0:n2, 0:n3))
+    allocate (rhs1(0:n1, 0:n2, 0:n3, 4))
+    allocate (rk3xo(n1m, n2m, n3m))
+    allocate (rk3yo(n1m, n2m, n3m))
+    allocate (rk3zo(n1m, n2m, n3m))
+    allocate (rk3to(n1m, n2m, n3m))
+    allocate (rk3xoo(n1m, n2m, n3m))
+    allocate (rk3yoo(n1m, n2m, n3m))
+    allocate (rk3zoo(n1m, n2m, n3m))
+    allocate (rk3too(n1m, n2m, n3m))
+    allocate (inout(0:n1, 0:n2, 0:n3, 4))
+    allocate (ifc(mbody, 4), jfc(mbody, 4), kfc(mbody, 4))
+    allocate (fcv(mbody, 4), fcvavg(mbody, 4))
+    allocate (intptype(mintp, 4))
+    allocate (intpindx(mintp, 4, 3))
+    allocate (geomfac(mintp, 4, 0:2, 0:2, 0:2))
+    allocate (qmass(n1m, n2m, n3m))
+    allocate (dudtr(mbody, 3))
 
-      RETURN
-      END SUBROUTINE THERMAL_ALLO
+    u = 0.
+    v = 0.
+    w = 0.
+    p = 0.
+    t = 0.
+    rhs1 = 0.
+    rk3xo = 0.
+    rk3yo = 0.
+    rk3zo = 0.
+    rk3xoo = 0.
+    rk3yoo = 0.
+    rk3zoo = 0.
+    inout = 0
+    ifc = 0
+    jfc = 0
+    kfc = 0
+    fcv = 0.
+    fcvavg = 0.
+    intptype = 0
+    intpindx = 0
+    geomfac = 0.
+    qmass = 0.
+    dudtr = 0.
+
+    return
+  end subroutine thermal_allo
 !=======================================================================
-      SUBROUTINE THERMAL_DEALLO
+  subroutine thermal_deallo
 !=======================================================================
-      IMPLICIT NONE
-      
-      DEALLOCATE(U,V,W,P,T)
-      DEALLOCATE(RHS1,RK3XO,RK3YO,RK3ZO)
-      DEALLOCATE(RK3XOO,RK3YOO,RK3ZOO)
-      DEALLOCATE(INOUT,IFC,JFC,KFC)
-      DEALLOCATE(FCV,FCVAVG)
-      DEALLOCATE(INTPTYPE,INTPINDX,GEOMFAC)
-      DEALLOCATE(QMASS,DUDTR)
+    implicit none
 
-      RETURN
-      END SUBROUTINE THERMAL_DEALLO
+    deallocate (u, v, w, p, t)
+    deallocate (rhs1, rk3xo, rk3yo, rk3zo)
+    deallocate (rk3xoo, rk3yoo, rk3zoo)
+    deallocate (inout, ifc, jfc, kfc)
+    deallocate (fcv, fcvavg)
+    deallocate (intptype, intpindx, geomfac)
+    deallocate (qmass, dudtr)
+
+    return
+  end subroutine thermal_deallo
 !=======================================================================
-      SUBROUTINE LES_ALLO
+  subroutine les_allo
 !=======================================================================
-      USE MOD_COMMON, ONLY : N1,N2,N3,N1M,N2M,N3M,NZERO
-      IMPLICIT NONE
+    use mod_common, only: n1, n2, n3, n1m, n2m, n3m, nzero
+    implicit none
 
-      ALLOCATE(INZ(NZERO))
-      ALLOCATE(JNZ(NZERO))
-      ALLOCATE(KNZ(NZERO))
-      ALLOCATE(NWALL_DVM(N1M,N2M,N3M))
-      ALLOCATE(NUSGS (0:N1,0:N2,0:N3))
-      ALLOCATE(NUSGS1(0:N1,0:N2,0:N3,3))
-      ALLOCATE(CFX1(N1M,-1:1))
-      ALLOCATE(CFX2(N1M,-2:2))
-      ALLOCATE(CFY1(N2M,-1:1))
-      ALLOCATE(CFY2(N2M,-2:2))
-      ALLOCATE(CFZ1(N3M,-1:1))
-      ALLOCATE(CFZ2(N3M,-2:2))
+    allocate (inz(nzero))
+    allocate (jnz(nzero))
+    allocate (knz(nzero))
+    allocate (nwall_dvm(n1m, n2m, n3m))
+    allocate (nusgs(0:n1, 0:n2, 0:n3))
+    allocate (nusgs1(0:n1, 0:n2, 0:n3, 3))
+    allocate (cfx1(n1m, -1:1))
+    allocate (cfx2(n1m, -2:2))
+    allocate (cfy1(n2m, -1:1))
+    allocate (cfy2(n2m, -2:2))
+    allocate (cfz1(n3m, -1:1))
+    allocate (cfz2(n3m, -2:2))
 
-      INZ = 0
-      JNZ = 0
-      KNZ = 0
-      NWALL_DVM = 1
-      NUSGS = 0.
-      NUSGS1 = 0.
-      CFX1 = 0.
-      CFX2 = 0.
-      CFY1 = 0.
-      CFY2 = 0.
-      CFZ1 = 0.
-      CFZ2 = 0.
+    inz = 0
+    jnz = 0
+    knz = 0
+    nwall_dvm = 1
+    nusgs = 0.
+    nusgs1 = 0.
+    cfx1 = 0.
+    cfx2 = 0.
+    cfy1 = 0.
+    cfy2 = 0.
+    cfz1 = 0.
+    cfz2 = 0.
 
-      RETURN
-      END SUBROUTINE LES_ALLO
+    return
+  end subroutine les_allo
 !=======================================================================
-      SUBROUTINE LES_DEALLO
+  subroutine les_deallo
 !=======================================================================
-      IMPLICIT NONE
+    implicit none
 
-      DEALLOCATE(INZ,JNZ,KNZ,NWALL_DVM)
-      DEALLOCATE(NUSGS,NUSGS1)
-      DEALLOCATE(CFX1,CFX2,CFY1,CFY2,CFZ1,CFZ2)
+    deallocate (inz, jnz, knz, nwall_dvm)
+    deallocate (nusgs, nusgs1)
+    deallocate (cfx1, cfx2, cfy1, cfy2, cfz1, cfz2)
 
-      RETURN
-      END SUBROUTINE LES_DEALLO
+    return
+  end subroutine les_deallo
 !=======================================================================
-      SUBROUTINE LES_THERMAL_ALLO
+  subroutine les_thermal_allo
 !=======================================================================
-      USE MOD_COMMON, ONLY : N1,N2,N3,N1M,N2M,N3M
-      IMPLICIT NONE
+    use mod_common, only: n1, n2, n3, n1m, n2m, n3m
+    implicit none
 
-      ALLOCATE(ALSGS (0:N1,0:N2,0:N3))
-      ALLOCATE(ALSGS1(0:N1,0:N2,0:N3,3))
+    allocate (alsgs(0:n1, 0:n2, 0:n3))
+    allocate (alsgs1(0:n1, 0:n2, 0:n3, 3))
 
-      ALSGS = 0.
-      ALSGS1 = 0.
+    alsgs = 0.
+    alsgs1 = 0.
 
-      RETURN
-      END SUBROUTINE LES_THERMAL_ALLO
+    return
+  end subroutine les_thermal_allo
 !=======================================================================
-      SUBROUTINE LES_THERMAL_DEALLO
+  subroutine les_thermal_deallo
 !=======================================================================
-      USE MOD_COMMON, ONLY : N1,N2,N3,N1M,N2M,N3M
-      IMPLICIT NONE
+    use mod_common, only: n1, n2, n3, n1m, n2m, n3m
+    implicit none
 
-      DEALLOCATE(ALSGS,ALSGS1)
+    deallocate (alsgs, alsgs1)
 
-      RETURN
-      END SUBROUTINE LES_THERMAL_DEALLO
+    return
+  end subroutine les_thermal_deallo
 !=======================================================================
-      SUBROUTINE AVG_ALLO
+  subroutine avg_allo
 !=======================================================================
-      USE MOD_COMMON, ONLY : N1,N2,N3,N1M,N2M,N3M
-      IMPLICIT NONE
+    use mod_common, only: n1, n2, n3, n1m, n2m, n3m
+    implicit none
 
-      ALLOCATE(UAVG(N1M,N2M,N3M))
-      ALLOCATE(VAVG(N1M,N2M,N3M))
-      ALLOCATE(WAVG(N1M,N2M,N3M))
-      ALLOCATE(PAVG(N1M,N2M,N3M))
-      ALLOCATE(TAVG(N1M,N2M,N3M))
-      ALLOCATE(P2AVG(N1M,N2M,N3M))
-      ALLOCATE(T2AVG(N1M,N2M,N3M))
-      ALLOCATE(SSAVG(N1M,N2M,N3M))
-      ALLOCATE(UIUJAVG(N1M,N2M,N3M,6))
-      ALLOCATE(VORAVG(N1M,N2M,N3M,3))
-      ALLOCATE(VOR2AVG(N1M,N2M,N3M,6))
+    allocate (uavg(n1m, n2m, n3m))
+    allocate (vavg(n1m, n2m, n3m))
+    allocate (wavg(n1m, n2m, n3m))
+    allocate (pavg(n1m, n2m, n3m))
+    allocate (tavg(n1m, n2m, n3m))
+    allocate (p2avg(n1m, n2m, n3m))
+    allocate (t2avg(n1m, n2m, n3m))
+    allocate (ssavg(n1m, n2m, n3m))
+    allocate (uiujavg(n1m, n2m, n3m, 6))
+    allocate (voravg(n1m, n2m, n3m, 3))
+    allocate (vor2avg(n1m, n2m, n3m, 6))
 
-      UAVG = 0.
-      VAVG = 0.
-      WAVG = 0.
-      PAVG = 0.
-      TAVG = 0.
-      P2AVG = 0.
-      T2AVG = 0.
-      SSAVG = 0.
-      UIUJAVG = 0.
-      VORAVG = 0.
-      VOR2AVG = 0.
+    uavg = 0.
+    vavg = 0.
+    wavg = 0.
+    pavg = 0.
+    tavg = 0.
+    p2avg = 0.
+    t2avg = 0.
+    ssavg = 0.
+    uiujavg = 0.
+    voravg = 0.
+    vor2avg = 0.
 
-      RETURN
-      END SUBROUTINE AVG_ALLO
+    return
+  end subroutine avg_allo
 !=======================================================================
-      SUBROUTINE AVG_DEALLO
+  subroutine avg_deallo
 !=======================================================================
-      IMPLICIT NONE
+    implicit none
 
-      DEALLOCATE(UAVG,VAVG,WAVG,PAVG,TAVG)
-      DEALLOCATE(P2AVG,T2AVG,SSAVG)
-      DEALLOCATE(UIUJAVG,VORAVG,VOR2AVG)
+    deallocate (uavg, vavg, wavg, pavg, tavg)
+    deallocate (p2avg, t2avg, ssavg)
+    deallocate (uiujavg, voravg, vor2avg)
 
-      RETURN
-      END SUBROUTINE AVG_DEALLO
+    return
+  end subroutine avg_deallo
 !=======================================================================
 !=======================================================================
-      SUBROUTINE CONJG_ALLO
+  subroutine conjg_allo
 !=======================================================================
-      USE MOD_COMMON, ONLY : N1,N2,N3,N1M,N2M,N3M
-      IMPLICIT NONE
+    use mod_common, only: n1, n2, n3, n1m, n2m, n3m
+    implicit none
 
-      ALLOCATE(CSTAR(N1M,N2M,N3M))
-      ALLOCATE(KSTAR(N1M,N2M,N3M,6))
+    allocate (cstar(n1m, n2m, n3m))
+    allocate (kstar(n1m, n2m, n3m, 6))
 
-      CSTAR = 1.
-      KSTAR = 1.
+    cstar = 1.
+    kstar = 1.
 
-      RETURN
-      END SUBROUTINE CONJG_ALLO
+    return
+  end subroutine conjg_allo
 !=======================================================================
-      SUBROUTINE CONJG_DEALLO
+  subroutine conjg_deallo
 !=======================================================================
-      IMPLICIT NONE
+    implicit none
 
-      DEALLOCATE(CSTAR,KSTAR)
+    deallocate (cstar, kstar)
 
-      RETURN
-      END SUBROUTINE CONJG_DEALLO
+    return
+  end subroutine conjg_deallo
 !=======================================================================
-END MODULE MOD_FLOWARRAY
+end module mod_flowarray

@@ -221,9 +221,9 @@ if IBMINT == 'ON':
     YY = lib_ibm_body.geomfac_preset(Y, YM, YPRDIC)
     ZZ = lib_ibm_body.geomfac_preset(Z, ZM, ZPRDIC)
 
-    GEOMFAC['u'] = lib_ibm_body.geomfac_intp(XX[:,0], YY[:,1], ZZ[:,2], FCP['u'], INTPINDX['u'], .0)
-    GEOMFAC['v'] = lib_ibm_body.geomfac_intp(XX[:,1], YY[:,2], ZZ[:,0], FCP['v'], INTPINDX['v'], .0)
-    GEOMFAC['w'] = lib_ibm_body.geomfac_intp(XX[:,2], YY[:,0], ZZ[:,1], FCP['w'], INTPINDX['w'], .0)
+    GEOMFAC['u'] = lib_ibm_body.geomfac_intp(XX[:,0], YY[:,2], ZZ[:,1], FCP['u'], INTPINDX['u'], .0)
+    GEOMFAC['v'] = lib_ibm_body.geomfac_intp(XX[:,1], YY[:,0], ZZ[:,2], FCP['v'], INTPINDX['v'], .0)
+    GEOMFAC['w'] = lib_ibm_body.geomfac_intp(XX[:,2], YY[:,1], ZZ[:,0], FCP['w'], INTPINDX['w'], .0)
 
     if HTRNFR == 'ON':
         GEOMFAC['t'] = lib_ibm_body.geomfac_intp(XX[:,2], YY[:,2], ZZ[:,2], FCP['t'], INTPINDX['t'], .0)

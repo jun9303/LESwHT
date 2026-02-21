@@ -1,612 +1,601 @@
 !=======================================================================
 !
-!     Codebase (LICA 2017 Version) by 
-!     H. Choi / Department of Mechanical & Aerospace Engineering
-!     Seoul National University
+!     CODEBASE (LICA 2017 VERSION) BY
+!     H. CHOI / DEPARTMENT OF MECHANICAL & AEROSPACE ENGINEERING
+!     SEOUL NATIONAL UNIVERSITY
 !
 !=======================================================================
 !
-!     LESwHT (c) 2026 S. Lee (ORCID: 0000-0002-2063-6298)
-!     2018.02.28. Modified for F2PY (Fortran-to-Python) usage
-!     2026.02.18. Code modernization
+!     LESWHT (C) 2026 S. LEE (ORCID: 0000-0002-2063-6298)
+!     2018.02.28. MODIFIED FOR F2PY (FORTRAN-TO-PYTHON) USAGE
+!     2026.02.18. CODE MODERNIZATION
 !
 !=======================================================================
-SUBROUTINE FIND_INOUT(NX, NY, NZ, XCOORD, YCOORD, ZCOORD, NBODY, INOUT, T)
-    !$ USE OMP_LIB
-    IMPLICIT NONE
-    
-    INTEGER(8), INTENT(IN)  :: NX, NY, NZ
-    REAL(8),    INTENT(IN)  :: XCOORD(0:NX), YCOORD(0:NY), ZCOORD(0:NZ), T
-    INTEGER(8), INTENT(OUT) :: INOUT(0:NX, 0:NY, 0:NZ)
-    INTEGER(8), INTENT(OUT) :: NBODY
+subroutine find_inout(nx, ny, nz, xcoord, ycoord, zcoord, nbody, inout, t)
+!$ USE OMP_LIB
+  implicit none
 
-    INTEGER(8) :: I, J, K
-    REAL(8)    :: VAL
-    ! EXTERNAL FUNCTION DECLARATION
-    REAL(8), EXTERNAL :: FUNCBODY
+  integer(8), intent(in) :: nx, ny, nz
+  real(8), intent(in) :: xcoord(0:nx), ycoord(0:ny), zcoord(0:nz), t
+  integer(8), intent(out) :: inout(0:nx, 0:ny, 0:nz)
+  integer(8), intent(out) :: nbody
 
-    NBODY = 0
-    INOUT = 1
+  integer(8) :: i, j, k
+  real(8) :: val
+  ! EXTERNAL FUNCTION DECLARATION
+  real(8), external :: funcbody
 
-    !$OMP PARALLEL DO REDUCTION(+:NBODY) PRIVATE(I, J, K, VAL)
-    DO K = 0, NZ
-        DO J = 0, NY
-            DO I = 0, NX
-                VAL = FUNCBODY(XCOORD(I), YCOORD(J), ZCOORD(K), T)
-                IF (VAL .LE. 1.0D-10) THEN
-                    NBODY = NBODY + 1
-                    INOUT(I, J, K) = 0
-                ENDIF
-            ENDDO
-        ENDDO
-    ENDDO
-    !$OMP END PARALLEL DO
+  nbody = 0
+  inout = 1
 
-    RETURN
-END SUBROUTINE FIND_INOUT
+  !$OMP PARALLEL DO REDUCTION(+:NBODY) PRIVATE(I, J, K, VAL)
+  do k = 0, nz
+    do j = 0, ny
+      do i = 0, nx
+        val = funcbody(xcoord(i), ycoord(j), zcoord(k), t)
+        if (val .le. 1.0d-10) then
+          nbody = nbody + 1
+          inout(i, j, k) = 0
+        end if
+      end do
+    end do
+  end do
+  !$OMP END PARALLEL DO
 
-
-!=======================================================================
-SUBROUTINE FINDBDY_INTP(DIR, NX, NY, NZ, NBODY, INOUT, UFIX_X,   &
-                        UFIX_Y, UFIX_Z, LFIX_X, LFIX_Y, LFIX_Z,  &
-                        NINTP, NINNER, FCP, INTPTYPE, INTPINDX)
-    !$ USE OMP_LIB
-    IMPLICIT NONE
-    
-    INTEGER(8), INTENT(IN)  :: DIR, NX, NY, NZ, NBODY
-    INTEGER(8), INTENT(IN)  :: INOUT(0:NX, 0:NY, 0:NZ)
-    INTEGER(8), INTENT(IN)  :: UFIX_X(NX-1), UFIX_Y(NY-1), UFIX_Z(NZ-1)
-    INTEGER(8), INTENT(IN)  :: LFIX_X(NX-1), LFIX_Y(NY-1), LFIX_Z(NZ-1)
-    
-    INTEGER(8), INTENT(OUT) :: NINTP, NINNER
-    INTEGER(8), INTENT(OUT) :: FCP(NBODY, 3)
-    INTEGER(8), INTENT(OUT) :: INTPTYPE(NBODY, 1), INTPINDX(NBODY, 3)
-
-    INTEGER(8) :: I, J, K, IP, IM, JP, JM, KP, KM
-    INTEGER(8) :: ISTART, JSTART, KSTART
-    INTEGER(8) :: INOUT_SUM
-    
-    ! Temporary array for inner points to avoid race conditions or complex sorting
-    INTEGER(8), ALLOCATABLE :: FCP_TEMP(:,:)
-
-    ALLOCATE(FCP_TEMP(NBODY, 3))
-
-    ISTART = 1; JSTART = 1; KSTART = 1
-    IF (DIR .EQ. 1) ISTART = 2
-    IF (DIR .EQ. 2) JSTART = 2
-    IF (DIR .EQ. 3) KSTART = 2
-
-    NINTP = 0
-    NINNER = 0
-
-    ! Serial loop to classify points (could be parallelized with offset calculation)
-    DO K = KSTART, NZ-1
-        KM = K-1; KP = K+1
-        DO J = JSTART, NY-1
-            JM = J-1; JP = J+1
-            DO I = ISTART, NX-1
-                IM = I-1; IP = I+1
-
-                INOUT_SUM = (ABS(INOUT(IP,J,K)-INOUT(IM,J,K)))*(1-UFIX_X(I))*(1-LFIX_X(I)) &
-                          + (ABS(INOUT(I,JP,K)-INOUT(I,JM,K)))*(1-UFIX_Y(J))*(1-LFIX_Y(J)) &
-                          + (ABS(INOUT(I,J,KP)-INOUT(I,J,KM)))*(1-UFIX_Z(K))*(1-LFIX_Z(K))
-
-                IF ((INOUT(I,J,K) .EQ. 0) .AND. (INOUT_SUM .GT. 0)) THEN
-                    NINTP = NINTP + 1
-                    FCP(NINTP, 1) = I
-                    FCP(NINTP, 2) = J
-                    FCP(NINTP, 3) = K
-                    INTPTYPE(NINTP, 1) = INOUT_SUM
-                    INTPINDX(NINTP, 1) = INOUT(IP,J,K) - INOUT(IM,J,K)
-                    INTPINDX(NINTP, 2) = INOUT(I,JP,K) - INOUT(I,JM,K)
-                    INTPINDX(NINTP, 3) = INOUT(I,J,KP) - INOUT(I,J,KM)
-                ELSE IF ((INOUT(I,J,K) .EQ. 0) .AND. (INOUT_SUM .EQ. 0)) THEN
-                    NINNER = NINNER + 1
-                    FCP_TEMP(NINNER, 1) = I
-                    FCP_TEMP(NINNER, 2) = J
-                    FCP_TEMP(NINNER, 3) = K
-                ENDIF
-            ENDDO
-        ENDDO
-    ENDDO
-
-    ! Copy inner points to the end of FCP
-    !$OMP PARALLEL DO PRIVATE(I)
-    DO I = 1, NINNER
-        FCP(NINTP+I, 1) = FCP_TEMP(I, 1)
-        FCP(NINTP+I, 2) = FCP_TEMP(I, 2)
-        FCP(NINTP+I, 3) = FCP_TEMP(I, 3)
-    ENDDO
-    !$OMP END PARALLEL DO
-
-    DEALLOCATE(FCP_TEMP)
-
-END SUBROUTINE FINDBDY_INTP
-
+  return
+end subroutine find_inout
 
 !=======================================================================
-SUBROUTINE GEOMFAC_PRESET(NI, ICOORD, IM, PRDIC, I_ADJ)
-    !$ USE OMP_LIB
-    IMPLICIT NONE
-    
-    INTEGER(8), INTENT(IN)  :: NI
-    REAL(8),    INTENT(IN)  :: ICOORD(0:NI), IM(0:NI)
-    CHARACTER(*), INTENT(IN):: PRDIC
-    REAL(8),    INTENT(OUT) :: I_ADJ(-1:NI+1, 3)
-    INTEGER(8) :: L
+subroutine findbdy_intp(dir, nx, ny, nz, nbody, inout, ufix_x, &
+                        ufix_y, ufix_z, lfix_x, lfix_y, lfix_z, &
+                        nintp, ninner, fcp, intptype, intpindx)
+!$ USE OMP_LIB
+  implicit none
 
-    I_ADJ = 0.0d0
+  integer(8), intent(in) :: dir, nx, ny, nz, nbody
+  integer(8), intent(in) :: inout(0:nx, 0:ny, 0:nz)
+  integer(8), intent(in) :: ufix_x(nx - 1), ufix_y(ny - 1), ufix_z(nz - 1)
+  integer(8), intent(in) :: lfix_x(nx - 1), lfix_y(ny - 1), lfix_z(nz - 1)
 
-    DO L = 1, NI
-        I_ADJ(L, 1) = ICOORD(L)
-        I_ADJ(L, 2) = IM(L)
-        I_ADJ(L, 3) = IM(L)
-    ENDDO
-    I_ADJ(0, 2) = IM(0)
-    I_ADJ(0, 3) = IM(0)
+  integer(8), intent(out) :: nintp, ninner
+  integer(8), intent(out) :: fcp(nbody, 3)
+  integer(8), intent(out) :: intptype(nbody, 1), intpindx(nbody, 3)
 
-    IF (PRDIC .EQ. 'ON') THEN
-        I_ADJ(0, 1)    = ICOORD(1) - (ICOORD(NI) - ICOORD(NI-1))
-        I_ADJ(-1, 1)   = ICOORD(1) - (ICOORD(NI) - ICOORD(NI-2))
-        I_ADJ(NI+1, 1) = ICOORD(NI) + (ICOORD(2) - ICOORD(1))
+  integer(8) :: i, j, k, ip, im, jp, jm, kp, km
+  integer(8) :: istart, jstart, kstart
+  integer(8) :: inout_sum
 
-        I_ADJ(0, 2)    = ICOORD(1) - 0.5d0*(ICOORD(NI) - ICOORD(NI-1))
-        I_ADJ(-1, 2)   = ICOORD(1) - (ICOORD(NI) - ICOORD(NI-1)) - 0.5d0*(ICOORD(NI-1) - ICOORD(NI-2))
-        I_ADJ(NI, 2)   = ICOORD(NI) + 0.5d0*(ICOORD(2) - ICOORD(1))
-        I_ADJ(NI+1, 2) = ICOORD(NI) + ICOORD(2) - ICOORD(1) + 0.5d0*(ICOORD(3) - ICOORD(2))
+  ! TEMPORARY ARRAY FOR INNER POINTS TO AVOID RACE CONDITIONS OR COMPLEX SORTING
+  integer(8), allocatable :: fcp_temp(:, :)
 
-        I_ADJ(0, 3)    = I_ADJ(0, 2)
-        I_ADJ(-1, 3)   = I_ADJ(-1, 2)
-        I_ADJ(NI, 3)   = I_ADJ(NI, 2)
-        I_ADJ(NI+1, 3) = I_ADJ(NI+1, 2)
-    ENDIF
-END SUBROUTINE GEOMFAC_PRESET
+  allocate (fcp_temp(nbody, 3))
 
+  istart = 1; jstart = 1; kstart = 1
+  if (dir .eq. 1) istart = 2
+  if (dir .eq. 2) jstart = 2
+  if (dir .eq. 3) kstart = 2
 
-!=======================================================================
-SUBROUTINE GEOMFAC_INTP(NX, NY, NZ, XPRE, YPRE, ZPRE, NINTP, &
-                        NBODY, FCP, INTPINDX, GEOMFAC, T)
-    !$ USE OMP_LIB
-    IMPLICIT NONE
-    
-    INTEGER(8), INTENT(IN)  :: NX, NY, NZ, NINTP, NBODY
-    REAL(8),    INTENT(IN)  :: XPRE(-1:NX+1), YPRE(-1:NY+1), ZPRE(-1:NZ+1)
-    INTEGER(8), INTENT(IN)  :: FCP(NBODY, 3), INTPINDX(NINTP, 3)
-    REAL(8),    INTENT(OUT) :: GEOMFAC(NINTP, 3, 3, 3)
-    REAL(8),    INTENT(IN)  :: T
+  nintp = 0
+  ninner = 0
 
-    INTEGER(8) :: L, M, N, I, J, K, INDIC
-    REAL(8)    :: X0, Y0, Z0, X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3
-    REAL(8)    :: XTEMP1, YTEMP1, ZTEMP1, XTEMP2, YTEMP2, ZTEMP2
-    REAL(8)    :: FFS, FFE, FF1, FF2
-    REAL(8)    :: XX1, YY1, ZZ1, XX2, YY2, ZZ2
-    REAL(8)    :: DDX, DDY, DDZ, DX1, DX2, DX3, DY1, DY2, DY3, DZ1, DZ2, DZ3
-    REAL(8)    :: A0, B0, C0, A1, B1, C1
-    
-    REAL(8), EXTERNAL :: FUNCBODY
+  ! SERIAL LOOP TO CLASSIFY POINTS (COULD BE PARALLELIZED WITH OFFSET CALCULATION)
+  do k = kstart, nz - 1
+    km = k - 1; kp = k + 1
+    do j = jstart, ny - 1
+      jm = j - 1; jp = j + 1
+      do i = istart, nx - 1
+        im = i - 1; ip = i + 1
 
-    !$OMP PARALLEL DO PRIVATE(L, M, N, I, J, K, INDIC, X0, Y0, Z0, X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3) &
-    !$OMP PRIVATE(XTEMP1, YTEMP1, ZTEMP1, XTEMP2, YTEMP2, ZTEMP2, FFS, FFE, FF1, FF2) &
-    !$OMP PRIVATE(XX1, YY1, ZZ1, XX2, YY2, ZZ2, DDX, DDY, DDZ) &
-    !$OMP PRIVATE(DX1, DX2, DX3, DY1, DY2, DY3, DZ1, DZ2, DZ3, A0, B0, C0, A1, B1, C1)
-    DO L = 1, NINTP
-        X1 = XPRE(FCP(L,1))
-        Y1 = YPRE(FCP(L,2))
-        Z1 = ZPRE(FCP(L,3))
+        inout_sum = (abs(inout(ip, j, k) - inout(im, j, k))) * (1 - ufix_x(i)) * (1 - lfix_x(i)) &
+                    + (abs(inout(i, jp, k) - inout(i, jm, k))) * (1 - ufix_y(j)) * (1 - lfix_y(j)) &
+                    + (abs(inout(i, j, kp) - inout(i, j, km))) * (1 - ufix_z(k)) * (1 - lfix_z(k))
 
-        X2 = XPRE(FCP(L,1) + INTPINDX(L,1))
-        Y2 = YPRE(FCP(L,2) + INTPINDX(L,2))
-        Z2 = ZPRE(FCP(L,3) + INTPINDX(L,3))
+        if ((inout(i, j, k) .eq. 0) .and. (inout_sum .gt. 0)) then
+          nintp = nintp + 1
+          fcp(nintp, 1) = i
+          fcp(nintp, 2) = j
+          fcp(nintp, 3) = k
+          intptype(nintp, 1) = inout_sum
+          intpindx(nintp, 1) = inout(ip, j, k) - inout(im, j, k)
+          intpindx(nintp, 2) = inout(i, jp, k) - inout(i, jm, k)
+          intpindx(nintp, 3) = inout(i, j, kp) - inout(i, j, km)
+        else if ((inout(i, j, k) .eq. 0) .and. (inout_sum .eq. 0)) then
+          ninner = ninner + 1
+          fcp_temp(ninner, 1) = i
+          fcp_temp(ninner, 2) = j
+          fcp_temp(ninner, 3) = k
+        end if
+      end do
+    end do
+  end do
 
-        INDIC = 0
-        X0 = X1; Y0 = Y1; Z0 = Z1 ! Initialize to avoid warning
+  ! COPY INNER POINTS TO THE END OF FCP
+  !$OMP PARALLEL DO PRIVATE(I)
+  do i = 1, ninner
+    fcp(nintp + i, 1) = fcp_temp(i, 1)
+    fcp(nintp + i, 2) = fcp_temp(i, 2)
+    fcp(nintp + i, 3) = fcp_temp(i, 3)
+  end do
+  !$OMP END PARALLEL DO
 
-        DO M = 1, 3
-            IF (M .EQ. 1) THEN
-                XTEMP1 = X1; YTEMP1 = Y1; ZTEMP1 = Z1
-                XTEMP2 = X2; YTEMP2 = Y2; ZTEMP2 = Z2
-                FFS = FUNCBODY(X1, Y1, Z1, T)
-                FFE = FUNCBODY(X2, Y2, Z2, T)
-                
-                IF (FFS * FFE .GT. 0.0d0) THEN
-                    ! Should not happen if surface is between 1 and 2, but fail-safe
-                    GEOMFAC(L,:,:,:) = 0.0d0
-                    GEOMFAC(L,1,1,1) = 1.0d0
-                    GOTO 45
-                ENDIF
-            ELSE
-                XTEMP1 = XX1; YTEMP1 = YY1; ZTEMP1 = ZZ1
-                XTEMP2 = XX2; YTEMP2 = YY2; ZTEMP2 = ZZ2
-            ENDIF
+  deallocate (fcp_temp)
 
-            ! Bisect/Linear search for surface
-            DO N = 0, 19
-                DDX = XTEMP2 - XTEMP1
-                DDY = YTEMP2 - YTEMP1
-                DDZ = ZTEMP2 - ZTEMP1
-
-                XX1 = XTEMP1 + DDX * DBLE(N) / 20.0d0
-                XX2 = XTEMP1 + DDX * DBLE(N+1) / 20.0d0
-                YY1 = YTEMP1 + DDY * DBLE(N) / 20.0d0
-                YY2 = YTEMP1 + DDY * DBLE(N+1) / 20.0d0
-                ZZ1 = ZTEMP1 + DDZ * DBLE(N) / 20.0d0
-                ZZ2 = ZTEMP1 + DDZ * DBLE(N+1) / 20.0d0
-                
-                FF1 = FUNCBODY(XX1, YY1, ZZ1, T)
-                FF2 = FUNCBODY(XX2, YY2, ZZ2, T)
-
-                IF (FF1 .EQ. 0.0d0) THEN
-                    X0 = XX1; Y0 = YY1; Z0 = ZZ1
-                    GOTO 33
-                ELSE IF (FF2 .EQ. 0.0d0) THEN
-                    X0 = XX2; Y0 = YY2; Z0 = ZZ2
-                    GOTO 33
-                ELSE IF (FF1 * FF2 .LT. 0.0d0) THEN
-                    X0 = 0.5d0 * (XX1 + XX2)
-                    Y0 = 0.5d0 * (YY1 + YY2)
-                    Z0 = 0.5d0 * (ZZ1 + ZZ2)
-                    IF (M .EQ. 3) GOTO 33
-                    GOTO 22
-                ENDIF
-            ENDDO
- 22         CONTINUE
-        ENDDO
- 33     CONTINUE
-
-        X3 = XPRE(FCP(L,1) + INTPINDX(L,1)*2)
-        Y3 = YPRE(FCP(L,2) + INTPINDX(L,2)*2)
-        Z3 = ZPRE(FCP(L,3) + INTPINDX(L,3)*2)
-
-        DX1 = ABS(X1-X0); DX2 = ABS(X2-X0); DX3 = ABS(X3-X0)
-        DY1 = ABS(Y1-Y0); DY2 = ABS(Y2-Y0); DY3 = ABS(Y3-Y0)
-        DZ1 = ABS(Z1-Z0); DZ2 = ABS(Z2-Z0); DZ3 = ABS(Z3-Z0)
-
-        ! Weight Calculation (unchanged logic)
-        IF (INTPINDX(L,1) .EQ. 0) THEN
-            A0 = 1.0d0; A1 = 1.0d0
-        ELSE IF (DX2 .GE. DX1) THEN
-            A0 = DX2 / (DX1 + DX2)
-            A1 = 1.0d0
-        ELSE
-            A0 = 0.5d0
-            A1 = (DX3 - DX1) / (DX3 - DX2)
-        ENDIF
-
-        IF (INTPINDX(L,2) .EQ. 0) THEN
-            B0 = 1.0d0; B1 = 1.0d0
-        ELSE IF (DY2 .GE. DY1) THEN
-            B0 = DY2 / (DY1 + DY2)
-            B1 = 1.0d0
-        ELSE
-            B0 = 0.5d0
-            B1 = (DY3 - DY1) / (DY3 - DY2)
-        ENDIF
-
-        IF (INTPINDX(L,3) .EQ. 0) THEN
-            C0 = 1.0d0; C1 = 1.0d0
-        ELSE IF (DZ2 .GE. DZ1) THEN
-            C0 = DZ2 / (DZ1 + DZ2)
-            C1 = 1.0d0
-        ELSE
-            C0 = 0.5d0
-            C1 = (DZ3 - DZ1) / (DZ3 - DZ2)
-        ENDIF
-
-        ! Populate GEOMFAC (Direct assignments)
-        GEOMFAC(L,1,1,1) =  1./(A0*B0*C0)
-        GEOMFAC(L,1,1,2) = -1./(A0*B0*C0)*(A0)*(B0)*(1.-C0)*(C1)
-        GEOMFAC(L,1,1,3) = -1./(A0*B0*C0)*(A0)*(B0)*(1.-C0)*(1.-C1)
-        GEOMFAC(L,1,2,1) = -1./(A0*B0*C0)*(A0)*(1.-B0)*(C0)*(B1)
-        GEOMFAC(L,1,2,2) = -1./(A0*B0*C0)*(A0)*(1.-B0)*(1.-C0)*(B1)*(C1)
-        GEOMFAC(L,1,2,3) = -1./(A0*B0*C0)*(A0)*(1.-B0)*(1.-C0)*(B1)*(1.-C1)
-        GEOMFAC(L,1,3,1) = -1./(A0*B0*C0)*(A0)*(1.-B0)*(C0)*(1.-B1)
-        GEOMFAC(L,1,3,2) = -1./(A0*B0*C0)*(A0)*(1.-B0)*(1.-C0)*(1.-B1)*(C1)
-        GEOMFAC(L,1,3,3) = -1./(A0*B0*C0)*(A0)*(1.-B0)*(1.-C0)*(1.-B1)*(1.-C1)
-
-        GEOMFAC(L,2,1,1) = -1./(A0*B0*C0)*(1.-A0)*(B0)*(C0)*(A1)
-        GEOMFAC(L,2,1,2) = -1./(A0*B0*C0)*(1.-A0)*(B0)*(1.-C0)*(A1)*(C1)
-        GEOMFAC(L,2,1,3) = -1./(A0*B0*C0)*(1.-A0)*(B0)*(1.-C0)*(A1)*(1.-C1)
-        GEOMFAC(L,2,2,1) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(C0)*(A1)*(B1)
-        GEOMFAC(L,2,2,2) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(1.-C0)*(A1)*(B1)*(C1)
-        GEOMFAC(L,2,2,3) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(1.-C0)*(A1)*(B1)*(1.-C1)
-        GEOMFAC(L,2,3,1) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(C0)*(A1)*(1.-B1)
-        GEOMFAC(L,2,3,2) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(1.-C0)*(A1)*(1.-B1)*(C1)
-        GEOMFAC(L,2,3,3) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(1.-C0)*(A1)*(1.-B1)*(1.-C1)
-
-        GEOMFAC(L,3,1,1) = -1./(A0*B0*C0)*(1.-A0)*(B0)*(C0)*(1.-A1)
-        GEOMFAC(L,3,1,2) = -1./(A0*B0*C0)*(1.-A0)*(B0)*(1.-C0)*(1.-A1)*(C1)
-        GEOMFAC(L,3,1,3) = -1./(A0*B0*C0)*(1.-A0)*(B0)*(1.-C0)*(1.-A1)*(1.-C1)
-        GEOMFAC(L,3,2,1) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(C0)*(1.-A1)*(B1)
-        GEOMFAC(L,3,2,2) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(1.-C0)*(1.-A1)*(B1)*(C1)
-        GEOMFAC(L,3,2,3) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(1.-C0)*(1.-A1)*(B1)*(1.-C1)
-        GEOMFAC(L,3,3,1) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(C0)*(1.-A1)*(1.-B1)
-        GEOMFAC(L,3,3,2) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(1.-C0)*(1.-A1)*(1.-B1)*(C1)
-        GEOMFAC(L,3,3,3) = -1./(A0*B0*C0)*(1.-A0)*(1.-B0)*(1.-C0)*(1.-A1)*(1.-B1)*(1.-C1)
-45      CONTINUE
-    ENDDO
-    !$OMP END PARALLEL DO
-
-END SUBROUTINE GEOMFAC_INTP
-
+end subroutine findbdy_intp
 
 !=======================================================================
-SUBROUTINE FINDBDY_NOINTP(DIR, NX, NY, NZ, NBODY, INOUT, NINNER, FCP)
-    IMPLICIT NONE
-    INTEGER(8), INTENT(IN)  :: DIR, NX, NY, NZ, NBODY
-    INTEGER(8), INTENT(IN)  :: INOUT(0:NX, 0:NY, 0:NZ)
-    INTEGER(8), INTENT(OUT) :: NINNER
-    INTEGER(8), INTENT(OUT) :: FCP(NBODY, 3)
+subroutine geomfac_preset(ni, icoord, im, prdic, i_adj)
+!$ USE OMP_LIB
+  implicit none
 
-    INTEGER(8) :: I, J, K, ISTART, JSTART, KSTART
+  integer(8), intent(in) :: ni
+  real(8), intent(in) :: icoord(0:ni), im(0:ni)
+  character(*), intent(in) :: prdic
+  real(8), intent(out) :: i_adj(-1:ni + 1, 3)
+  integer(8) :: l
 
-    ISTART = 1; JSTART = 1; KSTART = 1
-    IF (DIR .EQ. 1) ISTART = 2
-    IF (DIR .EQ. 2) JSTART = 2
-    IF (DIR .EQ. 3) KSTART = 2
+  i_adj = 0.0d0
 
-    NINNER = 0
+  do l = 0, ni
+    i_adj(l, 1) = icoord(l)
+    i_adj(l, 2) = im(l)
+    i_adj(l, 3) = im(l)
+  end do
 
-    DO K = KSTART, NZ-1
-        DO J = JSTART, NY-1
-            DO I = ISTART, NX-1
-                IF (INOUT(I,J,K) .EQ. 0) THEN
-                    NINNER = NINNER + 1
-                    FCP(NINNER, 1) = I
-                    FCP(NINNER, 2) = J
-                    FCP(NINNER, 3) = K
-                ENDIF
-            ENDDO
-        ENDDO
-    ENDDO
+  if (prdic .eq. 'on') then
+    i_adj(-1, 1)   = icoord(0) - (icoord(ni) - icoord(ni-1))
+    i_adj(ni+1, 1) = icoord(ni) + (icoord(1) - icoord(0))
 
-END SUBROUTINE FINDBDY_NOINTP
+    i_adj(0, 2)    = icoord(0) - 0.5d0*(icoord(ni) - icoord(ni-1))
+    i_adj(-1, 2)   = i_adj(-1, 1) - 0.5d0*(icoord(ni-1) - icoord(ni-2))
+        
+    i_adj(ni+1, 2) = icoord(ni) + 0.5d0*(icoord(1) - icoord(0))
 
-
-!=======================================================================
-SUBROUTINE FIND_ZERO_NU_SGS(NX, NY, NZ, XM, YM, ZM, NZERO, INOUT, T)
-    !$ USE OMP_LIB
-    IMPLICIT NONE
-    
-    INTEGER(8), INTENT(IN)  :: NX, NY, NZ
-    REAL(8),    INTENT(IN)  :: XM(0:NX), YM(0:NY), ZM(0:NZ), T
-    INTEGER(8), INTENT(OUT) :: INOUT(1:NX-1, 1:NY-1, 1:NZ-1)
-    INTEGER(8), INTENT(OUT) :: NZERO
-
-    INTEGER(8) :: I, J, K
-    REAL(8), EXTERNAL :: FUNCBODY
-
-    NZERO = 0
-    INOUT = 1
-
-    !$OMP PARALLEL DO REDUCTION(+:NZERO) PRIVATE(I, J, K)
-    DO K = 1, NZ-1
-        DO J = 1, NY-1
-            DO I = 1, NX-1
-                ! Check 7-point stencil. If any point is inside body, zero viscosity.
-                IF ( (FUNCBODY(XM(I),   YM(J),   ZM(K),   T) .LE. 1.0D-10) .OR. &
-                     (FUNCBODY(XM(I-1), YM(J),   ZM(K),   T) .LE. 1.0D-10) .OR. &
-                     (FUNCBODY(XM(I+1), YM(J),   ZM(K),   T) .LE. 1.0D-10) .OR. &
-                     (FUNCBODY(XM(I),   YM(J-1), ZM(K),   T) .LE. 1.0D-10) .OR. &
-                     (FUNCBODY(XM(I),   YM(J+1), ZM(K),   T) .LE. 1.0D-10) .OR. &
-                     (FUNCBODY(XM(I),   YM(J),   ZM(K-1), T) .LE. 1.0D-10) .OR. &
-                     (FUNCBODY(XM(I),   YM(J),   ZM(K+1), T) .LE. 1.0D-10) ) THEN
-                    NZERO = NZERO + 1
-                    INOUT(I, J, K) = 0
-                ENDIF
-            ENDDO
-        ENDDO
-    ENDDO
-    !$OMP END PARALLEL DO
-
-END SUBROUTINE FIND_ZERO_NU_SGS
-
+    i_adj(0, 3)    = i_adj(0, 2)
+    i_adj(-1, 3)   = i_adj(-1, 2)
+    i_adj(ni+1, 3) = i_adj(ni+1, 2)
+  end if
+end subroutine geomfac_preset
 
 !=======================================================================
-SUBROUTINE CONJG_INTP(NX, NY, NZ, CRATIO, KRATIO, XM, YM, ZM, X, Y, Z, &
-                      ISZERO, T, CSTAR, KSTAR)
-    !$ USE OMP_LIB
-    IMPLICIT NONE
-    
-    INTEGER(8), INTENT(IN)  :: NX, NY, NZ
-    REAL(8),    INTENT(IN)  :: CRATIO, KRATIO
-    REAL(8),    INTENT(IN)  :: XM(0:NX), YM(0:NY), ZM(0:NZ)
-    REAL(8),    INTENT(IN)  :: X(0:NX), Y(0:NY), Z(0:NZ)
-    INTEGER(8), INTENT(IN)  :: ISZERO(1:NX-1, 1:NY-1, 1:NZ-1)
-    REAL(8),    INTENT(IN)  :: T
-    
-    REAL(8),    INTENT(OUT) :: CSTAR(1:NX-1, 1:NY-1, 1:NZ-1)
-    REAL(8),    INTENT(OUT) :: KSTAR(1:NX-1, 1:NY-1, 1:NZ-1, 6)
+subroutine geomfac_intp(nx, ny, nz, xpre, ypre, zpre, nintp, &
+                        nbody, fcp, intpindx, geomfac, t)
+!$ USE OMP_LIB
+  implicit none
 
-    INTEGER(8) :: I, J, K, SUBC
-    REAL(8)    :: FPTEMP, AA
-    REAL(8), EXTERNAL :: FUNCBODY, FLUID_PORTION
+  integer(8), intent(in) :: nx, ny, nz, nintp, nbody
+  real(8), intent(in) :: xpre(-1:nx + 1), ypre(-1:ny + 1), zpre(-1:nz + 1)
+  integer(8), intent(in) :: fcp(nbody, 3), intpindx(nintp, 3)
+  real(8), intent(out) :: geomfac(nintp, 3, 3, 3)
+  real(8), intent(in) :: t
 
-    ! Subdivision level for Flood Fill
-    SUBC = 6  ! Optimized value from Lee & Hwang (2019)
+  integer(8) :: l, m, n, i, j, k, indic
+  real(8) :: x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3
+  real(8) :: xtemp1, ytemp1, ztemp1, xtemp2, ytemp2, ztemp2
+  real(8) :: ffs, ffe, ff1, ff2
+  real(8) :: xx1, yy1, zz1, xx2, yy2, zz2
+  real(8) :: ddx, ddy, ddz, dx1, dx2, dx3, dy1, dy2, dy3, dz1, dz2, dz3
+  real(8) :: a0, b0, c0, a1, b1, c1
 
-    !$OMP PARALLEL DO PRIVATE(I, J, K, FPTEMP, AA)
-    DO K = 1, NZ-1
-        DO J = 1, NY-1
-            DO I = 1, NX-1
-                ! AA > 0 if Center is Fluid. AA <= 0 if Center is Solid.
-                AA = FUNCBODY(XM(I), YM(J), ZM(K), T)
+  real(8), external :: funcbody
 
-                ! Heat Capacity C*
-                FPTEMP = FLUID_PORTION(X(I), X(I+1), Y(J), Y(J+1), Z(K), Z(K+1), T, SUBC)
-                CSTAR(I,J,K) = (1.0d0 - FPTEMP)*CRATIO + FPTEMP*1.0d0
+  !$OMP PARALLEL DO PRIVATE(L, M, N, I, J, K, INDIC, X0, Y0, Z0, X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3) &
+  !$OMP PRIVATE(XTEMP1, YTEMP1, ZTEMP1, XTEMP2, YTEMP2, ZTEMP2, FFS, FFE, FF1, FF2) &
+  !$OMP PRIVATE(XX1, YY1, ZZ1, XX2, YY2, ZZ2, DDX, DDY, DDZ) &
+  !$OMP PRIVATE(DX1, DX2, DX3, DY1, DY2, DY3, DZ1, DZ2, DZ3, A0, B0, C0, A1, B1, C1)
+  do l = 1, nintp
+    x1 = xpre(fcp(l, 1))
+    y1 = ypre(fcp(l, 2))
+    z1 = zpre(fcp(l, 3))
 
-                ! Thermal Conductivity K* (6 faces)
-                
-                ! East Face (i+1/2) - Center (XM) to (XM+1)
-                ! Using 'Interim' cell logic from paper
-                FPTEMP = FLUID_PORTION(XM(I), XM(I+1), Y(J), Y(J+1), Z(K), Z(K+1), T, SUBC)
-                IF (AA * FUNCBODY(XM(I+1), YM(J), ZM(K), T) .GE. 0.0d0) THEN
-                    ! Same phase
-                    KSTAR(I,J,K,1) = (1.0d0 - FPTEMP)*KRATIO + FPTEMP*1.0d0
-                ELSE
-                    ! Harmonic mean for interface
-                    KSTAR(I,J,K,1) = KRATIO / (KRATIO*FPTEMP + 1.0d0*(1.0d0-FPTEMP))
-                ENDIF
+    x2 = xpre(fcp(l, 1) + intpindx(l, 1))
+    y2 = ypre(fcp(l, 2) + intpindx(l, 2))
+    z2 = zpre(fcp(l, 3) + intpindx(l, 3))
 
-                ! West Face (i-1/2)
-                FPTEMP = FLUID_PORTION(XM(I-1), XM(I), Y(J), Y(J+1), Z(K), Z(K+1), T, SUBC)
-                IF (AA * FUNCBODY(XM(I-1), YM(J), ZM(K), T) .GE. 0.0d0) THEN
-                    KSTAR(I,J,K,2) = (1.0d0 - FPTEMP)*KRATIO + FPTEMP*1.0d0
-                ELSE
-                    KSTAR(I,J,K,2) = KRATIO / (KRATIO*FPTEMP + 1.0d0*(1.0d0-FPTEMP))
-                ENDIF
+    indic = 0
+    x0 = x1; y0 = y1; z0 = z1 ! INITIALIZE TO AVOID WARNING
 
-                ! North Face (j+1/2)
-                FPTEMP = FLUID_PORTION(X(I), X(I+1), YM(J), YM(J+1), Z(K), Z(K+1), T, SUBC)
-                IF (AA * FUNCBODY(XM(I), YM(J+1), ZM(K), T) .GE. 0.0d0) THEN
-                    KSTAR(I,J,K,3) = (1.0d0 - FPTEMP)*KRATIO + FPTEMP*1.0d0
-                ELSE
-                    KSTAR(I,J,K,3) = KRATIO / (KRATIO*FPTEMP + 1.0d0*(1.0d0-FPTEMP))
-                ENDIF
+    do m = 1, 3
+      if (m .eq. 1) then
+        xtemp1 = x1; ytemp1 = y1; ztemp1 = z1
+        xtemp2 = x2; ytemp2 = y2; ztemp2 = z2
+        ffs = funcbody(x1, y1, z1, t)
+        ffe = funcbody(x2, y2, z2, t)
 
-                ! South Face (j-1/2)
-                FPTEMP = FLUID_PORTION(X(I), X(I+1), YM(J-1), YM(J), Z(K), Z(K+1), T, SUBC)
-                IF (AA * FUNCBODY(XM(I), YM(J-1), ZM(K), T) .GE. 0.0d0) THEN
-                    KSTAR(I,J,K,4) = (1.0d0 - FPTEMP)*KRATIO + FPTEMP*1.0d0
-                ELSE
-                    KSTAR(I,J,K,4) = KRATIO / (KRATIO*FPTEMP + 1.0d0*(1.0d0-FPTEMP))
-                ENDIF
+        if (ffs * ffe .gt. 0.0d0) then
+          ! SHOULD NOT HAPPEN IF SURFACE IS BETWEEN 1 AND 2, BUT FAIL-SAFE
+          geomfac(l, :, :, :) = 0.0d0
+          geomfac(l, 1, 1, 1) = 1.0d0
+          goto 45
+        end if
+      else
+        xtemp1 = xx1; ytemp1 = yy1; ztemp1 = zz1
+        xtemp2 = xx2; ytemp2 = yy2; ztemp2 = zz2
+      end if
 
-                ! Top Face (k+1/2)
-                FPTEMP = FLUID_PORTION(X(I), X(I+1), Y(J), Y(J+1), ZM(K), ZM(K+1), T, SUBC)
-                IF (AA * FUNCBODY(XM(I), YM(J), ZM(K+1), T) .GE. 0.0d0) THEN
-                    KSTAR(I,J,K,5) = (1.0d0 - FPTEMP)*KRATIO + FPTEMP*1.0d0
-                ELSE
-                    KSTAR(I,J,K,5) = KRATIO / (KRATIO*FPTEMP + 1.0d0*(1.0d0-FPTEMP))
-                ENDIF
+      ! BISECT/LINEAR SEARCH FOR SURFACE
+      do n = 0, 19
+        ddx = xtemp2 - xtemp1
+        ddy = ytemp2 - ytemp1
+        ddz = ztemp2 - ztemp1
 
-                ! Bottom Face (k-1/2)
-                FPTEMP = FLUID_PORTION(X(I), X(I+1), Y(J), Y(J+1), ZM(K-1), ZM(K), T, SUBC)
-                IF (AA * FUNCBODY(XM(I), YM(J), ZM(K-1), T) .GE. 0.0d0) THEN
-                    KSTAR(I,J,K,6) = (1.0d0 - FPTEMP)*KRATIO + FPTEMP*1.0d0
-                ELSE
-                    KSTAR(I,J,K,6) = KRATIO / (KRATIO*FPTEMP + 1.0d0*(1.0d0-FPTEMP))
-                ENDIF
-            ENDDO
-        ENDDO
-    ENDDO
-    !$OMP END PARALLEL DO
+        xx1 = xtemp1 + ddx * dble(n) / 20.0d0
+        xx2 = xtemp1 + ddx * dble(n + 1) / 20.0d0
+        yy1 = ytemp1 + ddy * dble(n) / 20.0d0
+        yy2 = ytemp1 + ddy * dble(n + 1) / 20.0d0
+        zz1 = ztemp1 + ddz * dble(n) / 20.0d0
+        zz2 = ztemp1 + ddz * dble(n + 1) / 20.0d0
 
-END SUBROUTINE CONJG_INTP
+        ff1 = funcbody(xx1, yy1, zz1, t)
+        ff2 = funcbody(xx2, yy2, zz2, t)
 
+        if (ff1 .eq. 0.0d0) then
+          x0 = xx1; y0 = yy1; z0 = zz1
+          goto 33
+        else if (ff2 .eq. 0.0d0) then
+          x0 = xx2; y0 = yy2; z0 = zz2
+          goto 33
+        else if (ff1 * ff2 .lt. 0.0d0) then
+          x0 = 0.5d0 * (xx1 + xx2)
+          y0 = 0.5d0 * (yy1 + yy2)
+          z0 = 0.5d0 * (zz1 + zz2)
+          if (m .eq. 3) goto 33
+          goto 22
+        end if
+      end do
+22    continue
+    end do
+33  continue
+
+    x3 = xpre(fcp(l, 1) + intpindx(l, 1) * 2)
+    y3 = ypre(fcp(l, 2) + intpindx(l, 2) * 2)
+    z3 = zpre(fcp(l, 3) + intpindx(l, 3) * 2)
+
+    dx1 = abs(x1 - x0); dx2 = abs(x2 - x0); dx3 = abs(x3 - x0)
+    dy1 = abs(y1 - y0); dy2 = abs(y2 - y0); dy3 = abs(y3 - y0)
+    dz1 = abs(z1 - z0); dz2 = abs(z2 - z0); dz3 = abs(z3 - z0)
+
+    ! WEIGHT CALCULATION (UNCHANGED LOGIC)
+    if (intpindx(l, 1) .eq. 0) then
+      a0 = 1.0d0; a1 = 1.0d0
+    else if (dx2 .ge. dx1) then
+      a0 = dx2 / (dx1 + dx2)
+      a1 = 1.0d0
+    else
+      a0 = 0.5d0
+      a1 = (dx3 - dx1) / (dx3 - dx2)
+    end if
+
+    if (intpindx(l, 2) .eq. 0) then
+      b0 = 1.0d0; b1 = 1.0d0
+    else if (dy2 .ge. dy1) then
+      b0 = dy2 / (dy1 + dy2)
+      b1 = 1.0d0
+    else
+      b0 = 0.5d0
+      b1 = (dy3 - dy1) / (dy3 - dy2)
+    end if
+
+    if (intpindx(l, 3) .eq. 0) then
+      c0 = 1.0d0; c1 = 1.0d0
+    else if (dz2 .ge. dz1) then
+      c0 = dz2 / (dz1 + dz2)
+      c1 = 1.0d0
+    else
+      c0 = 0.5d0
+      c1 = (dz3 - dz1) / (dz3 - dz2)
+    end if
+
+    ! POPULATE GEOMFAC (DIRECT ASSIGNMENTS)
+    geomfac(l, 1, 1, 1) = 1./(a0 * b0 * c0)
+    geomfac(l, 1, 1, 2) = -1./(a0 * b0 * c0) * (a0) * (b0) * (1.-c0) * (c1)
+    geomfac(l, 1, 1, 3) = -1./(a0 * b0 * c0) * (a0) * (b0) * (1.-c0) * (1.-c1)
+    geomfac(l, 1, 2, 1) = -1./(a0 * b0 * c0) * (a0) * (1.-b0) * (c0) * (b1)
+    geomfac(l, 1, 2, 2) = -1./(a0 * b0 * c0) * (a0) * (1.-b0) * (1.-c0) * (b1) * (c1)
+    geomfac(l, 1, 2, 3) = -1./(a0 * b0 * c0) * (a0) * (1.-b0) * (1.-c0) * (b1) * (1.-c1)
+    geomfac(l, 1, 3, 1) = -1./(a0 * b0 * c0) * (a0) * (1.-b0) * (c0) * (1.-b1)
+    geomfac(l, 1, 3, 2) = -1./(a0 * b0 * c0) * (a0) * (1.-b0) * (1.-c0) * (1.-b1) * (c1)
+    geomfac(l, 1, 3, 3) = -1./(a0 * b0 * c0) * (a0) * (1.-b0) * (1.-c0) * (1.-b1) * (1.-c1)
+
+    geomfac(l, 2, 1, 1) = -1./(a0 * b0 * c0) * (1.-a0) * (b0) * (c0) * (a1)
+    geomfac(l, 2, 1, 2) = -1./(a0 * b0 * c0) * (1.-a0) * (b0) * (1.-c0) * (a1) * (c1)
+    geomfac(l, 2, 1, 3) = -1./(a0 * b0 * c0) * (1.-a0) * (b0) * (1.-c0) * (a1) * (1.-c1)
+    geomfac(l, 2, 2, 1) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (c0) * (a1) * (b1)
+    geomfac(l, 2, 2, 2) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (1.-c0) * (a1) * (b1) * (c1)
+    geomfac(l, 2, 2, 3) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (1.-c0) * (a1) * (b1) * (1.-c1)
+    geomfac(l, 2, 3, 1) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (c0) * (a1) * (1.-b1)
+    geomfac(l, 2, 3, 2) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (1.-c0) * (a1) * (1.-b1) * (c1)
+    geomfac(l, 2, 3, 3) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (1.-c0) * (a1) * (1.-b1) * (1.-c1)
+
+    geomfac(l, 3, 1, 1) = -1./(a0 * b0 * c0) * (1.-a0) * (b0) * (c0) * (1.-a1)
+    geomfac(l, 3, 1, 2) = -1./(a0 * b0 * c0) * (1.-a0) * (b0) * (1.-c0) * (1.-a1) * (c1)
+    geomfac(l, 3, 1, 3) = -1./(a0 * b0 * c0) * (1.-a0) * (b0) * (1.-c0) * (1.-a1) * (1.-c1)
+    geomfac(l, 3, 2, 1) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (c0) * (1.-a1) * (b1)
+    geomfac(l, 3, 2, 2) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (1.-c0) * (1.-a1) * (b1) * (c1)
+    geomfac(l, 3, 2, 3) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (1.-c0) * (1.-a1) * (b1) * (1.-c1)
+    geomfac(l, 3, 3, 1) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (c0) * (1.-a1) * (1.-b1)
+    geomfac(l, 3, 3, 2) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (1.-c0) * (1.-a1) * (1.-b1) * (c1)
+    geomfac(l, 3, 3, 3) = -1./(a0 * b0 * c0) * (1.-a0) * (1.-b0) * (1.-c0) * (1.-a1) * (1.-b1) * (1.-c1)
+45  continue
+  end do
+  !$OMP END PARALLEL DO
+
+end subroutine geomfac_intp
 
 !=======================================================================
-FUNCTION FLUID_PORTION(X1, X2, Y1, Y2, Z1, Z2, T, DIV) RESULT(VAL)
-    IMPLICIT NONE
-    REAL(8), INTENT(IN) :: X1, X2, Y1, Y2, Z1, Z2, T
-    INTEGER(8), INTENT(IN) :: DIV
-    REAL(8) :: VAL
+subroutine findbdy_nointp(dir, nx, ny, nz, nbody, inout, ninner, fcp)
+  implicit none
+  integer(8), intent(in) :: dir, nx, ny, nz, nbody
+  integer(8), intent(in) :: inout(0:nx, 0:ny, 0:nz)
+  integer(8), intent(out) :: ninner
+  integer(8), intent(out) :: fcp(nbody, 3)
 
-    ! Local variables for Flood Fill
-    REAL(8) :: DX, DY, DZ, XC, YC, ZC
-    INTEGER(8) :: I, J, K, II, JJ, KK
-    INTEGER(8) :: SOLID_COUNT, START_PHASE
-    
-    ! Automatic Arrays (Thread-safe on Stack)
-    ! PHASE: -1 (Unknown), 0 (Solid), 1 (Fluid)
-    INTEGER(8) :: PHASE(DIV, DIV, DIV)
-    
-    ! Stack for recursion (Iterative implementation)
-    INTEGER(8) :: STACK(DIV*DIV*DIV, 3) 
-    INTEGER(8) :: STACK_PTR
-    
-    REAL(8), EXTERNAL :: FUNCBODY
+  integer(8) :: i, j, k, istart, jstart, kstart
 
-    DX = (X2 - X1) / DBLE(DIV)
-    DY = (Y2 - Y1) / DBLE(DIV)
-    DZ = (Z2 - Z1) / DBLE(DIV)
+  istart = 1; jstart = 1; kstart = 1
+  if (dir .eq. 1) istart = 2
+  if (dir .eq. 2) jstart = 2
+  if (dir .eq. 3) kstart = 2
 
-    ! Initialize
-    PHASE = -1
-    STACK_PTR = 0
-    SOLID_COUNT = 0
+  ninner = 0
 
-    ! --- STEP 1: INITIATION (Check Corner 1,1,1) ---
-    XC = X1 + DX * 0.5d0
-    YC = Y1 + DY * 0.5d0
-    ZC = Z1 + DZ * 0.5d0
-    
-    IF (FUNCBODY(XC, YC, ZC, T) .LE. 1.0D-10) THEN
-        START_PHASE = 0 ! Solid
-    ELSE
-        START_PHASE = 1 ! Fluid
-    ENDIF
-    
-    PHASE(1, 1, 1) = START_PHASE
-    STACK_PTR = STACK_PTR + 1
-    STACK(STACK_PTR, 1) = 1
-    STACK(STACK_PTR, 2) = 1
-    STACK(STACK_PTR, 3) = 1
+  do k = kstart, nz - 1
+    do j = jstart, ny - 1
+      do i = istart, nx - 1
+        if (inout(i, j, k) .eq. 0) then
+          ninner = ninner + 1
+          fcp(ninner, 1) = i
+          fcp(ninner, 2) = j
+          fcp(ninner, 3) = k
+        end if
+      end do
+    end do
+  end do
 
-    ! --- STEP 2: FLOOD FILL ---
-    DO WHILE (STACK_PTR .GT. 0)
-        ! Pop
-        I = STACK(STACK_PTR, 1)
-        J = STACK(STACK_PTR, 2)
-        K = STACK(STACK_PTR, 3)
-        STACK_PTR = STACK_PTR - 1
+end subroutine findbdy_nointp
 
-        ! Check 6 neighbors
-        DO KK = K-1, K+1
-        DO JJ = J-1, J+1
-        DO II = I-1, I+1
-            ! Check Manhatten distance = 1 (Neighbors only, no diagonals, no self)
-            IF (ABS(II-I)+ABS(JJ-J)+ABS(KK-K) .NE. 1) CYCLE
-            
-            ! Boundary Check
-            IF (II .LT. 1 .OR. II .GT. DIV) CYCLE
-            IF (JJ .LT. 1 .OR. JJ .GT. DIV) CYCLE
-            IF (KK .LT. 1 .OR. KK .GT. DIV) CYCLE
-            
-            ! If already visited/identified, skip
-            IF (PHASE(II, JJ, KK) .NE. -1) CYCLE
+!=======================================================================
+subroutine find_zero_nu_sgs(nx, ny, nz, xm, ym, zm, nzero, inout, t)
+!$ USE OMP_LIB
+  implicit none
 
-            ! Identify Neighbor
-            XC = X1 + (X2-X1)/DBLE(DIV) * (DBLE(2*II-1)/2.0d0)
-            YC = Y1 + (Y2-Y1)/DBLE(DIV) * (DBLE(2*JJ-1)/2.0d0)
-            ZC = Z1 + (Z2-Z1)/DBLE(DIV) * (DBLE(2*KK-1)/2.0d0)
+  integer(8), intent(in) :: nx, ny, nz
+  real(8), intent(in) :: xm(0:nx), ym(0:ny), zm(0:nz), t
+  integer(8), intent(out) :: inout(1:nx - 1, 1:ny - 1, 1:nz - 1)
+  integer(8), intent(out) :: nzero
 
-            IF (FUNCBODY(XC, YC, ZC, T) .LE. 1.0D-10) THEN
-                PHASE(II, JJ, KK) = 0 ! Solid
-            ELSE
-                PHASE(II, JJ, KK) = 1 ! Fluid
-            ENDIF
+  integer(8) :: i, j, k
+  real(8), external :: funcbody
 
-            ! If Neighbor has SAME phase as Start, push to stack (continue flood)
-            ! If different, it is a boundary, so we stop flooding that path.
-            IF (PHASE(II, JJ, KK) .EQ. START_PHASE) THEN
-                STACK_PTR = STACK_PTR + 1
-                STACK(STACK_PTR, 1) = II
-                STACK(STACK_PTR, 2) = JJ
-                STACK(STACK_PTR, 3) = KK
-            ENDIF
-        ENDDO
-        ENDDO
-        ENDDO
-    ENDDO
+  nzero = 0
+  inout = 1
 
-    ! --- STEP 3: TERMINATION & COUNTING ---
-    ! Any sub-cell with PHASE == -1 is inaccessible from (1,1,1).
-    ! Assuming single interface, these must be the OPPOSITE phase of START_PHASE.
-    DO K = 1, DIV
-        DO J = 1, DIV
-            DO I = 1, DIV
-                IF (PHASE(I, J, K) .EQ. -1) THEN
-                    PHASE(I, J, K) = 1 - START_PHASE
-                ENDIF
-                
-                IF (PHASE(I, J, K) .EQ. 0) THEN
-                    SOLID_COUNT = SOLID_COUNT + 1
-                ENDIF
-            ENDDO
-        ENDDO
-    ENDDO
+  !$OMP PARALLEL DO REDUCTION(+:NZERO) PRIVATE(I, J, K)
+  do k = 1, nz - 1
+    do j = 1, ny - 1
+      do i = 1, nx - 1
+        ! CHECK 7-POINT STENCIL. IF ANY POINT IS INSIDE BODY, ZERO VISCOSITY.
+        if ((funcbody(xm(i), ym(j), zm(k), t) .le. 1.0d-10) .or. &
+            (funcbody(xm(i - 1), ym(j), zm(k), t) .le. 1.0d-10) .or. &
+            (funcbody(xm(i + 1), ym(j), zm(k), t) .le. 1.0d-10) .or. &
+            (funcbody(xm(i), ym(j - 1), zm(k), t) .le. 1.0d-10) .or. &
+            (funcbody(xm(i), ym(j + 1), zm(k), t) .le. 1.0d-10) .or. &
+            (funcbody(xm(i), ym(j), zm(k - 1), t) .le. 1.0d-10) .or. &
+            (funcbody(xm(i), ym(j), zm(k + 1), t) .le. 1.0d-10)) then
+          nzero = nzero + 1
+          inout(i, j, k) = 0
+        end if
+      end do
+    end do
+  end do
+  !$OMP END PARALLEL DO
 
-    VAL = 1.0d0 - DBLE(SOLID_COUNT) / DBLE(DIV**3)
+end subroutine find_zero_nu_sgs
 
-END FUNCTION FLUID_PORTION
+!=======================================================================
+subroutine conjg_intp(nx, ny, nz, cratio, kratio, xm, ym, zm, x, y, z, &
+                      iszero, t, cstar, kstar)
+!$ USE OMP_LIB
+  implicit none
+
+  integer(8), intent(in) :: nx, ny, nz
+  real(8), intent(in) :: cratio, kratio
+  real(8), intent(in) :: xm(0:nx), ym(0:ny), zm(0:nz)
+  real(8), intent(in) :: x(0:nx), y(0:ny), z(0:nz)
+  integer(8), intent(in) :: iszero(1:nx - 1, 1:ny - 1, 1:nz - 1)
+  real(8), intent(in) :: t
+
+  real(8), intent(out) :: cstar(1:nx - 1, 1:ny - 1, 1:nz - 1)
+  real(8), intent(out) :: kstar(1:nx - 1, 1:ny - 1, 1:nz - 1, 6)
+
+  integer(8) :: i, j, k, subc
+  real(8) :: fptemp, aa
+  real(8), external :: funcbody, fluid_portion
+
+  ! SUBDIVISION LEVEL FOR FLOOD FILL
+  subc = 6  ! OPTIMIZED VALUE FROM LEE & HWANG (2019)
+
+  !$OMP PARALLEL DO PRIVATE(I, J, K, FPTEMP, AA)
+  do k = 1, nz - 1
+    do j = 1, ny - 1
+      do i = 1, nx - 1
+        ! AA > 0 IF CENTER IS FLUID. AA <= 0 IF CENTER IS SOLID.
+        aa = funcbody(xm(i), ym(j), zm(k), t)
+
+        ! HEAT CAPACITY C*
+        fptemp = fluid_portion(x(i), x(i + 1), y(j), y(j + 1), z(k), z(k + 1), t, subc)
+        cstar(i, j, k) = (1.0d0 - fptemp) * cratio + fptemp * 1.0d0
+
+        ! THERMAL CONDUCTIVITY K* (6 FACES)
+
+        ! EAST FACE (I+1/2) - CENTER (XM) TO (XM+1)
+        ! USING 'INTERIM' CELL LOGIC FROM PAPER
+        fptemp = fluid_portion(xm(i), xm(i + 1), y(j), y(j + 1), z(k), z(k + 1), t, subc)
+        if (aa * funcbody(xm(i + 1), ym(j), zm(k), t) .ge. 0.0d0) then
+          ! SAME PHASE
+          kstar(i, j, k, 1) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
+        else
+          ! HARMONIC MEAN FOR INTERFACE
+          kstar(i, j, k, 1) = kratio / (kratio * fptemp + 1.0d0 * (1.0d0 - fptemp))
+        end if
+
+        ! WEST FACE (I-1/2)
+        fptemp = fluid_portion(xm(i - 1), xm(i), y(j), y(j + 1), z(k), z(k + 1), t, subc)
+        if (aa * funcbody(xm(i - 1), ym(j), zm(k), t) .ge. 0.0d0) then
+          kstar(i, j, k, 2) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
+        else
+          kstar(i, j, k, 2) = kratio / (kratio * fptemp + 1.0d0 * (1.0d0 - fptemp))
+        end if
+
+        ! NORTH FACE (J+1/2)
+        fptemp = fluid_portion(x(i), x(i + 1), ym(j), ym(j + 1), z(k), z(k + 1), t, subc)
+        if (aa * funcbody(xm(i), ym(j + 1), zm(k), t) .ge. 0.0d0) then
+          kstar(i, j, k, 3) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
+        else
+          kstar(i, j, k, 3) = kratio / (kratio * fptemp + 1.0d0 * (1.0d0 - fptemp))
+        end if
+
+        ! SOUTH FACE (J-1/2)
+        fptemp = fluid_portion(x(i), x(i + 1), ym(j - 1), ym(j), z(k), z(k + 1), t, subc)
+        if (aa * funcbody(xm(i), ym(j - 1), zm(k), t) .ge. 0.0d0) then
+          kstar(i, j, k, 4) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
+        else
+          kstar(i, j, k, 4) = kratio / (kratio * fptemp + 1.0d0 * (1.0d0 - fptemp))
+        end if
+
+        ! TOP FACE (K+1/2)
+        fptemp = fluid_portion(x(i), x(i + 1), y(j), y(j + 1), zm(k), zm(k + 1), t, subc)
+        if (aa * funcbody(xm(i), ym(j), zm(k + 1), t) .ge. 0.0d0) then
+          kstar(i, j, k, 5) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
+        else
+          kstar(i, j, k, 5) = kratio / (kratio * fptemp + 1.0d0 * (1.0d0 - fptemp))
+        end if
+
+        ! BOTTOM FACE (K-1/2)
+        fptemp = fluid_portion(x(i), x(i + 1), y(j), y(j + 1), zm(k - 1), zm(k), t, subc)
+        if (aa * funcbody(xm(i), ym(j), zm(k - 1), t) .ge. 0.0d0) then
+          kstar(i, j, k, 6) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
+        else
+          kstar(i, j, k, 6) = kratio / (kratio * fptemp + 1.0d0 * (1.0d0 - fptemp))
+        end if
+      end do
+    end do
+  end do
+  !$OMP END PARALLEL DO
+
+end subroutine conjg_intp
+
+!=======================================================================
+function fluid_portion(x1, x2, y1, y2, z1, z2, t, div) result(val)
+  implicit none
+  real(8), intent(in) :: x1, x2, y1, y2, z1, z2, t
+  integer(8), intent(in) :: div
+  real(8) :: val
+
+  ! LOCAL VARIABLES FOR FLOOD FILL
+  real(8) :: dx, dy, dz, xc, yc, zc
+  integer(8) :: i, j, k, ii, jj, kk
+  integer(8) :: solid_count, start_phase
+
+  ! AUTOMATIC ARRAYS (THREAD-SAFE ON STACK)
+  ! PHASE: -1 (UNKNOWN), 0 (SOLID), 1 (FLUID)
+  integer(8) :: phase(div, div, div)
+
+  ! STACK FOR RECURSION (ITERATIVE IMPLEMENTATION)
+  integer(8) :: stack(div * div * div, 3)
+  integer(8) :: stack_ptr
+
+  real(8), external :: funcbody
+
+  dx = (x2 - x1) / dble(div)
+  dy = (y2 - y1) / dble(div)
+  dz = (z2 - z1) / dble(div)
+
+  ! INITIALIZE
+  phase = -1
+  stack_ptr = 0
+  solid_count = 0
+
+  ! --- STEP 1: INITIATION (CHECK CORNER 1,1,1) ---
+  xc = x1 + dx * 0.5d0
+  yc = y1 + dy * 0.5d0
+  zc = z1 + dz * 0.5d0
+
+  if (funcbody(xc, yc, zc, t) .le. 1.0d-10) then
+    start_phase = 0 ! SOLID
+  else
+    start_phase = 1 ! FLUID
+  end if
+
+  phase(1, 1, 1) = start_phase
+  stack_ptr = stack_ptr + 1
+  stack(stack_ptr, 1) = 1
+  stack(stack_ptr, 2) = 1
+  stack(stack_ptr, 3) = 1
+
+  ! --- STEP 2: FLOOD FILL ---
+  do while (stack_ptr .gt. 0)
+    ! POP
+    i = stack(stack_ptr, 1)
+    j = stack(stack_ptr, 2)
+    k = stack(stack_ptr, 3)
+    stack_ptr = stack_ptr - 1
+
+    ! CHECK 6 NEIGHBORS
+    do kk = k - 1, k + 1
+      do jj = j - 1, j + 1
+        do ii = i - 1, i + 1
+          ! CHECK MANHATTEN DISTANCE = 1 (NEIGHBORS ONLY, NO DIAGONALS, NO SELF)
+          if (abs(ii - i) + abs(jj - j) + abs(kk - k) .ne. 1) cycle
+
+          ! BOUNDARY CHECK
+          if (ii .lt. 1 .or. ii .gt. div) cycle
+          if (jj .lt. 1 .or. jj .gt. div) cycle
+          if (kk .lt. 1 .or. kk .gt. div) cycle
+
+          ! IF ALREADY VISITED/IDENTIFIED, SKIP
+          if (phase(ii, jj, kk) .ne. -1) cycle
+
+          ! IDENTIFY NEIGHBOR
+          xc = x1 + (x2 - x1) / dble(div) * (dble(2 * ii - 1) / 2.0d0)
+          yc = y1 + (y2 - y1) / dble(div) * (dble(2 * jj - 1) / 2.0d0)
+          zc = z1 + (z2 - z1) / dble(div) * (dble(2 * kk - 1) / 2.0d0)
+
+          if (funcbody(xc, yc, zc, t) .le. 1.0d-10) then
+            phase(ii, jj, kk) = 0 ! SOLID
+          else
+            phase(ii, jj, kk) = 1 ! FLUID
+          end if
+
+          ! IF NEIGHBOR HAS SAME PHASE AS START, PUSH TO STACK (CONTINUE FLOOD)
+          ! IF DIFFERENT, IT IS A BOUNDARY, SO WE STOP FLOODING THAT PATH.
+          if (phase(ii, jj, kk) .eq. start_phase) then
+            stack_ptr = stack_ptr + 1
+            stack(stack_ptr, 1) = ii
+            stack(stack_ptr, 2) = jj
+            stack(stack_ptr, 3) = kk
+          end if
+        end do
+      end do
+    end do
+  end do
+
+  ! --- STEP 3: TERMINATION & COUNTING ---
+  ! ANY SUB-CELL WITH PHASE == -1 IS INACCESSIBLE FROM (1,1,1).
+  ! ASSUMING SINGLE INTERFACE, THESE MUST BE THE OPPOSITE PHASE OF START_PHASE.
+  do k = 1, div
+    do j = 1, div
+      do i = 1, div
+        if (phase(i, j, k) .eq. -1) then
+          phase(i, j, k) = 1 - start_phase
+        end if
+
+        if (phase(i, j, k) .eq. 0) then
+          solid_count = solid_count + 1
+        end if
+      end do
+    end do
+  end do
+
+  val = 1.0d0 - dble(solid_count) / dble(div**3)
+
+end function fluid_portion

@@ -1,179 +1,185 @@
 !=======================================================================
 !
-!     Codebase (LICA 2017 Version) by 
-!     H. Choi / Department of Mechanical & Aerospace Engineering
-!     Seoul National University
+!     CODEBASE (LICA 2017 VERSION) BY
+!     H. CHOI / DEPARTMENT OF MECHANICAL & AEROSPACE ENGINEERING
+!     SEOUL NATIONAL UNIVERSITY
 !
 !=======================================================================
 !
-!     LESwHT (c) 2026 S. Lee (ORCID: 0000-0002-2063-6298)
-!     2018.02.28. Updated (DOI:10.1016/j.ijheatmasstransfer.2019.01.019)
-!     2026.02.18. Code modernization
+!     LESWHT (C) 2026 S. LEE (ORCID: 0000-0002-2063-6298)
+!     2018.02.28. UPDATED (DOI:10.1016/J.IJHEATMASSTRANSFER.2019.01.019)
+!     2026.02.18. CODE MODERNIZATION
 !
 !=======================================================================
-PROGRAM SOLVER
-    USE MOD_COMMON
-    USE MOD_FLOWARRAY
-    IMPLICIT NONE
-    
-    ! INTEGER(8) :: I, J, K, N
-    REAL(8)    :: OMP_GET_WTIME
+program solver
+  use mod_common
+  use mod_flowarray
+  implicit none
 
-    !===================================================================
-    !     INITIALIZATION PHASE
-    !===================================================================
-    CALL PRINT_REAL_TIME()                   ! AT MISC_INIT LIBRARY
-                     
-    TOTAL_TIME_B = OMP_GET_WTIME()           ! INTRINSIC SUBROUTINE
-    CALL READSETTINGS()                      ! AT MISC_INIT LIBRARY
-    CALL READBCS()                           ! AT MISC_INIT LIBRARY
-    CALL READGEOM()                          ! AT MISC_INIT LIBRARY
-    CALL ALLOINIT()                          ! AT MISC_INIT LIBRARY
-    CALL ALLO_ARRAY()                        ! AT MISC_INIT LIBRARY
+  real(8) :: omp_get_wtime
+  real(8) :: time_prev
+  logical :: perturb_applied
 
-    ! --- LOAD PRE-PROCESSED DATA ---
-    IF (IBMON .EQ. 1) THEN
-        CALL IBMPREREAD()                    ! AT MISC_INIT LIBRARY
-        IF (ILES .EQ. 1) THEN
-            CALL NUTZEROREAD()               ! AT MISC_INIT LIBRARY
-        ENDIF
-        IF (ICONJG .EQ. 1) CALL CONJGREAD()  ! AT MISC_INIT LIBRARY
-    ENDIF
+  !===================================================================
+  !     INITIALIZATION PHASE
+  !===================================================================
+  call print_real_time()                   ! AT MISC_INIT LIBRARY
 
-    IF (ILES .EQ. 1) CALL SGSFILTERINIT()    ! AT SGS LIBRARY
+  total_time_b = omp_get_wtime()           ! INTRINSIC SUBROUTINE
+  call readsettings()                      ! AT MISC_INIT LIBRARY
+  call readbcs()                           ! AT MISC_INIT LIBRARY
+  call readgeom()                          ! AT MISC_INIT LIBRARY
+  call alloinit()                          ! AT MISC_INIT LIBRARY
+  call allo_array()                        ! AT MISC_INIT LIBRARY
 
-    ! --- FIELD LOADING ---
-    IF (IREAD .EQ. 1) THEN
-        CALL PREFLD()                        ! AT MISC_INIT LIBRARY
-    ELSE
-        CALL MAKEFLD()                       ! AT MISC_INIT LIBRARY
-        IF (EPS_PTR .NE. 0.0d0) THEN
-            CALL ADDPERTURB() 
-            ! Synchronize ghost cells so the Poisson solver doesn't blow up
-            CALL PRDIC_ADJ_UVW(0) 
-        ENDIF
-        CALL WRITEFIELD()
-    ENDIF
+  ! --- LOAD PRE-PROCESSED DATA ---
+  if (ibmon .eq. 1) then
+    call ibmpreread()                    ! AT MISC_INIT LIBRARY
+    if (iles .eq. 1) then
+      call nutzeroread()               ! AT MISC_INIT LIBRARY
+    end if
+    if (iconjg .eq. 1) call conjgread()  ! AT MISC_INIT LIBRARY
+  end if
 
-    IF (ICH .EQ. 1) CALL MEANPG()             ! AT SLV_MMTM LIBRARY
+  if (iles .eq. 1) call sgsfilterinit()    ! AT SGS LIBRARY
 
-    ! --- MISCELLANEOUS SETTINGS ---
-    CALL DTTIMEINIT()                        ! AT MISC_INIT LIBRARY
-    CALL RK3COEFINIT()                       ! AT MISC_INIT LIBRARY
-    CALL LHSINIT()                           ! AT SLV_MMTM LIBRARY
-    CALL POISINIT()                          ! AT POISS LIBRARY
-    CALL FTRFILES(1)
+  ! --- FIELD LOADING ---
+  if (iread .eq. 1) then
+    call prefld()                        ! AT MISC_INIT LIBRARY
+  else
+    call makefld()                       ! AT MISC_INIT LIBRARY
+    call writefield()
+  end if
 
-    CFLMAX = CFLFAC
-    NV = 101
-    NAV = 2001
+  if (ich .eq. 1) call meanpg()             ! AT SLV_MMTM LIBRARY
 
-    !===================================================================
-    !     TIME-DEPENDENT CALCULATION (MAIN SOLVER)
-    !===================================================================
-    DO M = 1, NTST
-        TIME_BEGIN = OMP_GET_WTIME()         ! INTRINSIC SUBROUTINE
-        CALL STEPINIT()                      ! AT SLV_AUXI LIBRARY
-        SUBDT = 0.0d0
+  ! --- MISCELLANEOUS SETTINGS ---
+  call dttimeinit()                        ! AT MISC_INIT LIBRARY
+  call rk3coefinit()                       ! AT MISC_INIT LIBRARY
+  call lhsinit()                           ! AT SLV_MMTM LIBRARY
+  call poisinit()                          ! AT POISS LIBRARY
+  call ftrfiles(1)
 
-        !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        !     RK3 SUB-STEP LOOP
-        !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        DO MSUB = 1, 3
-            CALL SUBSTEPINIT(MSUB)           ! AT SLV_AUXI LIBRARY
-            
-            IF (ICH .EQ. 1) THEN
-                CALL QVOLCALC(QVOL(1))       ! AT SLV_AUXI LIBRARY
-            ENDIF
+  cflmax = cflfac
+  nv = 101
+  nav = 3001
+  perturb_applied = .false.
 
-            SGSTIME_B(MSUB) = OMP_GET_WTIME()
-            IF (ILES .EQ. 1) THEN
-                CALL SGSCALC()               ! AT SGS LIBRARY
-                IF (IHTRANS .EQ. 1) CALL SGSCALC_T() ! AT SGS LIBRARY
-            ENDIF
-            SGSTIME_E(MSUB) = OMP_GET_WTIME()
+  !===================================================================
+  !     TIME-DEPENDENT CALCULATION (MAIN SOLVER)
+  !===================================================================
+  do m = 1, ntst
+    time_begin = omp_get_wtime()         ! INTRINSIC SUBROUTINE
+    call stepinit()                      ! AT SLV_AUXI LIBRARY
+    subdt = 0.0d0
 
-            IF (IMOVINGON .EQ. 1) CALL FINDFORCING() ! AT IBM_BODY (GLOBAL)
+    !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    !     RK3 SUB-STEP LOOP
+    !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    do msub = 1, 3
+      call substepinit(msub)           ! AT SLV_AUXI LIBRARY
 
-            RHSNLHSTIME_B(MSUB) = OMP_GET_WTIME()
-            CALL RHSNLHS()                   ! AT SLV_MMTM LIBRARY
-            RHSNLHSTIME_E(MSUB) = OMP_GET_WTIME()
+      if (ich .eq. 1) then
+        call qvolcalc(qvol(1))       ! AT SLV_AUXI LIBRARY
+      end if
 
-            ALLOCATE(DIVGSUM(0:N1, 0:N2, 0:N3))
-            ALLOCATE(PHI(0:N1, 0:N2, 0:N3))
-            DIVGSUM = 0.0d0
-            PHI = 0.0d0
+      sgstime_b(msub) = omp_get_wtime()
+      if (iles .eq. 1) then
+        call sgscalc()               ! AT SGS LIBRARY
+        if (ihtrans .eq. 1) call sgscalc_t() ! AT SGS LIBRARY
+      end if
+      sgstime_e(msub) = omp_get_wtime()
 
-            POISSTIME_B(MSUB) = OMP_GET_WTIME()
-            CALL DIVGS(DIVGSUM)              ! AT SLV_CONT LIBRARY
-            CALL POISSON(PHI, DIVGSUM)       ! AT POISS LIBRARY
-            POISSTIME_E(MSUB) = OMP_GET_WTIME()
+      if (imovingon .eq. 1) call findforcing() ! AT IBM_BODY (GLOBAL)
 
-            IF (ICH .EQ. 1) THEN
-                CALL QVOLCALC(QVOL(2))       ! AT SLV_AUXI LIBRARY
-                CALL QVOLCORR()              ! AT SLV_AUXI LIBRARY
-            ENDIF
-            
-            CALL UCALC(PHI)
+      rhsnlhstime_b(msub) = omp_get_wtime()
+      call rhsnlhs()                   ! AT SLV_MMTM LIBRARY
+      rhsnlhstime_e(msub) = omp_get_wtime()
 
-            IF (ICH .EQ. 1) THEN
-                CALL QVOLCALC(QVOL(0))       ! AT SLV_AUXI LIBRARY
-            ENDIF
+      allocate (divgsum(0:n1, 0:n2, 0:n3))
+      allocate (phi(0:n1, 0:n2, 0:n3))
+      divgsum = 0.0d0
+      phi = 0.0d0
 
-            CALL PCALC(PHI, DIVGSUM)
+      poisstime_b(msub) = omp_get_wtime()
+      call divgs(divgsum)              ! AT SLV_CONT LIBRARY
+      call poisson(phi, divgsum)       ! AT POISS LIBRARY
+      poisstime_e(msub) = omp_get_wtime()
 
-            IF (ICH .EQ. 1) CALL MEANPG()    ! AT SLV_AUXI LIBRARY
-            IF (IBMON .EQ. 1) CALL LAGFORCE()
+      if (ich .eq. 1) then
+        call qvolcalc(qvol(2))       ! AT SLV_AUXI LIBRARY
+        call qvolcorr()              ! AT SLV_AUXI LIBRARY
+      end if
 
-            IF (IHTRANS .EQ. 1) THEN
-                IF (ICH .EQ. 1) CALL TVOLCALC(TVOL(1)) ! AT SLV_AUXI LIBRARY
-                CALL RHSNLHS_T()                       ! AT SLV_ENGY LIBRARY
-                IF (ICH .EQ. 1) CALL TVOLCALC(TVOL(2)) ! AT SLV_AUXI LIBRARY
-                IF (ICH .EQ. 1) CALL TVOLCORR()        ! AT SLV_AUXI LIBRARY
-                CALL TCALC()                           ! AT SLV_AUXI LIBRARY
-                IF (ICH .EQ. 1) CALL TVOLCALC(TVOL(0)) ! AT SLV_AUXI LIBRARY
-            ENDIF
+      call ucalc(phi)
 
-            DEALLOCATE(DIVGSUM, PHI)
-        ENDDO
-        !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+      if (ich .eq. 1) then
+        call qvolcalc(qvol(0))       ! AT SLV_AUXI LIBRARY
+      end if
 
-        TIME = TIME + DT
+      call pcalc(phi, divgsum)
 
-        CALL CONVERGENCE_CHECK()
-        IF ((IBMON .EQ. 1) .AND. (MASSON .EQ. 1)) CALL MASSCHECK()
+      if (ich .eq. 1) call meanpg()    ! AT SLV_AUXI LIBRARY
+      if (ibmon .eq. 1) call lagforce()
 
-        IF (MOD(NTIME, NPIN) .EQ. 0) THEN
-            IHIST = IHIST + 1
-            CALL WRITEHISTORY()
-        ENDIF
+      if (ihtrans .eq. 1) then
+        if (ich .eq. 1) call tvolcalc(tvol(1)) ! AT SLV_AUXI LIBRARY
+        call rhsnlhs_t()                       ! AT SLV_ENGY LIBRARY
+        if (ich .eq. 1) call tvolcalc(tvol(2)) ! AT SLV_AUXI LIBRARY
+        if (ich .eq. 1) call tvolcorr()        ! AT SLV_AUXI LIBRARY
+        call tcalc()                           ! AT SLV_AUXI LIBRARY
+        if (ich .eq. 1) call tvolcalc(tvol(0)) ! AT SLV_AUXI LIBRARY
+      end if
 
-        IF ((NTRACE .GT. 0) .AND. (MOD(M, NTR) .EQ. 0)) CALL TRACER()
-        IF (IBMON .EQ. 1) THEN
-            CALL DRAGLIFT()
-        ENDIF
-        IF (IHTRANS .EQ. 1) CALL CALC_BOUNDARY_HEAT_FLUX()
+      deallocate (divgsum, phi)
+    end do
+    !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-        IF (MOD(NTIME, NPRINT) .EQ. 0) CALL WRITEFIELD()
-        IF (IAVG .EQ. 1) CALL FIELD_AVG()
+    time_prev = time
+    time = time + dt
 
-        TIME_END = OMP_GET_WTIME()
-        CALL WRITEFTRTIME()
+    if ((iread .eq. 0) .and. (eps_ptr .ne. 0.0d0) .and. (.not. perturb_applied)) then
+      if ((time_prev .lt. 50.0d0) .and. (time .ge. 50.0d0)) then
+        call addperturb()
+        call prdic_adj_uvw(0)
+        perturb_applied = .true.
+      end if
+    end if
 
-    ENDDO
+    call convergence_check()
+    if ((ibmon .eq. 1) .and. (masson .eq. 1)) call masscheck()
 
-    !===================================================================
-    !     FINISH AND CLEANUP
-    !===================================================================
-    CALL FTRFILES(0)
+    if (mod(ntime, npin) .eq. 0) then
+      ihist = ihist + 1
+      call writehistory()
+    end if
 
-    IF (MOD(NTIME, NPRINT) .NE. 0) CALL WRITEFIELD()
-    IF (IAVG .EQ. 1) CALL FIELD_AVG()
+    if ((ntrace .gt. 0) .and. (mod(m, ntr) .eq. 0)) call tracer()
+    if (ibmon .eq. 1) then
+      call draglift()
+    end if
+    if (ihtrans .eq. 1) call calc_boundary_heat_flux()
 
-    CALL CPU_TIME(TOTAL_TIME_E)
+    if (mod(ntime, nprint) .eq. 0) call writefield()
+    if (iavg .eq. 1) call field_avg()
 
-    CALL PRINT_REAL_TIME()
-    CALL DEALLO_ARRAY()
+    time_end = omp_get_wtime()
+    call writeftrtime()
 
-    STOP
-END PROGRAM SOLVER
+  end do
+
+  !===================================================================
+  !     FINISH AND CLEANUP
+  !===================================================================
+  call ftrfiles(0)
+
+  if (mod(ntime, nprint) .ne. 0) call writefield()
+  if (iavg .eq. 1) call field_avg()
+
+  call cpu_time(total_time_e)
+
+  call print_real_time()
+  call deallo_array()
+
+  stop
+end program solver

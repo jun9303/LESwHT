@@ -1,292 +1,291 @@
 !=======================================================================
-      SUBROUTINE SGSFILTERINIT
+      subroutine sgsfilterinit
 !=======================================================================
 !
-!     Filter coefficients for the Simpson's rule
-!     : For dynamic procedures to determine the model coefficient,
-!       a test filter is applied based on the Simpson's rule.
+!     FILTER COEFFICIENTS FOR THE SIMPSON'S RULE
+!     : FOR DYNAMIC PROCEDURES TO DETERMINE THE MODEL COEFFICIENT,
+!       A TEST FILTER IS APPLIED BASED ON THE SIMPSON'S RULE.
 !
-!     CFX1, CFX2  : Filter coefficients in x-direction
-!     CFY1, CFY2  : Filter coefficients in y-direction
-!     CFZ1, CFZ2  : Filter coefficients in z-direction
+!     CFX1, CFX2  : FILTER COEFFICIENTS IN X-DIRECTION
+!     CFY1, CFY2  : FILTER COEFFICIENTS IN Y-DIRECTION
+!     CFZ1, CFZ2  : FILTER COEFFICIENTS IN Z-DIRECTION
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : CFX1, CFX2, CFY1, CFY2, CFZ1, CFZ2 
-      IMPLICIT NONE
-      INTEGER*8              :: I,J,K
-      REAL*8                 :: H1,H2,H3,H4
+        use mod_common
+        use mod_flowarray, only: cfx1, cfx2, cfy1, cfy2, cfz1, cfz2
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: h1, h2, h3, h4
 
-      CFX1 = 0.
-      CFX2 = 0.
-      CFY1 = 0.
-      CFY2 = 0.
-      CFZ1 = 0.
-      CFZ2 = 0.
+        cfx1 = 0.
+        cfx2 = 0.
+        cfy1 = 0.
+        cfy2 = 0.
+        cfz1 = 0.
+        cfz2 = 0.
 
-      IF (XPRDIC .EQ. 1) THEN
-      
-        IF (N1M.EQ.1) GOTO 101
+        if (xprdic .eq. 1) then
 
-!$OMP PARALLEL DO private(H1,H2)
-        DO I=1,N1M
-          H1=C2CX(I)
-          H2=C2CX(I+1)
-          CFX1(I,-1)=(2.*H1-H2)/6./H1
-          CFX1(I, 0)=((H1+H2)**2)/6./H1/H2
-          CFX1(I, 1)=(2.*H2-H1)/6./H2
-        ENDDO
+          if (n1m .eq. 1) goto 101
+
+!$OMP PARALLEL DO PRIVATE(H1,H2)
+          do i = 1, n1m
+            h1 = c2cx(i)
+            h2 = c2cx(i + 1)
+            cfx1(i, -1) = (2.*h1 - h2) / 6./h1
+            cfx1(i, 0) = ((h1 + h2)**2) / 6./h1 / h2
+            cfx1(i, 1) = (2.*h2 - h1) / 6./h2
+          end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO private(H1,H2,H3,H4)
-        DO I=2,N1M-1
-          H1=C2CX(I-1)
-          H2=C2CX(I  )
-          H3=C2CX(I+1)
-          H4=C2CX(I+2)
-          CFX2(I,-2)=(2.*H1-H2)/6./H1/2.
-          CFX2(I,-1)=((H1+H2)**2)/6./H1/H2/2.
-          CFX2(I, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-          CFX2(I, 1)=((H3+H4)**2)/6./H3/H4/2.
-          CFX2(I, 2)=(2.*H4-H3)/6./H4/2.
-        ENDDO
+!$OMP PARALLEL DO PRIVATE(H1,H2,H3,H4)
+          do i = 2, n1m - 1
+            h1 = c2cx(i - 1)
+            h2 = c2cx(i)
+            h3 = c2cx(i + 1)
+            h4 = c2cx(i + 2)
+            cfx2(i, -2) = (2.*h1 - h2) / 6./h1 / 2.
+            cfx2(i, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+            cfx2(i, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+            cfx2(i, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+            cfx2(i, 2) = (2.*h4 - h3) / 6./h4 / 2.
+          end do
 !$OMP END PARALLEL DO
-        H1=C2CX(N1M)
-        H2=C2CX(1)
-        H3=C2CX(2)
-        H4=C2CX(3)
-        CFX2(1,-2)=(2.*H1-H2)/6./H1/2.
-        CFX2(1,-1)=((H1+H2)**2)/6./H1/H2/2.
-        CFX2(1, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-        CFX2(1, 1)=((H3+H4)**2)/6./H3/H4/2.
-        CFX2(1, 2)=(2.*H4-H3)/6./H4/2.
-        H1=C2CX(N1M-1)
-        H2=C2CX(N1M)
-        H3=C2CX(1)
-        H4=C2CX(2)
-        CFX2(N1M,-2)=(2.*H1-H2)/6./H1/2.
-        CFX2(N1M,-1)=((H1+H2)**2)/6./H1/H2/2.
-        CFX2(N1M, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-        CFX2(N1M, 1)=((H3+H4)**2)/6./H3/H4/2.
-        CFX2(N1M, 2)=(2.*H4-H3)/6./H4/2.
+          h1 = c2cx(n1m)
+          h2 = c2cx(1)
+          h3 = c2cx(2)
+          h4 = c2cx(3)
+          cfx2(1, -2) = (2.*h1 - h2) / 6./h1 / 2.
+          cfx2(1, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+          cfx2(1, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+          cfx2(1, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+          cfx2(1, 2) = (2.*h4 - h3) / 6./h4 / 2.
+          h1 = c2cx(n1m - 1)
+          h2 = c2cx(n1m)
+          h3 = c2cx(1)
+          h4 = c2cx(2)
+          cfx2(n1m, -2) = (2.*h1 - h2) / 6./h1 / 2.
+          cfx2(n1m, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+          cfx2(n1m, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+          cfx2(n1m, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+          cfx2(n1m, 2) = (2.*h4 - h3) / 6./h4 / 2.
 
-      ELSE
+        else
 
-        IF (N1M.EQ.1) GOTO 101
+          if (n1m .eq. 1) goto 101
 
-!$OMP PARALLEL DO private(H1,H2)
-        DO I=1,N1M
-          H1=C2CX(I)
-          H2=C2CX(I+1)
-          CFX1(I,-1)=(2.*H1-H2)/6./H1
-          CFX1(I, 0)=((H1+H2)**2)/6./H1/H2
-          CFX1(I, 1)=(2.*H2-H1)/6./H2
-        ENDDO
+!$OMP PARALLEL DO PRIVATE(H1,H2)
+          do i = 1, n1m
+            h1 = c2cx(i)
+            h2 = c2cx(i + 1)
+            cfx1(i, -1) = (2.*h1 - h2) / 6./h1
+            cfx1(i, 0) = ((h1 + h2)**2) / 6./h1 / h2
+            cfx1(i, 1) = (2.*h2 - h1) / 6./h2
+          end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO private(H1,H2,H3,H4)
-        DO I=3,N1M-2
-          H1=C2CX(I-1)
-          H2=C2CX(I  )
-          H3=C2CX(I+1)
-          H4=C2CX(I+2)
-          CFX2(I,-2)=(2.*H1-H2)/6./H1/2.
-          CFX2(I,-1)=((H1+H2)**2)/6./H1/H2/2.
-          CFX2(I, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-          CFX2(I, 1)=((H3+H4)**2)/6./H3/H4/2.
-          CFX2(I, 2)=(2.*H4-H3)/6./H4/2.
-        ENDDO
+!$OMP PARALLEL DO PRIVATE(H1,H2,H3,H4)
+          do i = 3, n1m - 2
+            h1 = c2cx(i - 1)
+            h2 = c2cx(i)
+            h3 = c2cx(i + 1)
+            h4 = c2cx(i + 2)
+            cfx2(i, -2) = (2.*h1 - h2) / 6./h1 / 2.
+            cfx2(i, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+            cfx2(i, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+            cfx2(i, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+            cfx2(i, 2) = (2.*h4 - h3) / 6./h4 / 2.
+          end do
 !$OMP END PARALLEL DO
-        H1=C2CX(2)
-        H2=C2CX(3)
-        CFX2(2,-1)=(2.*H1-H2)/6./H1
-        CFX2(2, 0)=((H1+H2)**2)/6./H1/H2
-        CFX2(2, 1)=(2.*H2-H1)/6./H2
-        H1=C2CX(N1M-1)
-        H2=C2CX(N1M)
-        CFX2(N1M-1,-1)=(2.*H1-H2)/6./H1
-        CFX2(N1M-1, 0)=((H1+H2)**2)/6./H1/H2
-        CFX2(N1M-1, 1)=(2.*H2-H1)/6./H2
+          h1 = c2cx(2)
+          h2 = c2cx(3)
+          cfx2(2, -1) = (2.*h1 - h2) / 6./h1
+          cfx2(2, 0) = ((h1 + h2)**2) / 6./h1 / h2
+          cfx2(2, 1) = (2.*h2 - h1) / 6./h2
+          h1 = c2cx(n1m - 1)
+          h2 = c2cx(n1m)
+          cfx2(n1m - 1, -1) = (2.*h1 - h2) / 6./h1
+          cfx2(n1m - 1, 0) = ((h1 + h2)**2) / 6./h1 / h2
+          cfx2(n1m - 1, 1) = (2.*h2 - h1) / 6./h2
 
-      ENDIF
+        end if
 
-  101 CONTINUE
+101     continue
 
+        if (yprdic .eq. 1) then
 
-      IF (YPRDIC .EQ. 1) THEN
-      
-        IF (N2M.EQ.1) GOTO 102
+          if (n2m .eq. 1) goto 102
 
-!$OMP PARALLEL DO private(H1,H2)
-        DO J=1,N2M
-          H1=C2CY(J)
-          H2=C2CY(J+1)
-          CFY1(J,-1)=(2.*H1-H2)/6./H1
-          CFY1(J, 0)=((H1+H2)**2)/6./H1/H2
-          CFY1(J, 1)=(2.*H2-H1)/6./H2
-        ENDDO
+!$OMP PARALLEL DO PRIVATE(H1,H2)
+          do j = 1, n2m
+            h1 = c2cy(j)
+            h2 = c2cy(j + 1)
+            cfy1(j, -1) = (2.*h1 - h2) / 6./h1
+            cfy1(j, 0) = ((h1 + h2)**2) / 6./h1 / h2
+            cfy1(j, 1) = (2.*h2 - h1) / 6./h2
+          end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO private(H1,H2,H3,H4)
-        DO J=2,N2M-1
-          H1=C2CY(J-1)
-          H2=C2CY(J  )
-          H3=C2CY(J+1)
-          H4=C2CY(J+2)
-          CFY2(J,-2)=(2.*H1-H2)/6./H1/2.
-          CFY2(J,-1)=((H1+H2)**2)/6./H1/H2/2.
-          CFY2(J, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-          CFY2(J, 1)=((H3+H4)**2)/6./H3/H4/2.
-          CFY2(J, 2)=(2.*H4-H3)/6./H4/2.
-        ENDDO
+!$OMP PARALLEL DO PRIVATE(H1,H2,H3,H4)
+          do j = 2, n2m - 1
+            h1 = c2cy(j - 1)
+            h2 = c2cy(j)
+            h3 = c2cy(j + 1)
+            h4 = c2cy(j + 2)
+            cfy2(j, -2) = (2.*h1 - h2) / 6./h1 / 2.
+            cfy2(j, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+            cfy2(j, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+            cfy2(j, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+            cfy2(j, 2) = (2.*h4 - h3) / 6./h4 / 2.
+          end do
 !$OMP END PARALLEL DO
-        H1=C2CY(N2M)
-        H2=C2CY(1)
-        H3=C2CY(2)
-        H4=C2CY(3)
-        CFY2(1,-2)=(2.*H1-H2)/6./H1/2.
-        CFY2(1,-1)=((H1+H2)**2)/6./H1/H2/2.
-        CFY2(1, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-        CFY2(1, 1)=((H3+H4)**2)/6./H3/H4/2.
-        CFY2(1, 2)=(2.*H4-H3)/6./H4/2.
-        H1=C2CY(N2M-1)
-        H2=C2CY(N2M)
-        H3=C2CY(1)
-        H4=C2CY(2)
-        CFY2(N2M,-2)=(2.*H1-H2)/6./H1/2.
-        CFY2(N2M,-1)=((H1+H2)**2)/6./H1/H2/2.
-        CFY2(N2M, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-        CFY2(N2M, 1)=((H3+H4)**2)/6./H3/H4/2.
-        CFY2(N2M, 2)=(2.*H4-H3)/6./H4/2.
+          h1 = c2cy(n2m)
+          h2 = c2cy(1)
+          h3 = c2cy(2)
+          h4 = c2cy(3)
+          cfy2(1, -2) = (2.*h1 - h2) / 6./h1 / 2.
+          cfy2(1, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+          cfy2(1, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+          cfy2(1, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+          cfy2(1, 2) = (2.*h4 - h3) / 6./h4 / 2.
+          h1 = c2cy(n2m - 1)
+          h2 = c2cy(n2m)
+          h3 = c2cy(1)
+          h4 = c2cy(2)
+          cfy2(n2m, -2) = (2.*h1 - h2) / 6./h1 / 2.
+          cfy2(n2m, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+          cfy2(n2m, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+          cfy2(n2m, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+          cfy2(n2m, 2) = (2.*h4 - h3) / 6./h4 / 2.
 
-      ELSE
+        else
 
-        IF (N2M.EQ.1) GOTO 102
-!$OMP PARALLEL DO private(H1,H2)
-        DO J=1,N2M
-          H1=C2CY(J)
-          H2=C2CY(J+1)
-          CFY1(J,-1)=(2.*H1-H2)/6./H1
-          CFY1(J, 0)=((H1+H2)**2)/6./H1/H2
-          CFY1(J, 1)=(2.*H2-H1)/6./H2
+          if (n2m .eq. 1) goto 102
+!$OMP PARALLEL DO PRIVATE(H1,H2)
+          do j = 1, n2m
+            h1 = c2cy(j)
+            h2 = c2cy(j + 1)
+            cfy1(j, -1) = (2.*h1 - h2) / 6./h1
+            cfy1(j, 0) = ((h1 + h2)**2) / 6./h1 / h2
+            cfy1(j, 1) = (2.*h2 - h1) / 6./h2
 
-        ENDDO
+          end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO private(H1,H2,H3,H4)
-        DO J=3,N2M-2
-          H1=C2CY(J-1)
-          H2=C2CY(J  )
-          H3=C2CY(J+1)
-          H4=C2CY(J+2)
-          CFY2(J,-2)=(2.*H1-H2)/6./H1/2.
-          CFY2(J,-1)=((H1+H2)**2)/6./H1/H2/2.
-          CFY2(J, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-          CFY2(J, 1)=((H3+H4)**2)/6./H3/H4/2.
-          CFY2(J, 2)=(2.*H4-H3)/6./H4/2.
-        ENDDO
+!$OMP PARALLEL DO PRIVATE(H1,H2,H3,H4)
+          do j = 3, n2m - 2
+            h1 = c2cy(j - 1)
+            h2 = c2cy(j)
+            h3 = c2cy(j + 1)
+            h4 = c2cy(j + 2)
+            cfy2(j, -2) = (2.*h1 - h2) / 6./h1 / 2.
+            cfy2(j, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+            cfy2(j, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+            cfy2(j, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+            cfy2(j, 2) = (2.*h4 - h3) / 6./h4 / 2.
+          end do
 !$OMP END PARALLEL DO
-        H1=C2CY(2)
-        H2=C2CY(3)
-        CFY2(2,-1)=(2.*H1-H2)/6./H1
-        CFY2(2, 0)=((H1+H2)**2)/6./H1/H2
-        CFY2(2, 1)=(2.*H2-H1)/6./H2
-        H1=C2CY(N2M-1)
-        H2=C2CY(N2M)
-        CFY2(N2M-1,-1)=(2.*H1-H2)/6./H1
-        CFY2(N2M-1, 0)=((H1+H2)**2)/6./H1/H2
-        CFY2(N2M-1, 1)=(2.*H2-H1)/6./H2
-      ENDIF
+          h1 = c2cy(2)
+          h2 = c2cy(3)
+          cfy2(2, -1) = (2.*h1 - h2) / 6./h1
+          cfy2(2, 0) = ((h1 + h2)**2) / 6./h1 / h2
+          cfy2(2, 1) = (2.*h2 - h1) / 6./h2
+          h1 = c2cy(n2m - 1)
+          h2 = c2cy(n2m)
+          cfy2(n2m - 1, -1) = (2.*h1 - h2) / 6./h1
+          cfy2(n2m - 1, 0) = ((h1 + h2)**2) / 6./h1 / h2
+          cfy2(n2m - 1, 1) = (2.*h2 - h1) / 6./h2
+        end if
 
-  102 CONTINUE
-  
-      IF (ZPRDIC .EQ. 1) THEN
+102     continue
 
-        IF (N3M.EQ.1) GOTO 103
+        if (zprdic .eq. 1) then
 
-!$OMP PARALLEL DO private(H1,H2)
-        DO K=1,N3M
-          H1=C2CZ(K)
-          H2=C2CZ(K+1)
-          CFZ1(K,-1)=(2.*H1-H2)/6./H1
-          CFZ1(K, 0)=((H1+H2)**2)/6./H1/H2
-          CFZ1(K, 1)=(2.*H2-H1)/6./H2
-        ENDDO
+          if (n3m .eq. 1) goto 103
+
+!$OMP PARALLEL DO PRIVATE(H1,H2)
+          do k = 1, n3m
+            h1 = c2cz(k)
+            h2 = c2cz(k + 1)
+            cfz1(k, -1) = (2.*h1 - h2) / 6./h1
+            cfz1(k, 0) = ((h1 + h2)**2) / 6./h1 / h2
+            cfz1(k, 1) = (2.*h2 - h1) / 6./h2
+          end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO private(H1,H2,H3,H4)
-        DO K=2,N3M-1
-          H1=C2CZ(K-1)
-          H2=C2CZ(K  )
-          H3=C2CZ(K+1)
-          H4=C2CZ(K+2)
-          CFZ2(K,-2)=(2.*H1-H2)/6./H1/2.
-          CFZ2(K,-1)=((H1+H2)**2)/6./H1/H2/2.
-          CFZ2(K, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-          CFZ2(K, 1)=((H3+H4)**2)/6./H3/H4/2.
-          CFZ2(K, 2)=(2.*H4-H3)/6./H4/2.
-        ENDDO
+!$OMP PARALLEL DO PRIVATE(H1,H2,H3,H4)
+          do k = 2, n3m - 1
+            h1 = c2cz(k - 1)
+            h2 = c2cz(k)
+            h3 = c2cz(k + 1)
+            h4 = c2cz(k + 2)
+            cfz2(k, -2) = (2.*h1 - h2) / 6./h1 / 2.
+            cfz2(k, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+            cfz2(k, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+            cfz2(k, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+            cfz2(k, 2) = (2.*h4 - h3) / 6./h4 / 2.
+          end do
 !$OMP END PARALLEL DO
-        H1=C2CZ(N3M)
-        H2=C2CZ(1)
-        H3=C2CZ(2)
-        H4=C2CZ(3)
-        CFZ2(1,-2)=(2.*H1-H2)/6./H1/2.
-        CFZ2(1,-1)=((H1+H2)**2)/6./H1/H2/2.
-        CFZ2(1, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-        CFZ2(1, 1)=((H3+H4)**2)/6./H3/H4/2.
-        CFZ2(1, 2)=(2.*H4-H3)/6./H4/2.
-        H1=C2CZ(N3M-1)
-        H2=C2CZ(N3M)
-        H3=C2CZ(1)
-        H4=C2CZ(2)
-        CFZ2(N3M,-2)=(2.*H1-H2)/6./H1/2.
-        CFZ2(N3M,-1)=((H1+H2)**2)/6./H1/H2/2.
-        CFZ2(N3M, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-        CFZ2(N3M, 1)=((H3+H4)**2)/6./H3/H4/2.
-        CFZ2(N3M, 2)=(2.*H4-H3)/6./H4/2.
+          h1 = c2cz(n3m)
+          h2 = c2cz(1)
+          h3 = c2cz(2)
+          h4 = c2cz(3)
+          cfz2(1, -2) = (2.*h1 - h2) / 6./h1 / 2.
+          cfz2(1, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+          cfz2(1, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+          cfz2(1, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+          cfz2(1, 2) = (2.*h4 - h3) / 6./h4 / 2.
+          h1 = c2cz(n3m - 1)
+          h2 = c2cz(n3m)
+          h3 = c2cz(1)
+          h4 = c2cz(2)
+          cfz2(n3m, -2) = (2.*h1 - h2) / 6./h1 / 2.
+          cfz2(n3m, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+          cfz2(n3m, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+          cfz2(n3m, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+          cfz2(n3m, 2) = (2.*h4 - h3) / 6./h4 / 2.
 
-      ELSE
+        else
 
-        IF (N3M.EQ.1) GOTO 103
+          if (n3m .eq. 1) goto 103
 
-!$OMP PARALLEL DO private(H1,H2)
-        DO K=1,N3M
-          H1=C2CZ(K)
-          H2=C2CZ(K+1)
-          CFZ1(K,-1)=(2.*H1-H2)/6./H1
-          CFZ1(K, 0)=((H1+H2)**2)/6./H1/H2
-          CFZ1(K, 1)=(2.*H2-H1)/6./H2
-        ENDDO
+!$OMP PARALLEL DO PRIVATE(H1,H2)
+          do k = 1, n3m
+            h1 = c2cz(k)
+            h2 = c2cz(k + 1)
+            cfz1(k, -1) = (2.*h1 - h2) / 6./h1
+            cfz1(k, 0) = ((h1 + h2)**2) / 6./h1 / h2
+            cfz1(k, 1) = (2.*h2 - h1) / 6./h2
+          end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO private(H1,H2,H3,H4)
-        DO K=3,N3M-2
-          H1=C2CZ(K-1)
-          H2=C2CZ(K  )
-          H3=C2CZ(K+1)
-          H4=C2CZ(K+2)
-          CFZ2(K,-2)=(2.*H1-H2)/6./H1/2.
-          CFZ2(K,-1)=((H1+H2)**2)/6./H1/H2/2.
-          CFZ2(K, 0)=((2.*H2-H1)/6./H2+(2.*H3-H4)/6./H3)/2.
-          CFZ2(K, 1)=((H3+H4)**2)/6./H3/H4/2.
-          CFZ2(K, 2)=(2.*H4-H3)/6./H4/2.
-        ENDDO
+!$OMP PARALLEL DO PRIVATE(H1,H2,H3,H4)
+          do k = 3, n3m - 2
+            h1 = c2cz(k - 1)
+            h2 = c2cz(k)
+            h3 = c2cz(k + 1)
+            h4 = c2cz(k + 2)
+            cfz2(k, -2) = (2.*h1 - h2) / 6./h1 / 2.
+            cfz2(k, -1) = ((h1 + h2)**2) / 6./h1 / h2 / 2.
+            cfz2(k, 0) = ((2.*h2 - h1) / 6./h2 + (2.*h3 - h4) / 6./h3) / 2.
+            cfz2(k, 1) = ((h3 + h4)**2) / 6./h3 / h4 / 2.
+            cfz2(k, 2) = (2.*h4 - h3) / 6./h4 / 2.
+          end do
 !$OMP END PARALLEL DO
-        H1=C2CZ(2)
-        H2=C2CZ(3)
-        CFZ2(2,-1)=(2.*H1-H2)/6./H1
-        CFZ2(2, 0)=((H1+H2)**2)/6./H1/H2
-        CFZ2(2, 1)=(2.*H2-H1)/6./H2
-        H1=C2CZ(N3M-1)
-        H2=C2CZ(N3M)
-        CFZ2(N3M-1,-1)=(2.*H1-H2)/6./H1
-        CFZ2(N3M-1, 0)=((H1+H2)**2)/6./H1/H2
-        CFZ2(N3M-1, 1)=(2.*H2-H1)/6./H2
+          h1 = c2cz(2)
+          h2 = c2cz(3)
+          cfz2(2, -1) = (2.*h1 - h2) / 6./h1
+          cfz2(2, 0) = ((h1 + h2)**2) / 6./h1 / h2
+          cfz2(2, 1) = (2.*h2 - h1) / 6./h2
+          h1 = c2cz(n3m - 1)
+          h2 = c2cz(n3m)
+          cfz2(n3m - 1, -1) = (2.*h1 - h2) / 6./h1
+          cfz2(n3m - 1, 0) = ((h1 + h2)**2) / 6./h1 / h2
+          cfz2(n3m - 1, 1) = (2.*h2 - h1) / 6./h2
 
-      ENDIF
+        end if
 
-  103 CONTINUE
+103     continue
 
-      RETURN
-      END SUBROUTINE SGSFILTERINIT
+        return
+      end subroutine sgsfilterinit
 !=======================================================================
 !=======================================================================
-      SUBROUTINE SGSCALC
+      subroutine sgscalc
 !=======================================================================
 !
 ! CALCULATE SUBGRID-SCALE EDDY VISCOSITY, NUSGS
@@ -304,622 +303,622 @@
 ! PLZ REFER TO "GERMANO IDENTITY" THEORY (GERMANO, 1992. J.FLUID MECH.)
 !
 !-----------------------------------------------------------------------
-!$    use omp_lib
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : NUSGS
-      IMPLICIT NONE
-      IF (MSUB .EQ. 1) THEN
-        IF (IREAD.EQ.0 .AND. NTIME.EQ.1) THEN
-          NUSGS = 0D0
-        ELSE
-          IF (INSMDL .EQ. 0) THEN
-            WRITE(*,*) 'SMAGORINSKY MODEL IS NOT IMPLEMENTED YET'
-            WRITE(*,*) 'SGS.F90 LINE 317'            
-            STOP
-          ELSE IF (INSMDL .EQ. 1) THEN
-            IF (IDVMON .EQ. 1) THEN
-              CALL SGS_DVMG         ! DYNAMIC VREMAN MODEL W/ GLOBAL COEF
-            ELSE
-              CALL SGS_CVM          ! CONSTANT VREMAN MODEL   
-            ENDIF
-          ENDIF
-        ENDIF
+!$      USE OMP_LIB
+        use mod_common
+        use mod_flowarray, only: nusgs
+        implicit none
+        if (msub .eq. 1) then
+          if (iread .eq. 0 .and. ntime .eq. 1) then
+            nusgs = 0d0
+          else
+            if (insmdl .eq. 0) then
+              write (*, *) 'SMAGORINSKY MODEL IS NOT IMPLEMENTED YET'
+              write (*, *) 'SGS.F90 LINE 317'
+              stop
+            else if (insmdl .eq. 1) then
+              if (idvmon .eq. 1) then
+                call sgs_dvmg         ! DYNAMIC VREMAN MODEL W/ GLOBAL COEF
+              else
+                call sgs_cvm          ! CONSTANT VREMAN MODEL
+              end if
+            end if
+          end if
 
-        CALL NUTZERO               ! SET NUSGS TO ZERO IN THE SOLID BODY
-        CALL NUTINTERPOL           !              INTERPOLATION OF NUSGS
-      ENDIF
+          call nutzero               ! SET NUSGS TO ZERO IN THE SOLID BODY
+          call nutinterpol           !              INTERPOLATION OF NUSGS
+        end if
 
-      RETURN
-      END SUBROUTINE SGSCALC
+        return
+      end subroutine sgscalc
 !=======================================================================
 !=======================================================================
-      SUBROUTINE SGS_CVM
+      subroutine sgs_cvm
 !=======================================================================
 !
 !     NUSGS=CSGSTS*SQRT(BBB/AAA)
 !     CSGSTS : VREMAN CONSTANT (= CSGSTS FROM MOD_COMMON)
 !     BBB    : B_{11}*B_{22}-B_{12}*B_{12}+B_{11}*B_{33}
 !             -B_{13}*B_{13}+B_{22}*B_{33}-B_{23}*B_{23}
-!     AAA    : A_{ij}*A_{ij}
-!     B_{ij} : SIGMA(DEL_{m}^2*A_{mi}*A_{mj}) where m=1, 2, 3
-!     A_{ij} : DUj/DXi
+!     AAA    : A_{IJ}*A_{IJ}
+!     B_{IJ} : SIGMA(DEL_{M}^2*A_{MI}*A_{MJ}) WHERE M=1, 2, 3
+!     A_{IJ} : DUJ/DXI
 !
-!-----------------------------------------------------------------------  
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,NUSGS
-      IMPLICIT NONE
-      INTEGER*8 :: I,J,K,KPLUS,KMINUS,JPLUS,JMINUS,IPLUS,IMINUS
-      REAL*8    :: VG11,VG12,VG13,VG21,VG22,VG23,VG31,VG32,VG33
-      REAL*8    :: UP,UM,VP,VM,WP,WM
-      REAL*8    :: A(9),B(6)
-      REAL*8    :: AAA,BBB
+!-----------------------------------------------------------------------
+        use mod_common
+        use mod_flowarray, only: u, v, w, nusgs
+        implicit none
+        integer(8) :: i, j, k, kplus, kminus, jplus, jminus, iplus, iminus
+        real(8) :: vg11, vg12, vg13, vg21, vg22, vg23, vg31, vg32, vg33
+        real(8) :: up, um, vp, vm, wp, wm
+        real(8) :: a(9), b(6)
+        real(8) :: aaa, bbb
 
-!$OMP PARALLEL DO private(UP,UM,VP,VM,WP,WM)&
-!$OMP private(A,B,AAA,BBB)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
+!$OMP PARALLEL DO PRIVATE(UP,UM,VP,VM,WP,WM)&
+!$OMP PRIVATE(A,B,AAA,BBB)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
 
-            CALL VELGRAD(I,J,K,A,B)         ! B IS USED FOR DUMMY VARIABLE
+              call velgrad(i, j, k, a, b)         ! B IS USED FOR DUMMY VARIABLE
 
-            B(1)=F2FX(I)**2.*A(1)*A(1)  &
-                +F2FY(J)**2.*A(4)*A(4)  &
-                +F2FZ(K)**2.*A(7)*A(7)
-            B(2)=F2FX(I)**2.*A(1)*A(2)  &
-                +F2FY(J)**2.*A(4)*A(5)  &
-                +F2FZ(K)**2.*A(7)*A(8)
-            B(3)=F2FX(I)**2.*A(1)*A(3)  &
-                +F2FY(J)**2.*A(4)*A(6)  &
-                +F2FZ(K)**2.*A(7)*A(9)
-            B(4)=F2FX(I)**2.*A(2)*A(2)  &
-                +F2FY(J)**2.*A(5)*A(5)  &
-                +F2FZ(K)**2.*A(8)*A(8)
-            B(5)=F2FX(I)**2.*A(2)*A(3)  &
-                +F2FY(J)**2.*A(5)*A(6)  &
-                +F2FZ(K)**2.*A(8)*A(9)
-            B(6)=F2FX(I)**2.*A(3)*A(3)  &
-                +F2FY(J)**2.*A(6)*A(6)  &
-                +F2FZ(K)**2.*A(9)*A(9)
-      
-            AAA=A(1)**2.+A(2)**2.+A(3)**2. &
-               +A(4)**2.+A(5)**2.+A(6)**2. &
-               +A(7)**2.+A(8)**2.+A(9)**2.
-            BBB=B(1)*B(4)+B(4)*B(6)+B(6)*B(1)&
-               -B(2)**2.-B(3)**2.-B(5)**2.
-      
-            BBB = DMAX1(BBB,1.0E-16)
-   
-            IF (AAA .EQ. 0.) THEN
-              NUSGS(I,J,K) = 0D0   
-            ELSE
-              NUSGS(I,J,K)= CSGSTS*SQRT(BBB/AAA)
-            ENDIF
-          ENDDO
-        ENDDO
-      ENDDO
+              b(1) = f2fx(i)**2.*a(1) * a(1) &
+                     + f2fy(j)**2.*a(4) * a(4) &
+                     + f2fz(k)**2.*a(7) * a(7)
+              b(2) = f2fx(i)**2.*a(1) * a(2) &
+                     + f2fy(j)**2.*a(4) * a(5) &
+                     + f2fz(k)**2.*a(7) * a(8)
+              b(3) = f2fx(i)**2.*a(1) * a(3) &
+                     + f2fy(j)**2.*a(4) * a(6) &
+                     + f2fz(k)**2.*a(7) * a(9)
+              b(4) = f2fx(i)**2.*a(2) * a(2) &
+                     + f2fy(j)**2.*a(5) * a(5) &
+                     + f2fz(k)**2.*a(8) * a(8)
+              b(5) = f2fx(i)**2.*a(2) * a(3) &
+                     + f2fy(j)**2.*a(5) * a(6) &
+                     + f2fz(k)**2.*a(8) * a(9)
+              b(6) = f2fx(i)**2.*a(3) * a(3) &
+                     + f2fy(j)**2.*a(6) * a(6) &
+                     + f2fz(k)**2.*a(9) * a(9)
+
+              aaa = a(1)**2.+a(2)**2.+a(3)**2. &
+                    +a(4)**2.+a(5)**2.+a(6)**2. &
+                    +a(7)**2.+a(8)**2.+a(9)**2.
+              bbb = b(1) * b(4) + b(4) * b(6) + b(6) * b(1) &
+                    - b(2)**2.-b(3)**2.-b(5)**2.
+
+              bbb = dmax1(bbb, 1.0e-16)
+
+              if (aaa .eq. 0.) then
+                nusgs(i, j, k) = 0d0
+              else
+                nusgs(i, j, k) = csgsts * sqrt(bbb / aaa)
+              end if
+            end do
+          end do
+        end do
 !$OMP END PARALLEL DO
 
-      RETURN
-      END SUBROUTINE SGS_CVM
+        return
+      end subroutine sgs_cvm
 !=======================================================================
 !=======================================================================
-      SUBROUTINE SGS_DVMG
+      subroutine sgs_dvmg
 !=======================================================================
 !
 !     NUSGS=CSGSTS*SQRT(BBB/AAA)
 !     CSGSTS   : VREMAN CONSTANT, DETERMINED FROM LSM OF GERMANO IDENTITY
 !     BBB    : B_{11}*B_{22}-B_{12}*B_{12}+B_{11}*B_{33}
 !             -B_{13}*B_{13}+B_{22}*B_{33}-B_{23}*B_{23}
-!     AAA    : A_{ij}*A_{ij}
-!     B_{ij} : SIGMA(DEL_{m}^2*A_{mi}*A_{mj}) where m=1, 2, 3
-!     A_{ij} : DUj/DXi
+!     AAA    : A_{IJ}*A_{IJ}
+!     B_{IJ} : SIGMA(DEL_{M}^2*A_{MI}*A_{MJ}) WHERE M=1, 2, 3
+!     A_{IJ} : DUJ/DXI
 !
-!----------------------------------------------------------------------- 
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,NUSGS,NWALL_DVM,AALP,LLIJ,MMIJ,UUI
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K
-      REAL*8  :: LJMJ_V,MJMJ_V
-      REAL*8  :: SDXF2,SDYF2,SDZF2,AAA,BBB,AMI,VOLUME
-      REAL*8  :: B(6),STR(6),ALP(9)
+!-----------------------------------------------------------------------
+        use mod_common
+        use mod_flowarray, only: u, v, w, nusgs, nwall_dvm, aalp, llij, mmij, uui
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: ljmj_v, mjmj_v
+        real(8) :: sdxf2, sdyf2, sdzf2, aaa, bbb, ami, volume
+        real(8) :: b(6), str(6), alp(9)
 
-      LJMJ_V = 0.
-      MJMJ_V = 0.
-      CSGSTS     = 0.
+        ljmj_v = 0.
+        mjmj_v = 0.
+        csgsts = 0.
 
-      ALLOCATE (AALP(N1M,N2M,N3M,9))
-      ALLOCATE (LLIJ(N1M,N2M,N3M,6))
-      ALLOCATE (MMIJ(N1M,N2M,N3M,6))
-      ALLOCATE (UUI (N1M,N2M,N3M,3))
-
-!$OMP PARALLEL DO&
-!$OMP private(B,STR,ALP)&
-!$OMP private(SDXF2,SDYF2,SDZF2,AAA,BBB)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            CALL VELGRAD(I,J,K,ALP,STR)
-            SDXF2=F2FX(I)**2.
-            SDYF2=F2FY(J)**2.
-            SDZF2=F2FZ(K)**2.
-            B(1)=SDXF2*ALP(1)*ALP(1)  &
-                +SDYF2*ALP(4)*ALP(4)  &
-                +SDZF2*ALP(7)*ALP(7)
-            B(2)=SDXF2*ALP(1)*ALP(2)  &
-                +SDYF2*ALP(4)*ALP(5)  &
-                +SDZF2*ALP(7)*ALP(8)
-            B(3)=SDXF2*ALP(1)*ALP(3)  &
-                +SDYF2*ALP(4)*ALP(6)  &
-                +SDZF2*ALP(7)*ALP(9)
-            B(4)=SDXF2*ALP(2)*ALP(2)  &
-                +SDYF2*ALP(5)*ALP(5)  &
-                +SDZF2*ALP(8)*ALP(8)
-            B(5)=SDXF2*ALP(2)*ALP(3)  &
-                +SDYF2*ALP(5)*ALP(6)  &
-                +SDZF2*ALP(8)*ALP(9)
-            B(6)=SDXF2*ALP(3)*ALP(3)  &
-                +SDYF2*ALP(6)*ALP(6)  &
-                +SDZF2*ALP(9)*ALP(9)
-            AAA=ALP(1)**2.+ALP(2)**2.+ALP(3)**2. &
-               +ALP(4)**2.+ALP(5)**2.+ALP(6)**2. &
-               +ALP(7)**2.+ALP(8)**2.+ALP(9)**2.
-            BBB=B(1)*B(4)+B(4)*B(6)+B(6)*B(1)  &
-               -B(2)**2. -B(3)**2. -B(5)**2.
-            BBB = DMAX1(BBB,1.0E-16)
-            IF (AAA .EQ. 0.) THEN
-              NUSGS(I,J,K) = 0D0   
-            ELSE
-              NUSGS(I,J,K)= SQRT(BBB/AAA)
-            ENDIF
-            MMIJ(I,J,K,1)=NUSGS(I,J,K)*STR(1)
-            MMIJ(I,J,K,2)=NUSGS(I,J,K)*STR(2)
-            MMIJ(I,J,K,3)=NUSGS(I,J,K)*STR(3)
-            MMIJ(I,J,K,4)=NUSGS(I,J,K)*STR(4)
-            MMIJ(I,J,K,5)=NUSGS(I,J,K)*STR(5)
-            MMIJ(I,J,K,6)=NUSGS(I,J,K)*STR(6)
-            AALP(I,J,K,1)=ALP(1)
-            AALP(I,J,K,2)=ALP(2)
-            AALP(I,J,K,3)=ALP(3)
-            AALP(I,J,K,4)=ALP(4)
-            AALP(I,J,K,5)=ALP(5)
-            AALP(I,J,K,6)=ALP(6)
-            AALP(I,J,K,7)=ALP(7)
-            AALP(I,J,K,8)=ALP(8)
-            AALP(I,J,K,9)=ALP(9)
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-!$OMP PARALLEL DO
-      DO I = 1,6
-        CALL TEST_FILTER(MMIJ(:,:,:,I),FILTER)
-      ENDDO
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
-      DO J =1,9
-        CALL TEST_FILTER(AALP(:,:,:,J),FILTER)
-      ENDDO
-!$OMP END PARALLEL DO
+        allocate (aalp(n1m, n2m, n3m, 9))
+        allocate (llij(n1m, n2m, n3m, 6))
+        allocate (mmij(n1m, n2m, n3m, 6))
+        allocate (uui(n1m, n2m, n3m, 3))
 
 !$OMP PARALLEL DO&
-!$OMP private(B,STR,ALP)&
-!$OMP private(SDXF2,SDYF2,SDZF2,AAA,BBB,AMI)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            CALL VELGRAD(I,J,K,ALP,STR)
-            SDXF2=(0.5*F2FX(I-1)*(1.-FIXIU(I))+F2FX(I)  &
-                  +0.5*F2FX(I+1)*(1.-FIXIL(I)))**2.
-            SDYF2=(0.5*F2FY(J-1)*(1.-FIXJU(J))+F2FY(J)  &
-                  +0.5*F2FY(J+1)*(1.-FIXJL(J)))**2.
-            SDZF2=(0.5*F2FZ(K-1)*(1.-FIXKU(K))+F2FZ(K)  &
-                  +0.5*F2FZ(K+1)*(1.-FIXKL(K)))**2.
-            B(1)=SDXF2*ALP(1)*ALP(1)&
-                +SDYF2*ALP(4)*ALP(4)&
-                +SDZF2*ALP(7)*ALP(7)
-            B(2)=SDXF2*ALP(1)*ALP(2)&
-                +SDYF2*ALP(4)*ALP(5)&
-                +SDZF2*ALP(7)*ALP(8)
-            B(3)=SDXF2*ALP(1)*ALP(3)&
-                +SDYF2*ALP(4)*ALP(6)&
-                +SDZF2*ALP(7)*ALP(9)
-            B(4)=SDXF2*ALP(2)*ALP(2)&
-                +SDYF2*ALP(5)*ALP(5)&
-                +SDZF2*ALP(8)*ALP(8)
-            B(5)=SDXF2*ALP(2)*ALP(3)&
-                +SDYF2*ALP(5)*ALP(6)&
-                +SDZF2*ALP(8)*ALP(9)
-            B(6)=SDXF2*ALP(3)*ALP(3)&
-                +SDYF2*ALP(6)*ALP(6)&
-                +SDZF2*ALP(9)*ALP(9)
-            AAA=ALP(1)**2.+ALP(2)**2.+ALP(3)**2. &
-               +ALP(4)**2.+ALP(5)**2.+ALP(6)**2. &
-               +ALP(7)**2.+ALP(8)**2.+ALP(9)**2.
-            BBB=B(1)*B(4)+B(4)*B(6)+B(6)*B(1)  &
-               -B(2)**2. -B(3)**2. -B(5)**2.
-            BBB = DMAX1(BBB,1.0E-16)
-            IF (AAA .EQ. 0.) THEN
-              AMI = 0D0   
-            ELSE
-              AMI = SQRT(BBB/AAA)
-            ENDIF
-            MMIJ(I,J,K,1)=AMI*STR(1)-MMIJ(I,J,K,1)
-            MMIJ(I,J,K,2)=AMI*STR(2)-MMIJ(I,J,K,2)
-            MMIJ(I,J,K,3)=AMI*STR(3)-MMIJ(I,J,K,3)
-            MMIJ(I,J,K,4)=AMI*STR(4)-MMIJ(I,J,K,4)
-            MMIJ(I,J,K,5)=AMI*STR(5)-MMIJ(I,J,K,5)
-            MMIJ(I,J,K,6)=AMI*STR(6)-MMIJ(I,J,K,6)
-            UUI (I,J,K,1)=0.5*(U(I,J,K)+U(I+1,J,K))
-            UUI (I,J,K,2)=0.5*(V(I,J,K)+V(I,J+1,K))
-            UUI (I,J,K,3)=0.5*(W(I,J,K)+W(I,J,K+1))
-            LLIJ(I,J,K,1)=UUI(I,J,K,1)*UUI(I,J,K,1)
-            LLIJ(I,J,K,2)=UUI(I,J,K,1)*UUI(I,J,K,2)
-            LLIJ(I,J,K,3)=UUI(I,J,K,1)*UUI(I,J,K,3)
-            LLIJ(I,J,K,4)=UUI(I,J,K,2)*UUI(I,J,K,2)
-            LLIJ(I,J,K,5)=UUI(I,J,K,2)*UUI(I,J,K,3)
-            LLIJ(I,J,K,6)=UUI(I,J,K,3)*UUI(I,J,K,3)
-          ENDDO
-        ENDDO
-      ENDDO
+!$OMP PRIVATE(B,STR,ALP)&
+!$OMP PRIVATE(SDXF2,SDYF2,SDZF2,AAA,BBB)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              call velgrad(i, j, k, alp, str)
+              sdxf2 = f2fx(i)**2.
+              sdyf2 = f2fy(j)**2.
+              sdzf2 = f2fz(k)**2.
+              b(1) = sdxf2 * alp(1) * alp(1) &
+                     + sdyf2 * alp(4) * alp(4) &
+                     + sdzf2 * alp(7) * alp(7)
+              b(2) = sdxf2 * alp(1) * alp(2) &
+                     + sdyf2 * alp(4) * alp(5) &
+                     + sdzf2 * alp(7) * alp(8)
+              b(3) = sdxf2 * alp(1) * alp(3) &
+                     + sdyf2 * alp(4) * alp(6) &
+                     + sdzf2 * alp(7) * alp(9)
+              b(4) = sdxf2 * alp(2) * alp(2) &
+                     + sdyf2 * alp(5) * alp(5) &
+                     + sdzf2 * alp(8) * alp(8)
+              b(5) = sdxf2 * alp(2) * alp(3) &
+                     + sdyf2 * alp(5) * alp(6) &
+                     + sdzf2 * alp(8) * alp(9)
+              b(6) = sdxf2 * alp(3) * alp(3) &
+                     + sdyf2 * alp(6) * alp(6) &
+                     + sdzf2 * alp(9) * alp(9)
+              aaa = alp(1)**2.+alp(2)**2.+alp(3)**2. &
+                    +alp(4)**2.+alp(5)**2.+alp(6)**2. &
+                    +alp(7)**2.+alp(8)**2.+alp(9)**2.
+              bbb = b(1) * b(4) + b(4) * b(6) + b(6) * b(1) &
+                    - b(2)**2.-b(3)**2.-b(5)**2.
+              bbb = dmax1(bbb, 1.0e-16)
+              if (aaa .eq. 0.) then
+                nusgs(i, j, k) = 0d0
+              else
+                nusgs(i, j, k) = sqrt(bbb / aaa)
+              end if
+              mmij(i, j, k, 1) = nusgs(i, j, k) * str(1)
+              mmij(i, j, k, 2) = nusgs(i, j, k) * str(2)
+              mmij(i, j, k, 3) = nusgs(i, j, k) * str(3)
+              mmij(i, j, k, 4) = nusgs(i, j, k) * str(4)
+              mmij(i, j, k, 5) = nusgs(i, j, k) * str(5)
+              mmij(i, j, k, 6) = nusgs(i, j, k) * str(6)
+              aalp(i, j, k, 1) = alp(1)
+              aalp(i, j, k, 2) = alp(2)
+              aalp(i, j, k, 3) = alp(3)
+              aalp(i, j, k, 4) = alp(4)
+              aalp(i, j, k, 5) = alp(5)
+              aalp(i, j, k, 6) = alp(6)
+              aalp(i, j, k, 7) = alp(7)
+              aalp(i, j, k, 8) = alp(8)
+              aalp(i, j, k, 9) = alp(9)
+            end do
+          end do
+        end do
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO
-      DO I = 1,3
-        CALL TEST_FILTER(UUI(:,:,:,I),FILTER)
-      ENDDO
+        do i = 1, 6
+          call test_filter(mmij(:, :, :, i), filter)
+        end do
 !$OMP END PARALLEL DO
 !$OMP PARALLEL DO
-      DO J =1,6
-        CALL TEST_FILTER(LLIJ(:,:,:,J),FILTER)
-      ENDDO
+        do j = 1, 9
+          call test_filter(aalp(:, :, :, j), filter)
+        end do
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO&
-!$OMP reduction(+:LJMJ_V,MJMJ_V)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            VOLUME = F2FX(I)*F2FY(J)*F2FZ(K)
-            LLIJ(I,J,K,1)=LLIJ(I,J,K,1)-UUI(I,J,K,1)*UUI(I,J,K,1)
-            LLIJ(I,J,K,2)=LLIJ(I,J,K,2)-UUI(I,J,K,1)*UUI(I,J,K,2)
-            LLIJ(I,J,K,3)=LLIJ(I,J,K,3)-UUI(I,J,K,1)*UUI(I,J,K,3)
-            LLIJ(I,J,K,4)=LLIJ(I,J,K,4)-UUI(I,J,K,2)*UUI(I,J,K,2)
-            LLIJ(I,J,K,5)=LLIJ(I,J,K,5)-UUI(I,J,K,2)*UUI(I,J,K,3)
-            LLIJ(I,J,K,6)=LLIJ(I,J,K,6)-UUI(I,J,K,3)*UUI(I,J,K,3)
-            LJMJ_V=LJMJ_V                                &
-                 +(2.*LLIJ(I,J,K,2)*MMIJ(I,J,K,2)+LLIJ(I,J,K,1)*MMIJ(I,J,K,1) &
-                  +2.*LLIJ(I,J,K,3)*MMIJ(I,J,K,3)+LLIJ(I,J,K,4)*MMIJ(I,J,K,4) &
-                  +2.*LLIJ(I,J,K,5)*MMIJ(I,J,K,5)+LLIJ(I,J,K,6)*MMIJ(I,J,K,6))&
-                 *FLOAT(NWALL_DVM(I,J,K))*VOLUME
-            MJMJ_V=MJMJ_V                                &
-                   +(2.*MMIJ(I,J,K,2)**2.+MMIJ(I,J,K,1)**2.  &
-                    +2.*MMIJ(I,J,K,3)**2.+MMIJ(I,J,K,4)**2.  &
-                    +2.*MMIJ(I,J,K,5)**2.+MMIJ(I,J,K,6)**2.) &
-                    *FLOAT(NWALL_DVM(I,J,K))*VOLUME
-          ENDDO
-        ENDDO
-      ENDDO
+!$OMP PRIVATE(B,STR,ALP)&
+!$OMP PRIVATE(SDXF2,SDYF2,SDZF2,AAA,BBB,AMI)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              call velgrad(i, j, k, alp, str)
+              sdxf2 = (0.5 * f2fx(i - 1) * (1.-fixiu(i)) + f2fx(i) &
+                       + 0.5 * f2fx(i + 1) * (1.-fixil(i)))**2.
+              sdyf2 = (0.5 * f2fy(j - 1) * (1.-fixju(j)) + f2fy(j) &
+                       + 0.5 * f2fy(j + 1) * (1.-fixjl(j)))**2.
+              sdzf2 = (0.5 * f2fz(k - 1) * (1.-fixku(k)) + f2fz(k) &
+                       + 0.5 * f2fz(k + 1) * (1.-fixkl(k)))**2.
+              b(1) = sdxf2 * alp(1) * alp(1) &
+                     + sdyf2 * alp(4) * alp(4) &
+                     + sdzf2 * alp(7) * alp(7)
+              b(2) = sdxf2 * alp(1) * alp(2) &
+                     + sdyf2 * alp(4) * alp(5) &
+                     + sdzf2 * alp(7) * alp(8)
+              b(3) = sdxf2 * alp(1) * alp(3) &
+                     + sdyf2 * alp(4) * alp(6) &
+                     + sdzf2 * alp(7) * alp(9)
+              b(4) = sdxf2 * alp(2) * alp(2) &
+                     + sdyf2 * alp(5) * alp(5) &
+                     + sdzf2 * alp(8) * alp(8)
+              b(5) = sdxf2 * alp(2) * alp(3) &
+                     + sdyf2 * alp(5) * alp(6) &
+                     + sdzf2 * alp(8) * alp(9)
+              b(6) = sdxf2 * alp(3) * alp(3) &
+                     + sdyf2 * alp(6) * alp(6) &
+                     + sdzf2 * alp(9) * alp(9)
+              aaa = alp(1)**2.+alp(2)**2.+alp(3)**2. &
+                    +alp(4)**2.+alp(5)**2.+alp(6)**2. &
+                    +alp(7)**2.+alp(8)**2.+alp(9)**2.
+              bbb = b(1) * b(4) + b(4) * b(6) + b(6) * b(1) &
+                    - b(2)**2.-b(3)**2.-b(5)**2.
+              bbb = dmax1(bbb, 1.0e-16)
+              if (aaa .eq. 0.) then
+                ami = 0d0
+              else
+                ami = sqrt(bbb / aaa)
+              end if
+              mmij(i, j, k, 1) = ami * str(1) - mmij(i, j, k, 1)
+              mmij(i, j, k, 2) = ami * str(2) - mmij(i, j, k, 2)
+              mmij(i, j, k, 3) = ami * str(3) - mmij(i, j, k, 3)
+              mmij(i, j, k, 4) = ami * str(4) - mmij(i, j, k, 4)
+              mmij(i, j, k, 5) = ami * str(5) - mmij(i, j, k, 5)
+              mmij(i, j, k, 6) = ami * str(6) - mmij(i, j, k, 6)
+              uui(i, j, k, 1) = 0.5 * (u(i, j, k) + u(i + 1, j, k))
+              uui(i, j, k, 2) = 0.5 * (v(i, j, k) + v(i, j + 1, k))
+              uui(i, j, k, 3) = 0.5 * (w(i, j, k) + w(i, j, k + 1))
+              llij(i, j, k, 1) = uui(i, j, k, 1) * uui(i, j, k, 1)
+              llij(i, j, k, 2) = uui(i, j, k, 1) * uui(i, j, k, 2)
+              llij(i, j, k, 3) = uui(i, j, k, 1) * uui(i, j, k, 3)
+              llij(i, j, k, 4) = uui(i, j, k, 2) * uui(i, j, k, 2)
+              llij(i, j, k, 5) = uui(i, j, k, 2) * uui(i, j, k, 3)
+              llij(i, j, k, 6) = uui(i, j, k, 3) * uui(i, j, k, 3)
+            end do
+          end do
+        end do
 !$OMP END PARALLEL DO
-
-      DEALLOCATE (AALP)
-      DEALLOCATE (LLIJ)
-      DEALLOCATE (MMIJ)
-      DEALLOCATE (UUI)
-
-      CSGSTS = DMAX1(0., -0.5*LJMJ_V/MJMJ_V)
 
 !$OMP PARALLEL DO
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            NUSGS(I,J,K) = CSGSTS * NUSGS(I,J,K)
-          ENDDO
-        ENDDO
-      ENDDO
+        do i = 1, 3
+          call test_filter(uui(:, :, :, i), filter)
+        end do
 !$OMP END PARALLEL DO
-
-      RETURN
-      END SUBROUTINE SGS_DVMG
-!=======================================================================
-!=======================================================================
-      SUBROUTINE TEST_FILTER(A0,DIR)
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : CFX1,CFY1,CFZ1
-      IMPLICIT NONE
-      INTEGER*8    :: DIR
-      REAL*8       :: A0(N1M,N2M,N3M)
-
-      INTEGER*8   :: I,J,K
-      INTEGER*8   :: XFILTER,YFILTER,ZFILTER
-      REAL*8      :: TMP(N1M,N2M,N3M)
-
-      IF (DIR .EQ. 1) THEN
-        XFILTER = 1
-        YFILTER = 0
-        ZFILTER = 0
-      ELSE IF (DIR .EQ. 2) THEN
-        XFILTER = 0
-        YFILTER = 0
-        ZFILTER = 1
-      ELSE IF (DIR .EQ. 3) THEN
-        XFILTER = 1
-        YFILTER = 0
-        ZFILTER = 1
-      ELSE
-        WRITE(*,*) 'INVALID FILTER INPUT.'
-        STOP
-      ENDIF 
-      
-      TMP = A0
-
-      IF (XFILTER .EQ. 1) THEN
-        IF (XPRDIC.NE.1) THEN
-          DO K=1,N3M
-            DO J=1,N2M
-              DO I=2,N1M-1
-                TMP(I,J,K)=CFX1(I,-1)*TMP(I-1,J,K)  &
-                          +CFX1(I, 0)*TMP(I  ,J,K)  &
-                          +CFX1(I, 1)*TMP(I+1,J,K)
-              ENDDO
-            ENDDO
-          ENDDO
-        ELSE
-          DO J=1,N2M
-            DO K=1,N3M
-              DO I=2,N1M-1
-                TMP(I,J,K)=CFX1(I,-1)*TMP(I-1,J,K)  &
-                          +CFX1(I, 0)*TMP(I  ,J,K)  &
-                          +CFX1(I, 1)*TMP(I+1,J,K)
-              ENDDO
-              TMP(1,J,K)=CFX1(I,-1)*TMP(N1M,J,K)  &
-                        +CFX1(I, 0)*TMP(1  ,J,K)  &
-                        +CFX1(I, 1)*TMP(2  ,J,K)
-              TMP(N1M,J,K)=CFX1(I,-1)*TMP(N1M-1,J,K)  &
-                          +CFX1(I, 0)*TMP(N1M  ,J,K)  &
-                          +CFX1(I, 1)*TMP(1    ,J,K)
-            ENDDO
-          ENDDO
-        ENDIF
-      ENDIF
-
-      IF (YFILTER .EQ. 1) THEN
-        IF (YPRDIC.NE.1) THEN
-          DO K=1,N3M
-            DO J=2,N2M-1
-              DO I=1,N1M
-                TMP(I,J,K)=CFY1(J,-1)*TMP(I,J-1,K)  &
-                          +CFY1(J, 0)*TMP(I,J  ,K)  &
-                          +CFY1(J, 1)*TMP(I,J+1,K)
-              ENDDO
-            ENDDO
-          ENDDO
-        ELSE
-          DO K=1,N3M
-            DO I=1,N1M
-              DO J=2,N2M-1
-                TMP(I,J,K)=CFY1(J,-1)*TMP(I,J-1,K)  &
-                          +CFY1(J, 0)*TMP(I,J  ,K)  &
-                          +CFY1(J, 1)*TMP(I,J+1,K)
-              ENDDO
-              TMP(I,1,K)=CFY1(J,-1)*TMP(I,N2M,K)  &
-                        +CFY1(J, 0)*TMP(I,1  ,K)  &
-                        +CFY1(J, 1)*TMP(I,2  ,K)
-              TMP(I,N2M,K)=CFY1(J,-1)*TMP(I,N2M-1,K)  &
-                          +CFY1(J, 0)*TMP(I,N2M  ,K)  &
-                          +CFY1(J, 1)*TMP(I,1    ,K)
-            ENDDO
-          ENDDO
-        ENDIF
-      ENDIF
-
-      IF (ZFILTER .EQ. 1) THEN
-        IF (ZPRDIC.NE.1) THEN
-          DO K=2,N3M-1
-            DO J=1,N2M
-              DO I=1,N1M
-                TMP(I,J,K)=CFZ1(K,-1)*TMP(I,J,K-1)  &
-                          +CFZ1(K, 0)*TMP(I,J,K  )  &
-                          +CFZ1(K, 1)*TMP(I,J,K+1)
-              ENDDO
-            ENDDO
-          ENDDO
-        ELSE
-          DO I=1,N1M
-            DO J=1,N2M
-              DO K=2,N3M-1
-                TMP(I,J,K)=CFZ1(K,-1)*TMP(I,J,K-1)  &
-                          +CFZ1(K, 0)*TMP(I,J,K  )  &
-                          +CFZ1(K, 1)*TMP(I,J,K+1)
-              ENDDO
-              TMP(I,J,1)=CFZ1(K,-1)*TMP(I,J,N3M)  &
-                        +CFZ1(K, 0)*TMP(I,J,1)  &
-                        +CFZ1(K, 1)*TMP(I,J,2)
-              TMP(I,J,N3M)=CFZ1(K,-1)*TMP(I,J,N3M-1)  &
-                          +CFZ1(K, 0)*TMP(I,J,N3M  )  &
-                          +CFZ1(K, 1)*TMP(I,J,1    )
-            ENDDO
-          ENDDO
-        ENDIF
-      ENDIF
-
-      A0 = TMP
-
-      RETURN
-      END SUBROUTINE TEST_FILTER
-!=======================================================================
-!=======================================================================
-      SUBROUTINE VELGRAD(I,J,K,A,SR)
-!=======================================================================
-!$    use omp_lib
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,NUSGS
-      IMPLICIT NONE
-      INTEGER*8    :: I,J,K
-      REAL*8       :: A(9),SR(6)
-      INTEGER*8    :: KPLUS,KMINUS,JPLUS,JMINUS,IPLUS,IMINUS
-      REAL*8       :: VG11,VG12,VG13,VG21,VG22,VG23,VG31,VG32,VG33
-      REAL*8       :: UP,UM,VP,VM,WP,WM
-
-      KPLUS=KPV(K)
-      KMINUS=KMV(K)
-      JPLUS=JPV(J)
-      JMINUS=JMV(J)
-      IPLUS=IPV(I)
-      IMINUS=IMV(I)
-
-      VG11=F2FXI(I)*(U(IPLUS,J,K)-U(I,J,K))
-
-      UP=C2CYI(JPLUS)*0.25                                       &
-        *(F2FY(JPLUS)*(U(I,J,K)+U(IPLUS,J,K))                    &
-         +F2FY(J)*(U(I,JPLUS,K)+U(IPLUS,JPLUS,K)))               &
-        *(1.-FIXJU(J))+0.5*(U(I,N2,K)+U(IPLUS,N2,K))*FIXJU(J)
-      UM=C2CYI(J)*0.25                                           &
-        *(F2FY(J)*(U(I,JMINUS,K)+U(IPLUS,JMINUS,K))              &
-          +F2FY(JMINUS)*(U(I,J,K)+U(IPLUS,J,K)))                 &
-        *(1.-FIXJL(J))+0.5*(U(I,0,K)+U(IPLUS,0,K))*FIXJL(J)
-      VG12=F2FYI(J)*(UP-UM)
-
-      UP=C2CZI(KPLUS)*0.25                                       &
-         *(F2FZ(KPLUS)*(U(I,J,K)+U(IPLUS,J,K))                   &
-          +F2FZ(K)*(U(I,J,KPLUS)+U(IPLUS,J,KPLUS)))              &
-         *(1.-FIXKU(K))+0.5*(U(I,J,N3)+U(IPLUS,J,N3))*FIXKU(K)
-      UM=C2CZI(K)*0.25                                           &
-         *(F2FZ(K)*(U(I,J,KMINUS)+U(IPLUS,J,KMINUS))             &
-          +F2FZ(KMINUS)*(U(I,J,K)+U(IPLUS,J,K)))                 &
-         *(1.-FIXKL(K))+0.5*(U(I,J,0)+U(IPLUS,J,0))*FIXKL(K)
-      VG13=F2FZI(K)*(UP-UM)
-
-      VP=C2CXI(IPLUS)*0.25                                       &
-         *(F2FX(IPLUS)*(V(I,J,K)+V(I,JPLUS,K))                   &
-          +F2FX(I)*(V(IPLUS,J,K)+V(IPLUS,JPLUS,K)))              &
-         *(1.-FIXIU(I))+0.5*(V(N1,J,K)+V(N1,JPLUS,K))*FIXIU(I)
-      VM=C2CXI(I)*0.25                                           &
-         *(F2FX(I)*(V(IMINUS,J,K)+V(IMINUS,JPLUS,K))             &
-          +F2FX(IMINUS)*(V(I,J,K)+V(I,JPLUS,K)))                 &
-         *(1.-FIXIL(I))+0.5*(V(0,J,K)+V(0,JPLUS,K))*FIXIL(I)
-      VG21=F2FXI(I)*(VP-VM)
-
-      VG22=F2FYI(J)*(V(I,JPLUS,K)-V(I,J,K))
-
-      VP=C2CZI(KPLUS)*0.25                                       &
-         *(F2FZ(KPLUS)*(V(I,J,K)+V(I,JPLUS,K))                   &
-          +F2FZ(K)*(V(I,J,KPLUS)+V(I,JPLUS,KPLUS)))              &
-         *(1.-FIXKU(K))+0.5*(V(I,J,N3)+V(I,JPLUS,N3))*FIXKU(K)
-      VM=C2CZI(K)*0.25                                           &
-         *(F2FZ(K)*(V(I,J,KMINUS)+V(I,JPLUS,KMINUS))             &
-          +F2FZ(KMINUS)*(V(I,J,K)+V(I,JPLUS,K)))                 &
-         *(1.-FIXKL(K))+0.5*(V(I,J,0)+V(I,JPLUS,0))*FIXKL(K)
-      VG23=F2FZI(K)*(VP-VM)
-      
-      WP=C2CXI(IPLUS)*0.25                                       &
-         *(F2FX(IPLUS)*(W(I,J,K)+W(I,J,KPLUS))                   &
-          +F2FX(I)*(W(IPLUS,J,K)+W(IPLUS,J,KPLUS)))              &
-         *(1.-FIXIU(I))+0.5*(W(N1,J,K)+W(N1,J,KPLUS))*FIXIU(I)
-      WM=C2CXI(I)*0.25                                           &
-         *(F2FX(I)*(W(IMINUS,J,K)+W(IMINUS,J,KPLUS))             &
-          +F2FX(IMINUS)*(W(I,J,K)+W(I,J,KPLUS)))                 &
-         *(1.-FIXIL(I))+0.5*(W(0,J,K)+W(0,J,KPLUS))*FIXIL(I)
-      VG31=F2FXI(I)*(WP-WM)
-      
-      WP=C2CYI(JPLUS)*0.25                                       &
-         *(F2FY(JPLUS)*(W(I,J,K)+W(I,J,KPLUS))                   &
-          +F2FY(J)*(W(I,JPLUS,K)+W(I,JPLUS,KPLUS)))              &
-         *(1.-FIXJU(J))+0.5*(W(I,N2,K)+W(I,N2,KPLUS))*FIXJU(J)
-      WM=C2CYI(J)*0.25                                           &
-         *(F2FY(J)*(W(I,JMINUS,K)+W(I,JMINUS,KPLUS))             &
-          +F2FY(JMINUS)*(W(I,J,K)+W(I,J,KPLUS)))                 &
-          *(1.-FIXJL(J))+0.5*(W(I,0,K)+W(I,0,KPLUS))*FIXJL(J)
-      VG32=F2FYI(J)*(WP-WM)
-      
-      VG33=F2FZI(K)*(W(I,J,KPLUS)-W(I,J,K))
-      
-      A(1)=VG11
-      A(2)=VG21
-      A(3)=VG31
-      A(4)=VG12
-      A(5)=VG22
-      A(6)=VG32
-      A(7)=VG13
-      A(8)=VG23
-      A(9)=VG33
-
-      SR(1)= VG11
-      SR(2)= 0.5*(VG12+VG21)
-      SR(3)= 0.5*(VG13+VG31)
-      SR(4)= VG22
-      SR(5)= 0.5*(VG23+VG32)
-      SR(6)= VG33
-
-      RETURN
-      END SUBROUTINE VELGRAD
-!=======================================================================
-!=======================================================================
-      SUBROUTINE NUTZERO
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : NUSGS,INZ,JNZ,KNZ
-      IMPLICIT NONE
-      INTEGER*8  :: I,J,K
-      INTEGER*8  :: IMAX,JMAX,KMAX,L
-      REAL*8     :: NUSGSAVG, NUSGSMAX, AREA
-      REAL*8     :: FUNCBODY
-
-      IMAX = 0
-      JMAX = 0
-      KMAX = 0
-
 !$OMP PARALLEL DO
-        DO L=1,NZERO
-          NUSGS(INZ(L),JNZ(L),KNZ(L)) = 0.
-        ENDDO
+        do j = 1, 6
+          call test_filter(llij(:, :, :, j), filter)
+        end do
 !$OMP END PARALLEL DO
-
-      NUSGSAVG = 0.
-      AREA = 0.
-      NUSGSMAX = 0.
 
 !$OMP PARALLEL DO&
-!$OMP reduction(+:NUSGSAVG, AREA)&
-!$OMP reduction(MAX:NUSGSMAX)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            IF (FUNCBODY(XMP(I),YMP(J),ZMP(K),TIME).GE.1.E-10) THEN
-              NUSGSAVG = NUSGSAVG + NUSGS(I,J,K)*F2FX(I)*F2FY(J)*F2FZ(K)
-              AREA = AREA + F2FX(I)*F2FY(J)*F2FZ(K)
-              IF (NUSGS(I,J,K).GT.NUSGSMAX) THEN
-                NUSGSMAX = NUSGS(I,J,K)
-                IMAX = I
-                JMAX = J
-                KMAX = K
-              ENDIF
-            ELSE
-              NUSGS(I,J,K) = 0.
-            ENDIF
-          ENDDO
-        ENDDO
-      ENDDO
+!$OMP REDUCTION(+:LJMJ_V,MJMJ_V)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              volume = f2fx(i) * f2fy(j) * f2fz(k)
+              llij(i, j, k, 1) = llij(i, j, k, 1) - uui(i, j, k, 1) * uui(i, j, k, 1)
+              llij(i, j, k, 2) = llij(i, j, k, 2) - uui(i, j, k, 1) * uui(i, j, k, 2)
+              llij(i, j, k, 3) = llij(i, j, k, 3) - uui(i, j, k, 1) * uui(i, j, k, 3)
+              llij(i, j, k, 4) = llij(i, j, k, 4) - uui(i, j, k, 2) * uui(i, j, k, 2)
+              llij(i, j, k, 5) = llij(i, j, k, 5) - uui(i, j, k, 2) * uui(i, j, k, 3)
+              llij(i, j, k, 6) = llij(i, j, k, 6) - uui(i, j, k, 3) * uui(i, j, k, 3)
+              ljmj_v = ljmj_v &
+                       + (2.*llij(i, j, k, 2) * mmij(i, j, k, 2) + llij(i, j, k, 1) * mmij(i, j, k, 1) &
+                          + 2.*llij(i, j, k, 3) * mmij(i, j, k, 3) + llij(i, j, k, 4) * mmij(i, j, k, 4) &
+                          + 2.*llij(i, j, k, 5) * mmij(i, j, k, 5) + llij(i, j, k, 6) * mmij(i, j, k, 6)) &
+                       * float(nwall_dvm(i, j, k)) * volume
+              mjmj_v = mjmj_v &
+                       + (2.*mmij(i, j, k, 2)**2.+mmij(i, j, k, 1)**2. &
+                          +2.*mmij(i, j, k, 3)**2.+mmij(i, j, k, 4)**2. &
+                          +2.*mmij(i, j, k, 5)**2.+mmij(i, j, k, 6)**2.) &
+                       * float(nwall_dvm(i, j, k)) * volume
+            end do
+          end do
+        end do
 !$OMP END PARALLEL DO
 
-      NUSGSAVG = NUSGSAVG / AREA
+        deallocate (aalp)
+        deallocate (llij)
+        deallocate (mmij)
+        deallocate (uui)
 
-      NUTAVG = NUSGSAVG * RE
-      NUTMAX = NUSGSMAX * RE
+        csgsts = dmax1(0., -0.5 * ljmj_v / mjmj_v)
 
-      WRITE(*,99)  CSGSTS
-      WRITE(*,100) NUTAVG
-      WRITE(*,110) NUTMAX,XMP(IMAX),YMP(JMAX),ZMP(KMAX),IMAX,JMAX,KMAX
-   99 FORMAT('CSGSTS =  ',ES10.3)
-  100 FORMAT('NUTAVG =  ',ES10.3)
-  110 FORMAT('NUTMAX =  ',ES10.3,' @ ',3F10.4,' , ',3I5)
+!$OMP PARALLEL DO
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              nusgs(i, j, k) = csgsts * nusgs(i, j, k)
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
 
-      RETURN
-      END SUBROUTINE NUTZERO
+        return
+      end subroutine sgs_dvmg
 !=======================================================================
 !=======================================================================
-      SUBROUTINE NUTINTERPOL
+      subroutine test_filter(a0, dir)
+!=======================================================================
+        use mod_common
+        use mod_flowarray, only: cfx1, cfy1, cfz1
+        implicit none
+        integer(8) :: dir
+        real(8) :: a0(n1m, n2m, n3m)
+
+        integer(8) :: i, j, k
+        integer(8) :: xfilter, yfilter, zfilter
+        real(8) :: tmp(n1m, n2m, n3m)
+
+        if (dir .eq. 1) then
+          xfilter = 1
+          yfilter = 0
+          zfilter = 0
+        else if (dir .eq. 2) then
+          xfilter = 0
+          yfilter = 0
+          zfilter = 1
+        else if (dir .eq. 3) then
+          xfilter = 1
+          yfilter = 0
+          zfilter = 1
+        else
+          write (*, *) 'INVALID FILTER INPUT.'
+          stop
+        end if
+
+        tmp = a0
+
+        if (xfilter .eq. 1) then
+          if (xprdic .ne. 1) then
+            do k = 1, n3m
+              do j = 1, n2m
+                do i = 2, n1m - 1
+                  tmp(i, j, k) = cfx1(i, -1) * tmp(i - 1, j, k) &
+                                 + cfx1(i, 0) * tmp(i, j, k) &
+                                 + cfx1(i, 1) * tmp(i + 1, j, k)
+                end do
+              end do
+            end do
+          else
+            do j = 1, n2m
+              do k = 1, n3m
+                do i = 2, n1m - 1
+                  tmp(i, j, k) = cfx1(i, -1) * tmp(i - 1, j, k) &
+                                 + cfx1(i, 0) * tmp(i, j, k) &
+                                 + cfx1(i, 1) * tmp(i + 1, j, k)
+                end do
+                tmp(1, j, k) = cfx1(i, -1) * tmp(n1m, j, k) &
+                               + cfx1(i, 0) * tmp(1, j, k) &
+                               + cfx1(i, 1) * tmp(2, j, k)
+                tmp(n1m, j, k) = cfx1(i, -1) * tmp(n1m - 1, j, k) &
+                                 + cfx1(i, 0) * tmp(n1m, j, k) &
+                                 + cfx1(i, 1) * tmp(1, j, k)
+              end do
+            end do
+          end if
+        end if
+
+        if (yfilter .eq. 1) then
+          if (yprdic .ne. 1) then
+            do k = 1, n3m
+              do j = 2, n2m - 1
+                do i = 1, n1m
+                  tmp(i, j, k) = cfy1(j, -1) * tmp(i, j - 1, k) &
+                                 + cfy1(j, 0) * tmp(i, j, k) &
+                                 + cfy1(j, 1) * tmp(i, j + 1, k)
+                end do
+              end do
+            end do
+          else
+            do k = 1, n3m
+              do i = 1, n1m
+                do j = 2, n2m - 1
+                  tmp(i, j, k) = cfy1(j, -1) * tmp(i, j - 1, k) &
+                                 + cfy1(j, 0) * tmp(i, j, k) &
+                                 + cfy1(j, 1) * tmp(i, j + 1, k)
+                end do
+                tmp(i, 1, k) = cfy1(j, -1) * tmp(i, n2m, k) &
+                               + cfy1(j, 0) * tmp(i, 1, k) &
+                               + cfy1(j, 1) * tmp(i, 2, k)
+                tmp(i, n2m, k) = cfy1(j, -1) * tmp(i, n2m - 1, k) &
+                                 + cfy1(j, 0) * tmp(i, n2m, k) &
+                                 + cfy1(j, 1) * tmp(i, 1, k)
+              end do
+            end do
+          end if
+        end if
+
+        if (zfilter .eq. 1) then
+          if (zprdic .ne. 1) then
+            do k = 2, n3m - 1
+              do j = 1, n2m
+                do i = 1, n1m
+                  tmp(i, j, k) = cfz1(k, -1) * tmp(i, j, k - 1) &
+                                 + cfz1(k, 0) * tmp(i, j, k) &
+                                 + cfz1(k, 1) * tmp(i, j, k + 1)
+                end do
+              end do
+            end do
+          else
+            do i = 1, n1m
+              do j = 1, n2m
+                do k = 2, n3m - 1
+                  tmp(i, j, k) = cfz1(k, -1) * tmp(i, j, k - 1) &
+                                 + cfz1(k, 0) * tmp(i, j, k) &
+                                 + cfz1(k, 1) * tmp(i, j, k + 1)
+                end do
+                tmp(i, j, 1) = cfz1(k, -1) * tmp(i, j, n3m) &
+                               + cfz1(k, 0) * tmp(i, j, 1) &
+                               + cfz1(k, 1) * tmp(i, j, 2)
+                tmp(i, j, n3m) = cfz1(k, -1) * tmp(i, j, n3m - 1) &
+                                 + cfz1(k, 0) * tmp(i, j, n3m) &
+                                 + cfz1(k, 1) * tmp(i, j, 1)
+              end do
+            end do
+          end if
+        end if
+
+        a0 = tmp
+
+        return
+      end subroutine test_filter
+!=======================================================================
+!=======================================================================
+      subroutine velgrad(i, j, k, a, sr)
+!=======================================================================
+!$      USE OMP_LIB
+        use mod_common
+        use mod_flowarray, only: u, v, w, nusgs
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: a(9), sr(6)
+        integer(8) :: kplus, kminus, jplus, jminus, iplus, iminus
+        real(8) :: vg11, vg12, vg13, vg21, vg22, vg23, vg31, vg32, vg33
+        real(8) :: up, um, vp, vm, wp, wm
+
+        kplus = kpv(k)
+        kminus = kmv(k)
+        jplus = jpv(j)
+        jminus = jmv(j)
+        iplus = ipv(i)
+        iminus = imv(i)
+
+        vg11 = f2fxi(i) * (u(iplus, j, k) - u(i, j, k))
+
+        up = c2cyi(jplus) * 0.25 &
+             * (f2fy(jplus) * (u(i, j, k) + u(iplus, j, k)) &
+                + f2fy(j) * (u(i, jplus, k) + u(iplus, jplus, k))) &
+             * (1.-fixju(j)) + 0.5 * (u(i, n2, k) + u(iplus, n2, k)) * fixju(j)
+        um = c2cyi(j) * 0.25 &
+             * (f2fy(j) * (u(i, jminus, k) + u(iplus, jminus, k)) &
+                + f2fy(jminus) * (u(i, j, k) + u(iplus, j, k))) &
+             * (1.-fixjl(j)) + 0.5 * (u(i, 0, k) + u(iplus, 0, k)) * fixjl(j)
+        vg12 = f2fyi(j) * (up - um)
+
+        up = c2czi(kplus) * 0.25 &
+             * (f2fz(kplus) * (u(i, j, k) + u(iplus, j, k)) &
+                + f2fz(k) * (u(i, j, kplus) + u(iplus, j, kplus))) &
+             * (1.-fixku(k)) + 0.5 * (u(i, j, n3) + u(iplus, j, n3)) * fixku(k)
+        um = c2czi(k) * 0.25 &
+             * (f2fz(k) * (u(i, j, kminus) + u(iplus, j, kminus)) &
+                + f2fz(kminus) * (u(i, j, k) + u(iplus, j, k))) &
+             * (1.-fixkl(k)) + 0.5 * (u(i, j, 0) + u(iplus, j, 0)) * fixkl(k)
+        vg13 = f2fzi(k) * (up - um)
+
+        vp = c2cxi(iplus) * 0.25 &
+             * (f2fx(iplus) * (v(i, j, k) + v(i, jplus, k)) &
+                + f2fx(i) * (v(iplus, j, k) + v(iplus, jplus, k))) &
+             * (1.-fixiu(i)) + 0.5 * (v(n1, j, k) + v(n1, jplus, k)) * fixiu(i)
+        vm = c2cxi(i) * 0.25 &
+             * (f2fx(i) * (v(iminus, j, k) + v(iminus, jplus, k)) &
+                + f2fx(iminus) * (v(i, j, k) + v(i, jplus, k))) &
+             * (1.-fixil(i)) + 0.5 * (v(0, j, k) + v(0, jplus, k)) * fixil(i)
+        vg21 = f2fxi(i) * (vp - vm)
+
+        vg22 = f2fyi(j) * (v(i, jplus, k) - v(i, j, k))
+
+        vp = c2czi(kplus) * 0.25 &
+             * (f2fz(kplus) * (v(i, j, k) + v(i, jplus, k)) &
+                + f2fz(k) * (v(i, j, kplus) + v(i, jplus, kplus))) &
+             * (1.-fixku(k)) + 0.5 * (v(i, j, n3) + v(i, jplus, n3)) * fixku(k)
+        vm = c2czi(k) * 0.25 &
+             * (f2fz(k) * (v(i, j, kminus) + v(i, jplus, kminus)) &
+                + f2fz(kminus) * (v(i, j, k) + v(i, jplus, k))) &
+             * (1.-fixkl(k)) + 0.5 * (v(i, j, 0) + v(i, jplus, 0)) * fixkl(k)
+        vg23 = f2fzi(k) * (vp - vm)
+
+        wp = c2cxi(iplus) * 0.25 &
+             * (f2fx(iplus) * (w(i, j, k) + w(i, j, kplus)) &
+                + f2fx(i) * (w(iplus, j, k) + w(iplus, j, kplus))) &
+             * (1.-fixiu(i)) + 0.5 * (w(n1, j, k) + w(n1, j, kplus)) * fixiu(i)
+        wm = c2cxi(i) * 0.25 &
+             * (f2fx(i) * (w(iminus, j, k) + w(iminus, j, kplus)) &
+                + f2fx(iminus) * (w(i, j, k) + w(i, j, kplus))) &
+             * (1.-fixil(i)) + 0.5 * (w(0, j, k) + w(0, j, kplus)) * fixil(i)
+        vg31 = f2fxi(i) * (wp - wm)
+
+        wp = c2cyi(jplus) * 0.25 &
+             * (f2fy(jplus) * (w(i, j, k) + w(i, j, kplus)) &
+                + f2fy(j) * (w(i, jplus, k) + w(i, jplus, kplus))) &
+             * (1.-fixju(j)) + 0.5 * (w(i, n2, k) + w(i, n2, kplus)) * fixju(j)
+        wm = c2cyi(j) * 0.25 &
+             * (f2fy(j) * (w(i, jminus, k) + w(i, jminus, kplus)) &
+                + f2fy(jminus) * (w(i, j, k) + w(i, j, kplus))) &
+             * (1.-fixjl(j)) + 0.5 * (w(i, 0, k) + w(i, 0, kplus)) * fixjl(j)
+        vg32 = f2fyi(j) * (wp - wm)
+
+        vg33 = f2fzi(k) * (w(i, j, kplus) - w(i, j, k))
+
+        a(1) = vg11
+        a(2) = vg21
+        a(3) = vg31
+        a(4) = vg12
+        a(5) = vg22
+        a(6) = vg32
+        a(7) = vg13
+        a(8) = vg23
+        a(9) = vg33
+
+        sr(1) = vg11
+        sr(2) = 0.5 * (vg12 + vg21)
+        sr(3) = 0.5 * (vg13 + vg31)
+        sr(4) = vg22
+        sr(5) = 0.5 * (vg23 + vg32)
+        sr(6) = vg33
+
+        return
+      end subroutine velgrad
+!=======================================================================
+!=======================================================================
+      subroutine nutzero
+!=======================================================================
+        use mod_common
+        use mod_flowarray, only: nusgs, inz, jnz, knz
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: imax, jmax, kmax, l
+        real(8) :: nusgsavg, nusgsmax, area
+        real(8) :: funcbody
+
+        imax = 0
+        jmax = 0
+        kmax = 0
+
+!$OMP PARALLEL DO
+        do l = 1, nzero
+          nusgs(inz(l), jnz(l), knz(l)) = 0.
+        end do
+!$OMP END PARALLEL DO
+
+        nusgsavg = 0.
+        area = 0.
+        nusgsmax = 0.
+
+!$OMP PARALLEL DO&
+!$OMP REDUCTION(+:NUSGSAVG, AREA)&
+!$OMP REDUCTION(MAX:NUSGSMAX)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                nusgsavg = nusgsavg + nusgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
+                area = area + f2fx(i) * f2fy(j) * f2fz(k)
+                if (nusgs(i, j, k) .gt. nusgsmax) then
+                  nusgsmax = nusgs(i, j, k)
+                  imax = i
+                  jmax = j
+                  kmax = k
+                end if
+              else
+                nusgs(i, j, k) = 0.
+              end if
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+
+        nusgsavg = nusgsavg / area
+
+        nutavg = nusgsavg * re
+        nutmax = nusgsmax * re
+
+        write (*, 99) csgsts
+        write (*, 100) nutavg
+        write (*, 110) nutmax, xmp(imax), ymp(jmax), zmp(kmax), imax, jmax, kmax
+99      format('CSGSTS =  ', es10.3)
+100     format('NUTAVG =  ', es10.3)
+110     format('NUTMAX =  ', es10.3, ' @ ', 3f10.4, ' , ', 3i5)
+
+        return
+      end subroutine nutzero
+!=======================================================================
+!=======================================================================
+      subroutine nutinterpol
 !=======================================================================
 !
 !     INTERPOLATION OF NUT
@@ -931,263 +930,263 @@
 !     FAR FIELD WALL(SIED WALL)              : D(NUT)/DX=0
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : NUSGS,NUSGS1,INZ,JNZ,KNZ
-      IMPLICIT NONE
-      INTEGER*8  :: I,J,K,IM,JM,KM
+        use mod_common
+        use mod_flowarray, only: nusgs, nusgs1, inz, jnz, knz
+        implicit none
+        integer(8) :: i, j, k, im, jm, km
 
-      NUSGS1 = 0.
+        nusgs1 = 0.
 
-      IF (XPRDIC .EQ. 1) THEN
+        if (xprdic .eq. 1) then
 !$OMP PARALLEL DO
-        DO K=0,N3
-          DO J=0,N2
-            NUSGS(0 ,J,K)=NUSGS(N1M,J,K)
-            NUSGS(N1,J,K)=NUSGS(1  ,J,K)
-          ENDDO
-        ENDDO
+          do k = 0, n3
+            do j = 0, n2
+              nusgs(0, j, k) = nusgs(n1m, j, k)
+              nusgs(n1, j, k) = nusgs(1, j, k)
+            end do
+          end do
 !$OMP END PARALLEL DO
-      ENDIF
+        end if
 
-      IF (YPRDIC .EQ. 1) THEN
+        if (yprdic .eq. 1) then
 !$OMP PARALLEL DO
-        DO K=0,N3
-          DO I=0,N1
-            NUSGS(I,0 ,K)=NUSGS(I,N2M,K)
-            NUSGS(I,N2,K)=NUSGS(I,  1,K)
-          ENDDO
-        ENDDO
+          do k = 0, n3
+            do i = 0, n1
+              nusgs(i, 0, k) = nusgs(i, n2m, k)
+              nusgs(i, n2, k) = nusgs(i, 1, k)
+            end do
+          end do
 !$OMP END PARALLEL DO
-      ENDIF
+        end if
 
-      IF (ZPRDIC .EQ. 1) THEN
+        if (zprdic .eq. 1) then
 !$OMP PARALLEL DO
-        DO J=0,N2
-          DO I=0,N1
-            NUSGS(I,J,0 )=NUSGS(I,J,N3M)
-            NUSGS(I,J,N3)=NUSGS(I,J,1  )
-          ENDDO
-        ENDDO
+          do j = 0, n2
+            do i = 0, n1
+              nusgs(i, j, 0) = nusgs(i, j, n3m)
+              nusgs(i, j, n3) = nusgs(i, j, 1)
+            end do
+          end do
 !$OMP END PARALLEL DO
-      ENDIF
+        end if
 
 !$OMP PARALLEL DO
-      DO K=K_BGPZ,N3M
-        DO J=J_BGPY,N2M
-          DO I=1,N1M
-            NUSGS1(I,J,K,1)=C2CYI(J)*C2CZI(K)*0.25                          &
-              *(F2FY(J-1)*(F2FZ(K-1)*NUSGS(I,J,K)+F2FZ(K)*NUSGS(I,J,K-1))   &
-              +F2FY(J)*(F2FZ(K-1)*NUSGS(I,J-1,K)+F2FZ(K)*NUSGS(I,J-1,K-1)))
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
-      DO K=K_BGPZ,N3M
-        DO J=1,N2M
-          DO I=I_BGPX,N1M
-            NUSGS1(I,J,K,2)=C2CZI(K)*C2CXI(I)*0.25                          &
-              *(F2FZ(K-1)*(F2FX(I-1)*NUSGS(I,J,K)+F2FX(I)*NUSGS(I-1,J,K))   &
-              +F2FZ(K)*(F2FX(I-1)*NUSGS(I,J,K-1)+F2FX(I)*NUSGS(I-1,J,K-1)))
-          ENDDO
-        ENDDO
-      ENDDO
+        do k = k_bgpz, n3m
+          do j = j_bgpy, n2m
+            do i = 1, n1m
+              nusgs1(i, j, k, 1) = c2cyi(j) * c2czi(k) * 0.25 &
+                                   * (f2fy(j - 1) * (f2fz(k - 1) * nusgs(i, j, k) + f2fz(k) * nusgs(i, j, k - 1)) &
+                                      + f2fy(j) * (f2fz(k - 1) * nusgs(i, j - 1, k) + f2fz(k) * nusgs(i, j - 1, k - 1)))
+            end do
+          end do
+        end do
 !$OMP END PARALLEL DO
 !$OMP PARALLEL DO
-      DO K=1,N3M
-        DO J=J_BGPY,N2M
-          DO I=I_BGPX,N1M
-            NUSGS1(I,J,K,3)=C2CXI(I)*C2CYI(J)*0.25                          &
-              *(F2FX(I-1)*(F2FY(J-1)*NUSGS(I,J,K)+F2FY(J)*NUSGS(I,J-1,K))   &
-              +F2FX(I)*(F2FY(J-1)*NUSGS(I-1,J,K)+F2FY(J)*NUSGS(I-1,J-1,K)))
-          ENDDO
-        ENDDO
-      ENDDO
+        do k = k_bgpz, n3m
+          do j = 1, n2m
+            do i = i_bgpx, n1m
+              nusgs1(i, j, k, 2) = c2czi(k) * c2cxi(i) * 0.25 &
+                                   * (f2fz(k - 1) * (f2fx(i - 1) * nusgs(i, j, k) + f2fx(i) * nusgs(i - 1, j, k)) &
+                                      + f2fz(k) * (f2fx(i - 1) * nusgs(i, j, k - 1) + f2fx(i) * nusgs(i - 1, j, k - 1)))
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
+        do k = 1, n3m
+          do j = j_bgpy, n2m
+            do i = i_bgpx, n1m
+              nusgs1(i, j, k, 3) = c2cxi(i) * c2cyi(j) * 0.25 &
+                                   * (f2fx(i - 1) * (f2fy(j - 1) * nusgs(i, j, k) + f2fy(j) * nusgs(i, j - 1, k)) &
+                                      + f2fx(i) * (f2fy(j - 1) * nusgs(i - 1, j, k) + f2fy(j) * nusgs(i - 1, j - 1, k)))
+            end do
+          end do
+        end do
 !$OMP END PARALLEL DO
 
-!!$OMP PARALLEL DO private(JM,KM)
-      DO J=J_BGPY,N2M
-        DO K=K_BGPZ,N3M
-          JM=JMV(J)
-          KM=KMV(K)
-          IF (XPRDIC .EQ. 1) THEN
-            NUSGS1(N1,J,K,1) = NUSGS1(1,J,K,1)
-            NUSGS1(N1,J,K,2) = NUSGS1(1,J,K,2)
-            NUSGS1(N1,J,K,3) = NUSGS1(1,J,K,3)
-          ELSE
-            IF (BC_XBTM .EQ. 0) THEN
-              NUSGS1(1,J,K,1) = 0.
-              NUSGS1(1,J,K,2) = 0.
-              NUSGS1(1,J,K,3) = 0.
-            ELSE
-              NUSGS1(1,J,K,2) = &
-                C2CZI(K)*0.5*(F2FZ(K)*NUSGS(2,J,KM)+F2FZ(KM)*NUSGS(2,J,K))
-              NUSGS1(1,J,K,3) = &
-                C2CYI(J)*0.5*(F2FY(J)*NUSGS(2,JM,K)+F2FY(JM)*NUSGS(2,J,K))
-            ENDIF
-            IF (BC_XTOP .EQ. 0) THEN
-              NUSGS1(N1,J,K,1) = 0.
-              NUSGS1(N1,J,K,2) = 0.
-              NUSGS1(N1,J,K,3) = 0.
-            ELSE
-              NUSGS1(N1,J,K,2) = &
-                C2CZI(K)*0.5*(F2FZ(K)*NUSGS(N1M,J,KM)+F2FZ(KM)*NUSGS(N1M,J,K))
-              NUSGS1(N1,J,K,3) = &
-                C2CYI(J)*0.5*(F2FY(J)*NUSGS(N1M,JM,K)+F2FY(JM)*NUSGS(N1M,J,K))
-            ENDIF
-          ENDIF
-        ENDDO
-      ENDDO
+!!$OMP PARALLEL DO PRIVATE(JM,KM)
+        do j = j_bgpy, n2m
+          do k = k_bgpz, n3m
+            jm = jmv(j)
+            km = kmv(k)
+            if (xprdic .eq. 1) then
+              nusgs1(n1, j, k, 1) = nusgs1(1, j, k, 1)
+              nusgs1(n1, j, k, 2) = nusgs1(1, j, k, 2)
+              nusgs1(n1, j, k, 3) = nusgs1(1, j, k, 3)
+            else
+              if (bc_xbtm .eq. 0) then
+                nusgs1(1, j, k, 1) = 0.
+                nusgs1(1, j, k, 2) = 0.
+                nusgs1(1, j, k, 3) = 0.
+              else
+                nusgs1(1, j, k, 2) = &
+                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(2, j, km) + f2fz(km) * nusgs(2, j, k))
+                nusgs1(1, j, k, 3) = &
+                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(2, jm, k) + f2fy(jm) * nusgs(2, j, k))
+              end if
+              if (bc_xtop .eq. 0) then
+                nusgs1(n1, j, k, 1) = 0.
+                nusgs1(n1, j, k, 2) = 0.
+                nusgs1(n1, j, k, 3) = 0.
+              else
+                nusgs1(n1, j, k, 2) = &
+                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(n1m, j, km) + f2fz(km) * nusgs(n1m, j, k))
+                nusgs1(n1, j, k, 3) = &
+                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(n1m, jm, k) + f2fy(jm) * nusgs(n1m, j, k))
+              end if
+            end if
+          end do
+        end do
 !!$OMP END PARALLEL DO
 
-!!$OMP PARALLEL DO private(IM,KM)
-      DO K=K_BGPZ,N3M
-        DO I=I_BGPX,N1M
-          IM=IMV(I)
-          KM=KMV(K)
-          IF (YPRDIC .EQ. 1) THEN
-            NUSGS1(I,N2,K,1) = NUSGS1(I,1,K,1)
-            NUSGS1(I,N2,K,2) = NUSGS1(I,1,K,2)
-            NUSGS1(I,N2,K,3) = NUSGS1(I,1,K,3)
-          ELSE
-            IF (BC_YBTM .EQ. 0) THEN
-              NUSGS1(I,1,K,1) = 0.
-              NUSGS1(I,1,K,2) = 0.
-              NUSGS1(I,1,K,3) = 0.
-            ELSE
-              NUSGS1(I,1,K,2) = &
-                C2CZI(K)*0.5*(F2FZ(K)*NUSGS(I,2,KM)+F2FZ(KM)*NUSGS(I,2,K))
-              NUSGS1(I,1,K,3) = &
-                C2CXI(I)*0.5*(F2FX(I)*NUSGS(IM,2,K)+F2FX(IM)*NUSGS(I,2,K))
-            ENDIF
-            IF (BC_YTOP .EQ. 0) THEN
-              NUSGS1(I,N2,K,1) = 0.
-              NUSGS1(I,N2,K,2) = 0.
-              NUSGS1(I,N2,K,3) = 0.
-            ELSE
-              NUSGS1(I,N2,K,2) = &
-                C2CZI(K)*0.5*(F2FZ(K)*NUSGS(I,N2M,KM)+F2FZ(KM)*NUSGS(I,N2M,K))
-              NUSGS1(I,N2,K,3) = &
-                C2CXI(I)*0.5*(F2FX(I)*NUSGS(IM,N2M,K)+F2FX(IM)*NUSGS(I,N2M,K))
-            ENDIF
-          ENDIF
-        ENDDO
-      ENDDO
+!!$OMP PARALLEL DO PRIVATE(IM,KM)
+        do k = k_bgpz, n3m
+          do i = i_bgpx, n1m
+            im = imv(i)
+            km = kmv(k)
+            if (yprdic .eq. 1) then
+              nusgs1(i, n2, k, 1) = nusgs1(i, 1, k, 1)
+              nusgs1(i, n2, k, 2) = nusgs1(i, 1, k, 2)
+              nusgs1(i, n2, k, 3) = nusgs1(i, 1, k, 3)
+            else
+              if (bc_ybtm .eq. 0) then
+                nusgs1(i, 1, k, 1) = 0.
+                nusgs1(i, 1, k, 2) = 0.
+                nusgs1(i, 1, k, 3) = 0.
+              else
+                nusgs1(i, 1, k, 2) = &
+                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(i, 2, km) + f2fz(km) * nusgs(i, 2, k))
+                nusgs1(i, 1, k, 3) = &
+                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, 2, k) + f2fx(im) * nusgs(i, 2, k))
+              end if
+              if (bc_ytop .eq. 0) then
+                nusgs1(i, n2, k, 1) = 0.
+                nusgs1(i, n2, k, 2) = 0.
+                nusgs1(i, n2, k, 3) = 0.
+              else
+                nusgs1(i, n2, k, 2) = &
+                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(i, n2m, km) + f2fz(km) * nusgs(i, n2m, k))
+                nusgs1(i, n2, k, 3) = &
+                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, n2m, k) + f2fx(im) * nusgs(i, n2m, k))
+              end if
+            end if
+          end do
+        end do
 !!$OMP END PARALLEL DO
 
-!!$OMP PARALLEL DO private(IM,JM)
-      DO I=I_BGPX,N1M
-        DO J=J_BGPY,N2M
-          IM=IMV(I)
-          JM=JMV(J)
-          IF (ZPRDIC .EQ. 1) THEN
-            NUSGS1(I,J,N3,1) = NUSGS1(I,J,1,1)
-            NUSGS1(I,J,N3,2) = NUSGS1(I,J,1,2)
-            NUSGS1(I,J,N3,3) = NUSGS1(I,J,1,3)
-          ELSE
-            IF (BC_ZBTM .EQ. 0) THEN
-              NUSGS1(I,J,1,1) = 0.
-              NUSGS1(I,J,1,2) = 0.
-              NUSGS1(I,J,1,3) = 0.
-            ELSE
-              NUSGS1(I,J,1,2) = &
-                C2CYI(J)*0.5*(F2FY(J)*NUSGS(I,JM,2)+F2FY(JM)*NUSGS(I,J,2))
-              NUSGS1(I,J,1,3) = &
-                C2CXI(I)*0.5*(F2FX(I)*NUSGS(IM,J,2)+F2FX(IM)*NUSGS(I,J,2))
-            ENDIF
-            IF (BC_ZTOP .EQ. 0) THEN
-              NUSGS1(I,J,N3,1) = 0.
-              NUSGS1(I,J,N3,2) = 0.
-              NUSGS1(I,J,N3,3) = 0.
-            ELSE
-              NUSGS1(I,J,N3,2) = &
-                C2CYI(K)*0.5*(F2FY(J)*NUSGS(I,JM,N3M)+F2FY(JM)*NUSGS(I,J,N3M))
-              NUSGS1(I,J,N3,3) = &
-                C2CXI(I)*0.5*(F2FX(I)*NUSGS(IM,J,N3M)+F2FX(IM)*NUSGS(I,J,N3M))
-            ENDIF
-          ENDIF
-        ENDDO
-      ENDDO
+!!$OMP PARALLEL DO PRIVATE(IM,JM)
+        do i = i_bgpx, n1m
+          do j = j_bgpy, n2m
+            im = imv(i)
+            jm = jmv(j)
+            if (zprdic .eq. 1) then
+              nusgs1(i, j, n3, 1) = nusgs1(i, j, 1, 1)
+              nusgs1(i, j, n3, 2) = nusgs1(i, j, 1, 2)
+              nusgs1(i, j, n3, 3) = nusgs1(i, j, 1, 3)
+            else
+              if (bc_zbtm .eq. 0) then
+                nusgs1(i, j, 1, 1) = 0.
+                nusgs1(i, j, 1, 2) = 0.
+                nusgs1(i, j, 1, 3) = 0.
+              else
+                nusgs1(i, j, 1, 2) = &
+                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(i, jm, 2) + f2fy(jm) * nusgs(i, j, 2))
+                nusgs1(i, j, 1, 3) = &
+                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, j, 2) + f2fx(im) * nusgs(i, j, 2))
+              end if
+              if (bc_ztop .eq. 0) then
+                nusgs1(i, j, n3, 1) = 0.
+                nusgs1(i, j, n3, 2) = 0.
+                nusgs1(i, j, n3, 3) = 0.
+              else
+                nusgs1(i, j, n3, 2) = &
+                  c2cyi(k) * 0.5 * (f2fy(j) * nusgs(i, jm, n3m) + f2fy(jm) * nusgs(i, j, n3m))
+                nusgs1(i, j, n3, 3) = &
+                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, j, n3m) + f2fx(im) * nusgs(i, j, n3m))
+              end if
+            end if
+          end do
+        end do
 !!$OMP END PARALLEL DO
 
-      RETURN
-      END SUBROUTINE NUTINTERPOL
+        return
+      end subroutine nutinterpol
 !=======================================================================
 !=======================================================================
-      SUBROUTINE RHSSGS
+      subroutine rhssgs
 !=======================================================================
 !
-!     D/DXj(NU_t*DUj/DXi)*(1-KroneckerDelta(ij)),
+!     D/DXJ(NU_T*DUJ/DXI)*(1-KRONECKERDELTA(IJ)),
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,NUSGS1,RHS1
-      IMPLICIT NONE
-      INTEGER*8 :: I,J,K
-      REAL*8    :: RHSU2,RHSU3,RHSV1,RHSV3,RHSW1,RHSW2
+        use mod_common
+        use mod_flowarray, only: u, v, w, nusgs1, rhs1
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: rhsu2, rhsu3, rhsv1, rhsv3, rhsw1, rhsw2
 
 !$OMP PARALLEL DO&
-!$OMP private(RHSU2,RHSU3)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=I_BGPX,N1M
-            RHSU2=F2FYI(J)*C2CXI(I)                            &
-                 *(NUSGS1(I,J+1,K,3)*(V(I,J+1,K)-V(I-1,J+1,K)) &
-                  -NUSGS1(I,J,K,3)*(V(I,J,K)-V(I-1,J,K)))
-            RHSU3=F2FZI(K)*C2CXI(I)                            &
-                 *(NUSGS1(I,J,K+1,2)*(W(I,J,K+1)-W(I-1,J,K+1)) &
-                  -NUSGS1(I,J,K,2)*(W(I,J,K)-W(I-1,J,K)))
-            RHS1(I,J,K,1)=RHSU2+RHSU3
-          ENDDO
-        ENDDO
-      ENDDO
+!$OMP PRIVATE(RHSU2,RHSU3)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = i_bgpx, n1m
+              rhsu2 = f2fyi(j) * c2cxi(i) &
+                      * (nusgs1(i, j + 1, k, 3) * (v(i, j + 1, k) - v(i - 1, j + 1, k)) &
+                         - nusgs1(i, j, k, 3) * (v(i, j, k) - v(i - 1, j, k)))
+              rhsu3 = f2fzi(k) * c2cxi(i) &
+                      * (nusgs1(i, j, k + 1, 2) * (w(i, j, k + 1) - w(i - 1, j, k + 1)) &
+                         - nusgs1(i, j, k, 2) * (w(i, j, k) - w(i - 1, j, k)))
+              rhs1(i, j, k, 1) = rhsu2 + rhsu3
+            end do
+          end do
+        end do
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO&
-!$OMP private(RHSV1,RHSV3)
-      DO K=1,N3M
-        DO J=J_BGPY,N2M
-          DO I=1,N1M
-            RHSV1=F2FXI(I)*C2CYI(J)                              &
-                  *(NUSGS1(I+1,J,K,3)*(U(I+1,J,K)-U(I+1,J-1,K))  &
-                   -NUSGS1(I,J,K,3)*(U(I,J,K)-U(I,J-1,K)))
-            RHSV3=F2FZI(K)*C2CYI(J)                              &
-                  *(NUSGS1(I,J,K+1,1)*(W(I,J,K+1)-W(I,J-1,K+1))  &
-                   -NUSGS1(I,J,K,1)*(W(I,J,K)-W(I,J-1,K)))
-            RHS1(I,J,K,2)=RHSV1+RHSV3
-          ENDDO
-        ENDDO
-      ENDDO
+!$OMP PRIVATE(RHSV1,RHSV3)
+        do k = 1, n3m
+          do j = j_bgpy, n2m
+            do i = 1, n1m
+              rhsv1 = f2fxi(i) * c2cyi(j) &
+                      * (nusgs1(i + 1, j, k, 3) * (u(i + 1, j, k) - u(i + 1, j - 1, k)) &
+                         - nusgs1(i, j, k, 3) * (u(i, j, k) - u(i, j - 1, k)))
+              rhsv3 = f2fzi(k) * c2cyi(j) &
+                      * (nusgs1(i, j, k + 1, 1) * (w(i, j, k + 1) - w(i, j - 1, k + 1)) &
+                         - nusgs1(i, j, k, 1) * (w(i, j, k) - w(i, j - 1, k)))
+              rhs1(i, j, k, 2) = rhsv1 + rhsv3
+            end do
+          end do
+        end do
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO&
-!$OMP private(RHSW1,RHSW2)
-      DO K=K_BGPZ,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            RHSW1=F2FXI(I)*C2CZI(K)                              &
-                   *(NUSGS1(I+1,J,K,2)*(U(I+1,J,K)-U(I+1,J,K-1)) &
-                   -NUSGS1(I,J,K,2)*(U(I,J,K)-U(I,J,K-1)))
-            RHSW2=F2FYI(J)*C2CZI(K)                              &
-                   *(NUSGS1(I,J+1,K,1)*(V(I,J+1,K)-V(I,J+1,K-1)) &
-                   -NUSGS1(I,J,K,1)*(V(I,J,K)-V(I,J,K-1)))
-            RHS1(I,J,K,3)=RHSW1+RHSW2
-          ENDDO
-        ENDDO
-      ENDDO
+!$OMP PRIVATE(RHSW1,RHSW2)
+        do k = k_bgpz, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              rhsw1 = f2fxi(i) * c2czi(k) &
+                      * (nusgs1(i + 1, j, k, 2) * (u(i + 1, j, k) - u(i + 1, j, k - 1)) &
+                         - nusgs1(i, j, k, 2) * (u(i, j, k) - u(i, j, k - 1)))
+              rhsw2 = f2fyi(j) * c2czi(k) &
+                      * (nusgs1(i, j + 1, k, 1) * (v(i, j + 1, k) - v(i, j + 1, k - 1)) &
+                         - nusgs1(i, j, k, 1) * (v(i, j, k) - v(i, j, k - 1)))
+              rhs1(i, j, k, 3) = rhsw1 + rhsw2
+            end do
+          end do
+        end do
 !$OMP END PARALLEL DO
 
-      RETURN
-      END SUBROUTINE RHSSGS
+        return
+      end subroutine rhssgs
 !=======================================================================
 !=======================================================================
-      SUBROUTINE SGSCALC_T
+      subroutine sgscalc_t
 !=======================================================================
 !
 ! CALCULATE SUBGRID-SCALE EDDY DIFFUSIVITY, ALSGS
 !
 ! ITEMDL = 0 -> EDDY DIFFUSIVITY MODEL (MOIN ET AL.,  1991. PHYS.FLUIDS)
-! 
+!
 ! ITEMDL = 1 -> NONE
 !
 ! IDVMON = OFF, CONSTANT COEFF. MODEL
@@ -1198,572 +1197,571 @@
 ! PLZ REFER TO "GERMANO IDENTITY" THEORY (GERMANO, 1992. J.FLUID MECH.)
 !
 !-----------------------------------------------------------------------
-!$    use omp_lib
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : ALSGS
-      IMPLICIT NONE
-      IF (MSUB .EQ. 1) THEN
-        
-        IF (IREAD.EQ.0 .AND. NTIME.EQ.1) THEN
-          ALSGS = 0D0
-        ELSE
-          IF (ITEMDL .EQ. 0) THEN
-            IF (IDVMON .EQ. 1) THEN
-             CALL SGS_EDM
-            ELSE
-             CALL SGS_CEDM
-            ENDIF
-          ELSE IF (ITEMDL .EQ. 1) THEN
-            WRITE(*,*) 'OTHER MODEL IS NOT IMPLEMENTED IN THIS VERSION'
-            WRITE(*,*) 'SGS.F90 LINE ***'
-            STOP
-          ENDIF
-        ENDIF
+!$      USE OMP_LIB
+        use mod_common
+        use mod_flowarray, only: alsgs
+        implicit none
+        if (msub .eq. 1) then
 
-        CALL ALPZERO               ! SET ALSGS TO ZERO IN THE SOLID BODY
-        CALL ALPINTERPOL           !              INTERPOLATION OF NUSGS
-      ENDIF
+          if (iread .eq. 0 .and. ntime .eq. 1) then
+            alsgs = 0d0
+          else
+            if (itemdl .eq. 0) then
+              if (idvmon .eq. 1) then
+                call sgs_edm
+              else
+                call sgs_cedm
+              end if
+            else if (itemdl .eq. 1) then
+              write (*, *) 'OTHER MODEL IS NOT IMPLEMENTED IN THIS VERSION'
+              write (*, *) 'SGS.F90 LINE ***'
+              stop
+            end if
+          end if
 
-      RETURN
-      END SUBROUTINE SGSCALC_T
+          call alpzero               ! SET ALSGS TO ZERO IN THE SOLID BODY
+          call alpinterpol           !              INTERPOLATION OF NUSGS
+        end if
+
+        return
+      end subroutine sgscalc_t
 !=======================================================================
 !=======================================================================
-      SUBROUTINE SGS_CEDM
+      subroutine sgs_cedm
 !=======================================================================
 !
-!     ALSGS=CSGSHF*SQRT(BBB/AAA)
+!     ALSGS=CSGSHF*DEL**2.*SQRT(2.*SSS)
 !     CSGSHF : EDDY DIFFUSIVITY CONSTANT (= CSGSHF FROM MOD_COMMON)
+!
 !     DEL    : FILTER WIDTH CHARACTERIZED BY MEAN CELL WIDTH
 !     SSS    : S_{ij}*S_{ij}
+!
 !     S_{ij} : STRAIN RATE (0.5 * [DUj/DXi + DUi/DXj]) 
 !
-!-----------------------------------------------------------------------  
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,T,ALSGS
-      IMPLICIT NONE
-      INTEGER*8 :: I,J,K,KPLUS,KMIALS,JPLUS,JMIALS,IPLUS,IMIALS
-      REAL*8    :: VG11,VG12,VG13,VG21,VG22,VG23,VG31,VG32,VG33
-      REAL*8    :: UP,UM,VP,VM,WP,WM
-      REAL*8    :: D(9),S(6)
-      REAL*8    :: DEL,SSS
+!-----------------------------------------------------------------------
+      use mod_common
+      use mod_flowarray, only : u,v,w,t,alsgs
+      implicit none
+      integer(8) :: i,j,k
+      real(8)    :: d(9),s(6)
+      real(8)    :: del,sss
 
-!$OMP PARALLEL DO private(UP,UM,VP,VM,WP,WM)&
-!$OMP private(D,S,DEL,SSS)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
+!$OMP PARALLEL DO private(D,S,DEL,SSS)
+      do k=1,n3m
+        do j=1,n2m
+          do i=1,n1m
 
-            CALL VELGRAD(I,J,K,D,S)         
+            call velgrad(i,j,k,d,s)         
 
-            D(1) = F2FX(I)
-            D(2) = F2FY(J)
-            D(3) = F2FZ(K)
+            d(1) = f2fx(i)
+            d(2) = f2fy(j)
+            d(3) = f2fz(k)
       
-            DEL=(D(1)*D(2)*D(3))**(1./3.)
-            SSS=S(1)**2.+2*S(2)**2.      &
-               +2*S(3)**2.+S(4)**2.      &
-               +2*S(5)**2.+S(6)**2.
-      
-            SSS = DMAX1(SSS, 1.0E-16)
+            del=(d(1)*d(2)*d(3))**(1./3.)
+         
+            sss=s(1)**2.+2.*s(2)**2.      &
+               +2.*s(3)**2.+s(4)**2.      &
+               +2.*s(5)**2.+s(6)**2.
+            sss = dmax1(sss, 1.0e-16)
    
-            ALSGS(I,J,K)= CSGSHF*DEL**2.*SQRT(2.*SSS)
-          ENDDO
-        ENDDO
-      ENDDO
+            alsgs(i,j,k)= csgshf*del**2.*sqrt(2.*sss)
+          enddo
+        enddo
+      enddo
 !$OMP END PARALLEL DO
 
-      RETURN
-      END SUBROUTINE SGS_CEDM
+      return
+      end subroutine sgs_cedm
 !=======================================================================
 !=======================================================================
-      SUBROUTINE SGS_EDM
+      subroutine sgs_edm
 !=======================================================================
 !
 !     ALSGS=CSGSHF*DEL**2.*SQRT(2.*SSS)
 !           CSGSHF DETERMINED VIA GERMANO IDENTITY
 !     CSGSHF : EDDY DIFFUSIVITY CONSTANT (= CSGSHF FROM MOD_COMMON)
 !     DEL    : FILTER WIDTH CHARACTERIZED BY MEAN CELL WIDTH
-!     SSS    : S_{ij}*S_{ij}
-!     S_{ij} : STRAIN RATE (0.5 * [DUj/DXi + DUi/DXj]) 
-!
-!-----------------------------------------------------------------------  
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,T,ALSGS,NWALL_DVM,AALP,LLIJ,MMIJ,UUI
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K
-      REAL*8  :: LJMJ_V,MJMJ_V
-      REAL*8  :: DEL,SSS,AMI,VOLUME
-      REAL*8  :: D(9),S(6),ALP(3)
-
-      LJMJ_V = 0.
-      MJMJ_V = 0.
-      CSGSHF   = 0.
-
-      ALLOCATE (AALP(N1M,N2M,N3M,6))
-      ALLOCATE (LLIJ(N1M,N2M,N3M,3))
-      ALLOCATE (MMIJ(N1M,N2M,N3M,3))
-      ALLOCATE (UUI (N1M,N2M,N3M,3))
-
-!$OMP PARALLEL DO&
-!$OMP private(D,S,ALP)&
-!$OMP private(DEL,SSS)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            CALL VELGRAD(I,J,K,D,S) ! D IS DUMMY VARIABLE
-            CALL TEMGRAD(I,J,K,ALP)
-            
-            D(1) = F2FX(I)
-            D(2) = F2FY(J)
-            D(3) = F2FZ(K)
-      
-            DEL=(D(1)*D(2)*D(3))**(1./3.)
-            SSS=S(1)**2.+2*S(2)**2.      &
-               +2*S(3)**2.+S(4)**2.      &
-               +2*S(5)**2.+S(6)**2.
-      
-            SSS = DMAX1(SSS, 1.0E-16)
-   
-            ALSGS(I,J,K)= DEL**2.*SQRT(2.*SSS)
-            
-            MMIJ(I,J,K,1) = ALSGS(I,J,K)*ALP(1)
-            MMIJ(I,J,K,2) = ALSGS(I,J,K)*ALP(2)
-            MMIJ(I,J,K,3) = ALSGS(I,J,K)*ALP(3)
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-!$OMP PARALLEL DO
-      DO I = 1,3
-        CALL TEST_FILTER(MMIJ(:,:,:,I),FILTER)
-      ENDDO
-!$OMP END PARALLEL DO        
-
-!$OMP PARALLEL DO&
-!$OMP private(D,S,ALP)&
-!$OMP private(DEL,SSS)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            CALL VELGRAD(I,J,K,D,S) ! D IS DUMMY VARIABLE
-            CALL TEMGRAD(I,J,K,ALP)
-            
-            D(1) = (0.5*F2FX(I-1)*(1.-FIXIU(I))+F2FX(I)  &
-                  +0.5*F2FX(I+1)*(1.-FIXIL(I)))
-            D(2) = (0.5*F2FY(J-1)*(1.-FIXJU(J))+F2FY(J)  &
-                  +0.5*F2FY(J+1)*(1.-FIXJL(J)))
-            D(3) = (0.5*F2FZ(K-1)*(1.-FIXKU(K))+F2FZ(K)  &
-                  +0.5*F2FZ(K+1)*(1.-FIXKL(K)))
-      
-            DEL=(D(1)*D(2)*D(3))**(1./3.)
-            SSS=S(1)**2.+2*S(2)**2.      &
-               +2*S(3)**2.+S(4)**2.      &
-               +2*S(5)**2.+S(6)**2.
-      
-            SSS = DMAX1(SSS,1.0E-16)
-   
-            AMI = DEL**2.*SQRT(2.* SSS)
-
-            MMIJ(I,J,K,1) = AMI*ALP(1) - MMIJ(I,J,K,1)
-            MMIJ(I,J,K,2) = AMI*ALP(2) - MMIJ(I,J,K,2)
-            MMIJ(I,J,K,3) = AMI*ALP(3) - MMIJ(I,J,K,3)
-            UUI (I,J,K,1)=0.5*(U(I,J,K)+U(I+1,J,K))
-            UUI (I,J,K,2)=0.5*(V(I,J,K)+V(I,J+1,K))
-            UUI (I,J,K,3)=0.5*(W(I,J,K)+W(I,J,K+1))
-            AALP(I,J,K,1)=T(I,J,K)
-            AALP(I,J,K,2)=T(I,J,K)
-            AALP(I,J,K,3)=T(I,J,K)
-            LLIJ(I,J,K,1)=UUI(I,J,K,1)*AALP(I,J,K,1)
-            LLIJ(I,J,K,2)=UUI(I,J,K,2)*AALP(I,J,K,2)
-            LLIJ(I,J,K,3)=UUI(I,J,K,3)*AALP(I,J,K,3)
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-!$OMP PARALLEL DO
-      DO I = 1,3
-        CALL TEST_FILTER(UUI(:,:,:,I),FILTER)
-      ENDDO
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
-      DO I = 1,3
-        CALL TEST_FILTER(AALP(:,:,:,I),FILTER)
-      ENDDO
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
-      DO J =1,3
-        CALL TEST_FILTER(LLIJ(:,:,:,J),FILTER)
-      ENDDO
-!$OMP END PARALLEL DO
-
-!$OMP PARALLEL DO&
-!$OMP reduction(+:LJMJ_V,MJMJ_V)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            VOLUME = F2FX(I)*F2FY(J)*F2FZ(K)
-            LLIJ(I,J,K,1)=LLIJ(I,J,K,1)-UUI(I,J,K,1)*AALP(I,J,K,1)
-            LLIJ(I,J,K,2)=LLIJ(I,J,K,2)-UUI(I,J,K,2)*AALP(I,J,K,2)
-            LLIJ(I,J,K,3)=LLIJ(I,J,K,3)-UUI(I,J,K,3)*AALP(I,J,K,3)
-            LJMJ_V=LJMJ_V                                &
-                 +(LLIJ(I,J,K,1)*MMIJ(I,J,K,1) &
-                  +LLIJ(I,J,K,2)*MMIJ(I,J,K,2) &
-                  +LLIJ(I,J,K,3)*MMIJ(I,J,K,3))&
-                 *FLOAT(NWALL_DVM(I,J,K))*VOLUME
-            MJMJ_V=MJMJ_V                                &
-                   +(MMIJ(I,J,K,1)*MMIJ(I,J,K,1) &
-                    +MMIJ(I,J,K,2)*MMIJ(I,J,K,2) &
-                    +MMIJ(I,J,K,3)*MMIJ(I,J,K,3))&
-                   *FLOAT(NWALL_DVM(I,J,K))*VOLUME
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-      DEALLOCATE (AALP)
-      DEALLOCATE (LLIJ)
-      DEALLOCATE (MMIJ)
-      DEALLOCATE (UUI)
-
-      CSGSHF = DMAX1(0., -LJMJ_V/MJMJ_V)
-
-!$OMP PARALLEL DO
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            ALSGS(I,J,K) = CSGSHF * ALSGS(I,J,K)
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-      RETURN
-      END SUBROUTINE SGS_EDM
-!=======================================================================
-      SUBROUTINE TEMGRAD(I,J,K,A)
-!=======================================================================
-!$    use omp_lib
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,T,ALSGS
-      IMPLICIT NONE
-      INTEGER*8    :: I,J,K
-      REAL*8       :: A(3)
-      INTEGER*8    :: KPLUS,KMINUS,JPLUS,JMINUS,IPLUS,IMINUS
-      REAL*8       :: TG1,TG2,TG3
-      REAL*8       :: TP,TM
-
-      KPLUS=KPV(K)
-      KMINUS=KMV(K)
-      JPLUS=JPV(J)
-      JMINUS=JMV(J)
-      IPLUS=IPV(I)
-      IMINUS=IMV(I)
-
-      TP=0.5*(F2FX(I)*T(IPLUS,J,K)+F2FX(IPLUS)*T(I,J,K))*C2CXI(IPLUS) &
-         *(1.-FIXIU(I))+T(IPLUS,J,K)*FIXIU(I)
-      TM=0.5*(F2FX(IMINUS)*T(I,J,K)+F2FX(I)*T(IMINUS,J,K))*C2CXI(I)   &
-         *(1.-FIXIL(I))+T(IMINUS,J,K)*FIXIL(I)
-
-      TG1 = F2FXI(I)*(TP-TM)
-
-      TP=0.5*(F2FY(J)*T(I,JPLUS,K)+F2FY(JPLUS)*T(I,J,K))*C2CYI(JPLUS) &
-         *(1.-FIXJU(J))+T(I,JPLUS,K)*FIXJU(J)
-      TM=0.5*(F2FY(JMINUS)*T(I,J,K)+F2FY(J)*T(I,JMINUS,K))*C2CYI(J)   &
-         *(1.-FIXJL(J))+T(I,JMINUS,K)*FIXJL(J)
-
-      TG2 = F2FYI(I)*(TP-TM)
-
-      TP=0.5*(F2FZ(K)*T(I,J,KPLUS)+F2FZ(KPLUS)*T(I,J,K))*C2CZI(KPLUS) &
-         *(1.-FIXKU(K))+T(I,J,KPLUS)*FIXKU(K)
-      TM=0.5*(F2FZ(KMINUS)*T(I,J,K)+F2FZ(K)*T(I,J,KMINUS))*C2CZI(K)   &
-         *(1.-FIXKL(K))+T(I,J,KMINUS)*FIXKL(K)
-
-      TG3 = F2FZI(I)*(TP-TM)
-
-      A(1)=TG1
-      A(2)=TG2
-      A(3)=TG3
-
-      RETURN
-      END SUBROUTINE TEMGRAD
-!=======================================================================
-!=======================================================================
-      SUBROUTINE ALPZERO
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : ALSGS,INZ,JNZ,KNZ
-      IMPLICIT NONE
-      INTEGER*8  :: I,J,K
-      INTEGER*8  :: IMAX,JMAX,KMAX,L
-      REAL*8     :: ALSGSAVG, ALSGSMAX, AREA
-      REAL*8     :: FUNCBODY
-
-      IMAX = 0
-      JMAX = 0
-      KMAX = 0
-
-!$OMP PARALLEL DO
-        DO L=1,NZERO
-          ALSGS(INZ(L),JNZ(L),KNZ(L)) = 0.
-        ENDDO
-!$OMP END PARALLEL DO
-
-      ALSGSAVG = 0.
-      AREA = 0.
-      ALSGSMAX = 0.
-
-!$OMP PARALLEL DO&
-!$OMP reduction(+:ALSGSAVG, AREA)&
-!$OMP reduction(MAX:ALSGSMAX)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            IF (FUNCBODY(XMP(I),YMP(J),ZMP(K),TIME).GE.1.E-10) THEN
-              ALSGSAVG = ALSGSAVG + ALSGS(I,J,K)*F2FX(I)*F2FY(J)*F2FZ(K)
-              AREA = AREA + F2FX(I)*F2FY(J)*F2FZ(K)
-              IF (ALSGS(I,J,K).GT.ALSGSMAX) THEN
-                ALSGSMAX = ALSGS(I,J,K)
-                IMAX = I
-                JMAX = J
-                KMAX = K
-              ENDIF
-            ELSE
-              ALSGS(I,J,K) = 0.
-            ENDIF
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-      ALSGSAVG = ALSGSAVG / AREA
-
-      ALPAVG = ALSGSAVG * RE * PR
-      ALPMAX = ALSGSMAX * RE * PR
-
-      WRITE(*,99)  CSGSHF
-      WRITE(*,100) ALPAVG
-      WRITE(*,110) ALPMAX,XMP(IMAX),YMP(JMAX),ZMP(KMAX),IMAX,JMAX,KMAX
-   99 FORMAT('CSGSHF =  ',ES10.3)
-  100 FORMAT('ALPAVG =  ',ES10.3)
-  110 FORMAT('ALPMAX =  ',ES10.3,' @ ',3F10.4,' , ',3I5)
-
-      RETURN
-      END SUBROUTINE ALPZERO
-!=======================================================================
-!=======================================================================
-      SUBROUTINE ALPINTERPOL
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : ALSGS,ALSGS1,INZ,JNZ,KNZ
-      IMPLICIT NONE
-      INTEGER*8  :: I,J,K,IM,JM,KM
-
-      ALSGS1 = 0.
-
-      IF (XPRDIC .EQ. 1) THEN
-!$OMP PARALLEL DO
-        DO K=0,N3
-          DO J=0,N2
-            ALSGS(0 ,J,K)=ALSGS(N1M,J,K)
-            ALSGS(N1,J,K)=ALSGS(1  ,J,K)
-          ENDDO
-        ENDDO
-!$OMP END PARALLEL DO
-      ENDIF
-
-      IF (YPRDIC .EQ. 1) THEN
-!$OMP PARALLEL DO
-        DO K=0,N3
-          DO I=0,N1
-            ALSGS(I,0 ,K)=ALSGS(I,N2M,K)
-            ALSGS(I,N2,K)=ALSGS(I,  1,K)
-          ENDDO
-        ENDDO
-!$OMP END PARALLEL DO
-      ENDIF
-
-      IF (ZPRDIC .EQ. 1) THEN
-!$OMP PARALLEL DO
-        DO J=0,N2
-          DO I=0,N1
-            ALSGS(I,J,0 )=ALSGS(I,J,N3M)
-            ALSGS(I,J,N3)=ALSGS(I,J,1  )
-          ENDDO
-        ENDDO
-!$OMP END PARALLEL DO
-      ENDIF
-
-!$OMP PARALLEL DO
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            ALSGS1(I,J,K,1)=C2CYI(J)*C2CZI(K)*0.25                          &
-              *(F2FY(J-1)*(F2FZ(K-1)*ALSGS(I,J,K)+F2FZ(K)*ALSGS(I,J,K-1))   &
-              +F2FY(J)*(F2FZ(K-1)*ALSGS(I,J-1,K)+F2FZ(K)*ALSGS(I,J-1,K-1)))
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            ALSGS1(I,J,K,2)=C2CZI(K)*C2CXI(I)*0.25                          &
-              *(F2FZ(K-1)*(F2FX(I-1)*ALSGS(I,J,K)+F2FX(I)*ALSGS(I-1,J,K))   &
-              +F2FZ(K)*(F2FX(I-1)*ALSGS(I,J,K-1)+F2FX(I)*ALSGS(I-1,J,K-1)))
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            ALSGS1(I,J,K,3)=C2CXI(I)*C2CYI(J)*0.25                          &
-              *(F2FX(I-1)*(F2FY(J-1)*ALSGS(I,J,K)+F2FY(J)*ALSGS(I,J-1,K))   &
-              +F2FX(I)*(F2FY(J-1)*ALSGS(I-1,J,K)+F2FY(J)*ALSGS(I-1,J-1,K)))
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-!!$OMP PARALLEL DO private(JM,KM)
-      DO J=1,N2M
-        DO K=1,N3M
-          JM=JMV(J)
-          KM=KMV(K)
-          IF (XPRDIC .EQ. 1) THEN
-            ALSGS1(N1,J,K,1) = ALSGS1(1,J,K,1)
-            ALSGS1(N1,J,K,2) = ALSGS1(1,J,K,2)
-            ALSGS1(N1,J,K,3) = ALSGS1(1,J,K,3)
-          ELSE
-            IF (BC_XBTM .EQ. 0) THEN
-              ALSGS1(1,J,K,1) = 0.
-              ALSGS1(1,J,K,2) = 0.
-              ALSGS1(1,J,K,3) = 0.
-            ELSE
-              ALSGS1(1,J,K,2) = &
-                C2CZI(K)*0.5*(F2FZ(K)*ALSGS(2,J,KM)+F2FZ(KM)*ALSGS(2,J,K))
-              ALSGS1(1,J,K,3) = &
-                C2CYI(J)*0.5*(F2FY(J)*ALSGS(2,JM,K)+F2FY(JM)*ALSGS(2,J,K))
-            ENDIF
-            IF (BC_XTOP .EQ. 0) THEN
-              ALSGS1(N1,J,K,1) = 0.
-              ALSGS1(N1,J,K,2) = 0.
-              ALSGS1(N1,J,K,3) = 0.
-            ELSE
-              ALSGS1(N1,J,K,2) = &
-                C2CZI(K)*0.5*(F2FZ(K)*ALSGS(N1M,J,KM)+F2FZ(KM)*ALSGS(N1M,J,K))
-              ALSGS1(N1,J,K,3) = &
-                C2CYI(J)*0.5*(F2FY(J)*ALSGS(N1M,JM,K)+F2FY(JM)*ALSGS(N1M,J,K))
-            ENDIF
-          ENDIF
-        ENDDO
-      ENDDO
-!!$OMP END PARALLEL DO
-
-!!$OMP PARALLEL DO private(IM,KM)
-      DO K=1,N3M
-        DO I=1,N1M
-          IM=IMV(I)
-          KM=KMV(K)
-          IF (YPRDIC .EQ. 1) THEN
-            ALSGS1(I,N2,K,1) = ALSGS1(I,1,K,1)
-            ALSGS1(I,N2,K,2) = ALSGS1(I,1,K,2)
-            ALSGS1(I,N2,K,3) = ALSGS1(I,1,K,3)
-          ELSE
-            IF (BC_YBTM .EQ. 0) THEN
-              ALSGS1(I,1,K,1) = 0.
-              ALSGS1(I,1,K,2) = 0.
-              ALSGS1(I,1,K,3) = 0.
-            ELSE
-              ALSGS1(I,1,K,2) = &
-                C2CZI(K)*0.5*(F2FZ(K)*ALSGS(I,2,KM)+F2FZ(KM)*ALSGS(I,2,K))
-              ALSGS1(I,1,K,3) = &
-                C2CXI(I)*0.5*(F2FX(I)*ALSGS(IM,2,K)+F2FX(IM)*ALSGS(I,2,K))
-            ENDIF
-            IF (BC_YTOP .EQ. 0) THEN
-              ALSGS1(I,N2,K,1) = 0.
-              ALSGS1(I,N2,K,2) = 0.
-              ALSGS1(I,N2,K,3) = 0.
-            ELSE
-              ALSGS1(I,N2,K,2) = &
-                C2CZI(K)*0.5*(F2FZ(K)*ALSGS(I,N2M,KM)+F2FZ(KM)*ALSGS(I,N2M,K))
-              ALSGS1(I,N2,K,3) = &
-                C2CXI(I)*0.5*(F2FX(I)*ALSGS(IM,N2M,K)+F2FX(IM)*ALSGS(I,N2M,K))
-            ENDIF
-          ENDIF
-        ENDDO
-      ENDDO
-!!$OMP END PARALLEL DO
-
-!!$OMP PARALLEL DO private(IM,JM)
-      DO I=1,N1M
-        DO J=1,N2M
-          IM=IMV(I)
-          JM=JMV(J)
-          IF (ZPRDIC .EQ. 1) THEN
-            ALSGS1(I,J,N3,1) = ALSGS1(I,J,1,1)
-            ALSGS1(I,J,N3,2) = ALSGS1(I,J,1,2)
-            ALSGS1(I,J,N3,3) = ALSGS1(I,J,1,3)
-          ELSE
-            IF (BC_ZBTM .EQ. 0) THEN
-              ALSGS1(I,J,1,1) = 0.
-              ALSGS1(I,J,1,2) = 0.
-              ALSGS1(I,J,1,3) = 0.
-            ELSE
-              ALSGS1(I,J,1,2) = &
-                C2CYI(J)*0.5*(F2FY(J)*ALSGS(I,JM,2)+F2FY(JM)*ALSGS(I,J,2))
-              ALSGS1(I,J,1,3) = &
-                C2CXI(I)*0.5*(F2FX(I)*ALSGS(IM,J,2)+F2FX(IM)*ALSGS(I,J,2))
-            ENDIF
-            IF (BC_ZTOP .EQ. 0) THEN
-              ALSGS1(I,J,N3,1) = 0.
-              ALSGS1(I,J,N3,2) = 0.
-              ALSGS1(I,J,N3,3) = 0.
-            ELSE
-              ALSGS1(I,J,N3,2) = &
-                C2CYI(K)*0.5*(F2FY(J)*ALSGS(I,JM,N3M)+F2FY(JM)*ALSGS(I,J,N3M))
-              ALSGS1(I,J,N3,3) = &
-                C2CXI(I)*0.5*(F2FX(I)*ALSGS(IM,J,N3M)+F2FX(IM)*ALSGS(I,J,N3M))
-            ENDIF
-          ENDIF
-        ENDDO
-      ENDDO
-!!$OMP END PARALLEL DO
-
-      RETURN
-      END SUBROUTINE ALPINTERPOL
-!=======================================================================
-!=======================================================================
-      SUBROUTINE RHSSGS_T
-!=======================================================================
-!
-!     Calculate non-linear SGS HF terms
+!     SSS    : S_{IJ}*S_{IJ}
+!     S_{IJ} : STRAIN RATE (0.5 * [DUJ/DXI + DUI/DXJ])
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,T,ALSGS1,RHS1
-      IMPLICIT NONE
-      INTEGER*8 :: I,J,K
-      REAL*8    :: RHST1,RHST2,RHST3
+        use mod_common
+        use mod_flowarray, only: u, v, w, t, alsgs, nwall_dvm, aalp, llij, mmij, uui
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: ljmj_v, mjmj_v
+        real(8) :: del, sss, ami, volume
+        real(8) :: d(9), s(6), alp(3)
+
+        ljmj_v = 0.
+        mjmj_v = 0.
+        csgshf = 0.
+
+        allocate (aalp(n1m, n2m, n3m, 6))
+        allocate (llij(n1m, n2m, n3m, 3))
+        allocate (mmij(n1m, n2m, n3m, 3))
+        allocate (uui(n1m, n2m, n3m, 3))
 
 !$OMP PARALLEL DO&
-!$OMP private(RHST1,RHST2,RHST3)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            RHST1=0.
-            RHST2=0.
-            RHST3=0.
-            RHS1(I,J,K,4)=RHST1+RHST2+RHST3
-          ENDDO
-        ENDDO
-      ENDDO
+!$OMP PRIVATE(D,S,ALP)&
+!$OMP PRIVATE(DEL,SSS)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              call velgrad(i, j, k, d, s) ! D IS DUMMY VARIABLE
+              call temgrad(i, j, k, alp)
+
+              d(1) = f2fx(i)
+              d(2) = f2fy(j)
+              d(3) = f2fz(k)
+
+              del = (d(1) * d(2) * d(3))**(1./3.)
+              sss = s(1)**2.+2 * s(2)**2. &
+                    +2 * s(3)**2.+s(4)**2. &
+                    +2 * s(5)**2.+s(6)**2.
+
+              sss = dmax1(sss, 1.0e-16)
+
+              alsgs(i, j, k) = del**2.*sqrt(2.*sss)
+
+              mmij(i, j, k, 1) = alsgs(i, j, k) * alp(1)
+              mmij(i, j, k, 2) = alsgs(i, j, k) * alp(2)
+              mmij(i, j, k, 3) = alsgs(i, j, k) * alp(3)
+            end do
+          end do
+        end do
 !$OMP END PARALLEL DO
 
-      RETURN
-      END SUBROUTINE RHSSGS_T
+!$OMP PARALLEL DO
+        do i = 1, 3
+          call test_filter(mmij(:, :, :, i), filter)
+        end do
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DO&
+!$OMP PRIVATE(D,S,ALP)&
+!$OMP PRIVATE(DEL,SSS)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              call velgrad(i, j, k, d, s) ! D IS DUMMY VARIABLE
+              call temgrad(i, j, k, alp)
+
+              d(1) = (0.5 * f2fx(i - 1) * (1.-fixiu(i)) + f2fx(i) &
+                      + 0.5 * f2fx(i + 1) * (1.-fixil(i)))
+              d(2) = (0.5 * f2fy(j - 1) * (1.-fixju(j)) + f2fy(j) &
+                      + 0.5 * f2fy(j + 1) * (1.-fixjl(j)))
+              d(3) = (0.5 * f2fz(k - 1) * (1.-fixku(k)) + f2fz(k) &
+                      + 0.5 * f2fz(k + 1) * (1.-fixkl(k)))
+
+              del = (d(1) * d(2) * d(3))**(1./3.)
+              sss = s(1)**2.+2 * s(2)**2. &
+                    +2 * s(3)**2.+s(4)**2. &
+                    +2 * s(5)**2.+s(6)**2.
+
+              sss = dmax1(sss, 1.0e-16)
+
+              ami = del**2.*sqrt(2.*sss)
+
+              mmij(i, j, k, 1) = ami * alp(1) - mmij(i, j, k, 1)
+              mmij(i, j, k, 2) = ami * alp(2) - mmij(i, j, k, 2)
+              mmij(i, j, k, 3) = ami * alp(3) - mmij(i, j, k, 3)
+              uui(i, j, k, 1) = 0.5 * (u(i, j, k) + u(i + 1, j, k))
+              uui(i, j, k, 2) = 0.5 * (v(i, j, k) + v(i, j + 1, k))
+              uui(i, j, k, 3) = 0.5 * (w(i, j, k) + w(i, j, k + 1))
+              aalp(i, j, k, 1) = t(i, j, k)
+              aalp(i, j, k, 2) = t(i, j, k)
+              aalp(i, j, k, 3) = t(i, j, k)
+              llij(i, j, k, 1) = uui(i, j, k, 1) * aalp(i, j, k, 1)
+              llij(i, j, k, 2) = uui(i, j, k, 2) * aalp(i, j, k, 2)
+              llij(i, j, k, 3) = uui(i, j, k, 3) * aalp(i, j, k, 3)
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DO
+        do i = 1, 3
+          call test_filter(uui(:, :, :, i), filter)
+        end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
+        do i = 1, 3
+          call test_filter(aalp(:, :, :, i), filter)
+        end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
+        do j = 1, 3
+          call test_filter(llij(:, :, :, j), filter)
+        end do
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DO&
+!$OMP REDUCTION(+:LJMJ_V,MJMJ_V)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              volume = f2fx(i) * f2fy(j) * f2fz(k)
+              llij(i, j, k, 1) = llij(i, j, k, 1) - uui(i, j, k, 1) * aalp(i, j, k, 1)
+              llij(i, j, k, 2) = llij(i, j, k, 2) - uui(i, j, k, 2) * aalp(i, j, k, 2)
+              llij(i, j, k, 3) = llij(i, j, k, 3) - uui(i, j, k, 3) * aalp(i, j, k, 3)
+              ljmj_v = ljmj_v &
+                       + (llij(i, j, k, 1) * mmij(i, j, k, 1) &
+                          + llij(i, j, k, 2) * mmij(i, j, k, 2) &
+                          + llij(i, j, k, 3) * mmij(i, j, k, 3)) &
+                       * float(nwall_dvm(i, j, k)) * volume
+              mjmj_v = mjmj_v &
+                       + (mmij(i, j, k, 1) * mmij(i, j, k, 1) &
+                          + mmij(i, j, k, 2) * mmij(i, j, k, 2) &
+                          + mmij(i, j, k, 3) * mmij(i, j, k, 3)) &
+                       * float(nwall_dvm(i, j, k)) * volume
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+
+        deallocate (aalp)
+        deallocate (llij)
+        deallocate (mmij)
+        deallocate (uui)
+
+        csgshf = dmax1(0., -ljmj_v / mjmj_v)
+
+!$OMP PARALLEL DO
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              alsgs(i, j, k) = csgshf * alsgs(i, j, k)
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+
+        return
+      end subroutine sgs_edm
+!=======================================================================
+      subroutine temgrad(i, j, k, a)
+!=======================================================================
+!$      USE OMP_LIB
+        use mod_common
+        use mod_flowarray, only: t
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: a(3)
+        integer(8) :: kplus, kminus, jplus, jminus, iplus, iminus
+        real(8) :: tg1, tg2, tg3
+        real(8) :: tp, tm
+
+        kplus = kpv(k)
+        kminus = kmv(k)
+        jplus = jpv(j)
+        jminus = jmv(j)
+        iplus = ipv(i)
+        iminus = imv(i)
+
+        tp = 0.5 * (f2fx(i) * t(iplus, j, k) + f2fx(iplus) * t(i, j, k)) * c2cxi(iplus) &
+             * (1.-fixiu(i)) + t(iplus, j, k) * fixiu(i)
+        tm = 0.5 * (f2fx(iminus) * t(i, j, k) + f2fx(i) * t(iminus, j, k)) * c2cxi(i) &
+             * (1.-fixil(i)) + t(iminus, j, k) * fixil(i)
+
+        tg1 = f2fxi(i) * (tp - tm)
+
+        tp = 0.5 * (f2fy(j) * t(i, jplus, k) + f2fy(jplus) * t(i, j, k)) * c2cyi(jplus) &
+             * (1.-fixju(j)) + t(i, jplus, k) * fixju(j)
+        tm = 0.5 * (f2fy(jminus) * t(i, j, k) + f2fy(j) * t(i, jminus, k)) * c2cyi(j) &
+             * (1.-fixjl(j)) + t(i, jminus, k) * fixjl(j)
+
+        tg2 = f2fyi(i) * (tp - tm)
+
+        tp = 0.5 * (f2fz(k) * t(i, j, kplus) + f2fz(kplus) * t(i, j, k)) * c2czi(kplus) &
+             * (1.-fixku(k)) + t(i, j, kplus) * fixku(k)
+        tm = 0.5 * (f2fz(kminus) * t(i, j, k) + f2fz(k) * t(i, j, kminus)) * c2czi(k) &
+             * (1.-fixkl(k)) + t(i, j, kminus) * fixkl(k)
+
+        tg3 = f2fzi(i) * (tp - tm)
+
+        a(1) = tg1
+        a(2) = tg2
+        a(3) = tg3
+
+        return
+      end subroutine temgrad
+!=======================================================================
+!=======================================================================
+      subroutine alpzero
+!=======================================================================
+        use mod_common
+        use mod_flowarray, only: alsgs, inz, jnz, knz
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: imax, jmax, kmax, l
+        real(8) :: alsgsavg, alsgsmax, area
+        real(8) :: funcbody
+
+        imax = 0
+        jmax = 0
+        kmax = 0
+
+!$OMP PARALLEL DO
+        do l = 1, nzero
+          alsgs(inz(l), jnz(l), knz(l)) = 0.
+        end do
+!$OMP END PARALLEL DO
+
+        alsgsavg = 0.
+        area = 0.
+        alsgsmax = 0.
+
+!$OMP PARALLEL DO&
+!$OMP REDUCTION(+:ALSGSAVG, AREA)&
+!$OMP REDUCTION(MAX:ALSGSMAX)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                alsgsavg = alsgsavg + alsgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
+                area = area + f2fx(i) * f2fy(j) * f2fz(k)
+                if (alsgs(i, j, k) .gt. alsgsmax) then
+                  alsgsmax = alsgs(i, j, k)
+                  imax = i
+                  jmax = j
+                  kmax = k
+                end if
+              else
+                alsgs(i, j, k) = 0.
+              end if
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+
+        alsgsavg = alsgsavg / area
+
+        alpavg = alsgsavg * re * pr
+        alpmax = alsgsmax * re * pr
+
+        write (*, 99) csgshf
+        write (*, 100) alpavg
+        write (*, 110) alpmax, xmp(imax), ymp(jmax), zmp(kmax), imax, jmax, kmax
+99      format('CSGSHF =  ', es10.3)
+100     format('ALPAVG =  ', es10.3)
+110     format('ALPMAX =  ', es10.3, ' @ ', 3f10.4, ' , ', 3i5)
+
+        return
+      end subroutine alpzero
+!=======================================================================
+!=======================================================================
+      subroutine alpinterpol
+!=======================================================================
+        use mod_common
+        use mod_flowarray, only: alsgs, alsgs1, inz, jnz, knz
+        implicit none
+        integer(8) :: i, j, k, im, jm, km
+
+        alsgs1 = 0.
+
+        if (xprdic .eq. 1) then
+!$OMP PARALLEL DO
+          do k = 0, n3
+            do j = 0, n2
+              alsgs(0, j, k) = alsgs(n1m, j, k)
+              alsgs(n1, j, k) = alsgs(1, j, k)
+            end do
+          end do
+!$OMP END PARALLEL DO
+        end if
+
+        if (yprdic .eq. 1) then
+!$OMP PARALLEL DO
+          do k = 0, n3
+            do i = 0, n1
+              alsgs(i, 0, k) = alsgs(i, n2m, k)
+              alsgs(i, n2, k) = alsgs(i, 1, k)
+            end do
+          end do
+!$OMP END PARALLEL DO
+        end if
+
+        if (zprdic .eq. 1) then
+!$OMP PARALLEL DO
+          do j = 0, n2
+            do i = 0, n1
+              alsgs(i, j, 0) = alsgs(i, j, n3m)
+              alsgs(i, j, n3) = alsgs(i, j, 1)
+            end do
+          end do
+!$OMP END PARALLEL DO
+        end if
+
+!$OMP PARALLEL DO
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              alsgs1(i, j, k, 1) = c2cyi(j) * c2czi(k) * 0.25 &
+                                   * (f2fy(j - 1) * (f2fz(k - 1) * alsgs(i, j, k) + f2fz(k) * alsgs(i, j, k - 1)) &
+                                      + f2fy(j) * (f2fz(k - 1) * alsgs(i, j - 1, k) + f2fz(k) * alsgs(i, j - 1, k - 1)))
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              alsgs1(i, j, k, 2) = c2czi(k) * c2cxi(i) * 0.25 &
+                                   * (f2fz(k - 1) * (f2fx(i - 1) * alsgs(i, j, k) + f2fx(i) * alsgs(i - 1, j, k)) &
+                                      + f2fz(k) * (f2fx(i - 1) * alsgs(i, j, k - 1) + f2fx(i) * alsgs(i - 1, j, k - 1)))
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              alsgs1(i, j, k, 3) = c2cxi(i) * c2cyi(j) * 0.25 &
+                                   * (f2fx(i - 1) * (f2fy(j - 1) * alsgs(i, j, k) + f2fy(j) * alsgs(i, j - 1, k)) &
+                                      + f2fx(i) * (f2fy(j - 1) * alsgs(i - 1, j, k) + f2fy(j) * alsgs(i - 1, j - 1, k)))
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+
+!!$OMP PARALLEL DO PRIVATE(JM,KM)
+        do j = 1, n2m
+          do k = 1, n3m
+            jm = jmv(j)
+            km = kmv(k)
+            if (xprdic .eq. 1) then
+              alsgs1(n1, j, k, 1) = alsgs1(1, j, k, 1)
+              alsgs1(n1, j, k, 2) = alsgs1(1, j, k, 2)
+              alsgs1(n1, j, k, 3) = alsgs1(1, j, k, 3)
+            else
+              if (bc_xbtm .eq. 0) then
+                alsgs1(1, j, k, 1) = 0.
+                alsgs1(1, j, k, 2) = 0.
+                alsgs1(1, j, k, 3) = 0.
+              else
+                alsgs1(1, j, k, 2) = &
+                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(2, j, km) + f2fz(km) * alsgs(2, j, k))
+                alsgs1(1, j, k, 3) = &
+                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(2, jm, k) + f2fy(jm) * alsgs(2, j, k))
+              end if
+              if (bc_xtop .eq. 0) then
+                alsgs1(n1, j, k, 1) = 0.
+                alsgs1(n1, j, k, 2) = 0.
+                alsgs1(n1, j, k, 3) = 0.
+              else
+                alsgs1(n1, j, k, 2) = &
+                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(n1m, j, km) + f2fz(km) * alsgs(n1m, j, k))
+                alsgs1(n1, j, k, 3) = &
+                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(n1m, jm, k) + f2fy(jm) * alsgs(n1m, j, k))
+              end if
+            end if
+          end do
+        end do
+!!$OMP END PARALLEL DO
+
+!!$OMP PARALLEL DO PRIVATE(IM,KM)
+        do k = 1, n3m
+          do i = 1, n1m
+            im = imv(i)
+            km = kmv(k)
+            if (yprdic .eq. 1) then
+              alsgs1(i, n2, k, 1) = alsgs1(i, 1, k, 1)
+              alsgs1(i, n2, k, 2) = alsgs1(i, 1, k, 2)
+              alsgs1(i, n2, k, 3) = alsgs1(i, 1, k, 3)
+            else
+              if (bc_ybtm .eq. 0) then
+                alsgs1(i, 1, k, 1) = 0.
+                alsgs1(i, 1, k, 2) = 0.
+                alsgs1(i, 1, k, 3) = 0.
+              else
+                alsgs1(i, 1, k, 2) = &
+                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(i, 2, km) + f2fz(km) * alsgs(i, 2, k))
+                alsgs1(i, 1, k, 3) = &
+                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, 2, k) + f2fx(im) * alsgs(i, 2, k))
+              end if
+              if (bc_ytop .eq. 0) then
+                alsgs1(i, n2, k, 1) = 0.
+                alsgs1(i, n2, k, 2) = 0.
+                alsgs1(i, n2, k, 3) = 0.
+              else
+                alsgs1(i, n2, k, 2) = &
+                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(i, n2m, km) + f2fz(km) * alsgs(i, n2m, k))
+                alsgs1(i, n2, k, 3) = &
+                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, n2m, k) + f2fx(im) * alsgs(i, n2m, k))
+              end if
+            end if
+          end do
+        end do
+!!$OMP END PARALLEL DO
+
+!!$OMP PARALLEL DO PRIVATE(IM,JM)
+        do i = 1, n1m
+          do j = 1, n2m
+            im = imv(i)
+            jm = jmv(j)
+            if (zprdic .eq. 1) then
+              alsgs1(i, j, n3, 1) = alsgs1(i, j, 1, 1)
+              alsgs1(i, j, n3, 2) = alsgs1(i, j, 1, 2)
+              alsgs1(i, j, n3, 3) = alsgs1(i, j, 1, 3)
+            else
+              if (bc_zbtm .eq. 0) then
+                alsgs1(i, j, 1, 1) = 0.
+                alsgs1(i, j, 1, 2) = 0.
+                alsgs1(i, j, 1, 3) = 0.
+              else
+                alsgs1(i, j, 1, 2) = &
+                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(i, jm, 2) + f2fy(jm) * alsgs(i, j, 2))
+                alsgs1(i, j, 1, 3) = &
+                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, j, 2) + f2fx(im) * alsgs(i, j, 2))
+              end if
+              if (bc_ztop .eq. 0) then
+                alsgs1(i, j, n3, 1) = 0.
+                alsgs1(i, j, n3, 2) = 0.
+                alsgs1(i, j, n3, 3) = 0.
+              else
+                alsgs1(i, j, n3, 2) = &
+                  c2cyi(k) * 0.5 * (f2fy(j) * alsgs(i, jm, n3m) + f2fy(jm) * alsgs(i, j, n3m))
+                alsgs1(i, j, n3, 3) = &
+                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, j, n3m) + f2fx(im) * alsgs(i, j, n3m))
+              end if
+            end if
+          end do
+        end do
+!!$OMP END PARALLEL DO
+
+        return
+      end subroutine alpinterpol
+!=======================================================================
+!=======================================================================
+      subroutine rhssgs_t
+!=======================================================================
+!
+!     CALCULATE NON-LINEAR SGS HF TERMS
+!
+!-----------------------------------------------------------------------
+        use mod_common
+        use mod_flowarray, only: u, v, w, t, alsgs1, rhs1
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: rhst1, rhst2, rhst3
+
+!$OMP PARALLEL DO&
+!$OMP PRIVATE(RHST1,RHST2,RHST3)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              rhst1 = 0.
+              rhst2 = 0.
+              rhst3 = 0.
+              rhs1(i, j, k, 4) = rhst1 + rhst2 + rhst3
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+
+        return
+      end subroutine rhssgs_t
 !=======================================================================

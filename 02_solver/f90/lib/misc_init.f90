@@ -1,989 +1,1032 @@
 !=======================================================================
-      SUBROUTINE PRINT_REAL_TIME
+      subroutine print_real_time
 !=======================================================================
-      IMPLICIT NONE
-      CHARACTER*8 ::  DATE
-      CHARACTER*10::  NOW
-      CHARACTER*5 ::  ZONE
-      INTEGER*8   ::  VALS(8)
+        implicit none
+        character*8 :: date
+        character*10 :: now
+        character*5 :: zone
+        integer(8) :: vals(8)
 
-      CALL DATE_AND_TIME(DATE,NOW,ZONE,VALS)
+        call date_and_time(date, now, zone, vals)
 
-      WRITE(*,101) VALS(1),VALS(2),VALS(3),VALS(5),VALS(6),VALS(7)
-      WRITE(*,*) ''
- 101  FORMAT(' @ 'I0.4,'-',I0.2,'-',I0.2,' ',I0.2,':',I0.2,':',I0.2)
+        write (*, 101) vals(1), vals(2), vals(3), vals(5), vals(6), vals(7)
+        write (*, *) ''
+101     format(' @ 'i0.4, '-', i0.2, '-', i0.2, ' ', i0.2, ':', i0.2, ':', i0.2)
 
-      RETURN
-      END SUBROUTINE PRINT_REAL_TIME
+        return
+      end subroutine print_real_time
 !=======================================================================
-      SUBROUTINE READSETTINGS
+      subroutine readsettings
 !=======================================================================
-      USE MOD_COMMON
-      IMPLICIT NONE
-      INTEGER*8    :: N
-      CHARACTER*10 :: DUMMY
+        use mod_common
+        implicit none
+        integer(8) :: n
+        character*10 :: dummy
 
-      OPEN(10,FILE='settings.in')
-      READ(10,*) DUMMY
-      READ(10,*) RE,PR,GR,GRDIR,T_INF
-      READ(10,*) DUMMY
-      READ(10,*) IRESET,IREAD,IAVG,IPZERO,EPS_PTR,UBULK_I
-      READ(10,*) DUMMY
-      READ(10,*) NTST,NPRINT,NPRIAVG,NPIN
-      READ(10,*) DUMMY
-      READ(10,*) IDTOPT,DT_SIZE,CFLFAC
-      READ(10,*) DUMMY
-      READ(10,*) RESID1,NLEV,NBLI,IOLDV,MGITR,IMGSOR,WWSOR
-      READ(10,*) DUMMY
-      READ(10,*) ILES,INSMDL,ITEMDL,IDVMON,CSGSTS,CSGSHF,FILTER
-      READ(10,*) DUMMY
-      READ(10,*) IBMON,MASSON,IMOVINGON,IHTRANS
-      READ(10,*) DUMMY
-      READ(10,*) GRIDFILE
-      READ(10,*) PREV_FLD
-      READ(10,*) DUMMY
-      READ(10,*) NTRACE,NTR
-      IF (NTRACE .GT. 0) THEN
-        DO N = 1, NTRACE
-          READ(10,*) TRPTS(N,1),TRPTS(N,2),TRPTS(N,3)
-        ENDDO
-      ENDIF
-      CLOSE(10)
+        open (10, file='settings.in')
+        read (10, *) dummy
+        read (10, *) re, pr, gr, grdir, t_inf
+        read (10, *) dummy
+        read (10, *) ireset, iread, iavg, ipzero, eps_ptr, ubulk_i
+        read (10, *) dummy
+        read (10, *) ntst, nprint, npriavg, npin
+        read (10, *) dummy
+        read (10, *) idtopt, dt_size, cflfac
+        read (10, *) dummy
+        read (10, *) resid1, nlev, nbli, ioldv, mgitr, imgsor, wwsor
+        read (10, *) dummy
+        read (10, *) iles, insmdl, itemdl, idvmon, csgsts, csgshf, filter
+        read (10, *) dummy
+        read (10, *) ibmon, masson, imovingon, ihtrans
+        read (10, *) dummy
+        read (10, *) gridfile
+        read (10, *) prev_fld
+        read (10, *) dummy
+        read (10, *) ntrace, ntr
+        if (ntrace .gt. 0) then
+          do n = 1, ntrace
+            read (10, *) trpts(n, 1), trpts(n, 2), trpts(n, 3)
+          end do
+        end if
+        close (10)
 
-      WRITE(*,*) '========= SETTINGS ========='
-      WRITE(*,*) ''
-      WRITE(*,101) RE,PR,GR
-      WRITE(*,102) IRESET,IREAD,IAVG,IPZERO,EPS_PTR,UBULK_I
-      WRITE(*,103) NTST,NPRINT,NPRIAVG,NPIN
-      WRITE(*,104) IDTOPT,DT,CFLFAC
-      WRITE(*,105) RESID1,NLEV,NBLI,IOLDV,MGITR,IMGSOR,WWSOR
-      WRITE(*,106) ILES,INSMDL,ITEMDL,IDVMON,CSGSTS,CSGSHF,FILTER
-      WRITE(*,107) IBMON,MASSON,IMOVINGON,IHTRANS
-      WRITE(*,108) GRIDFILE
-      WRITE(*,109) PREV_FLD
-      WRITE(*,*) ''
+        write (*, *) '========= SETTINGS ========='
+        write (*, *) ''
+        write (*, 101) re, pr, gr
+        write (*, 102) ireset, iread, iavg, ipzero, eps_ptr, ubulk_i
+        write (*, 103) ntst, nprint, npriavg, npin
+        write (*, 104) idtopt, dt, cflfac
+        write (*, 105) resid1, nlev, nbli, ioldv, mgitr, imgsor, wwsor
+        write (*, 106) iles, insmdl, itemdl, idvmon, csgsts, csgshf, filter
+        write (*, 107) ibmon, masson, imovingon, ihtrans
+        write (*, 108) gridfile
+        write (*, 109) prev_fld
+        write (*, *) ''
 
-      IF (NTRACE .GT. 0) THEN
-        WRITE(*,*) '========= TRACE POSITION ========='
-        WRITE(*,*) ''
-        DO  N=1,NTRACE
-          WRITE(*,110) N, TRPTS(N,1), TRPTS(N,2), TRPTS(N,3)
-        ENDDO
-      ENDIF
+        if (ntrace .gt. 0) then
+          write (*, *) '========= TRACE POSITION ========='
+          write (*, *) ''
+          do n = 1, ntrace
+            write (*, 110) n, trpts(n, 1), trpts(n, 2), trpts(n, 3)
+          end do
+        end if
 
- 101  FORMAT('  RE=',ES11.3,'  PR=',ES11.3,'  GR=',ES11.3)
- 102  FORMAT('  IRESET=',I5,'  IREAD=',I5,'  IAVG=',I5,'  IPZERO=',I5,'  EPS_PTR=',F7.3,'  UBULK_I=',F7.3)
- 103  FORMAT('  NTST=',I10,'  NPRINT=',I8,'  NPRIAVG=',I8,'  NPIN=',I5)
- 104  FORMAT('  IDTOPT=',I5,'  DT=',ES13.5,'  CFLFAC=',F11.3)
- 105  FORMAT('  RESID=',ES12.4,'  NLEV=',I5,'  NBLI=',I5,'  IOLDV=',I5,'  MGITR=',I5,'  IMGSOR=',I5,'  WWSOR=',F7.3)
- 106  FORMAT('  ILES=',I2,'  INSMDL=',I2,'  ITEMDL=',I2,'  IDVMON=',I2,'  CSGSTS='F12.4,'  CSGSHF=',F12.4,'  IFILTER=',I5)
- 107  FORMAT('  IBMON=',I2,'  MASSON=',I2,'  IMOVINGON=',I2,'  IHTRANS=',I2)
- 108  FORMAT('  GRIDFILE=',A25)
- 109  FORMAT('  PREV_FLD=',A25)
- 110  FORMAT(I5,3I6)
+101     format('  RE=', es11.3, '  PR=', es11.3, '  GR=', es11.3)
+102     format('  IRESET=', i5, '  IREAD=', i5, '  IAVG=', i5, '  IPZERO=', i5, '  EPS_PTR=', f7.3, '  UBULK_I=', f7.3)
+103     format('  NTST=', i10, '  NPRINT=', i8, '  NPRIAVG=', i8, '  NPIN=', i5)
+104     format('  IDTOPT=', i5, '  DT=', es13.5, '  CFLFAC=', f11.3)
+105     format('  RESID=', es12.4, '  NLEV=', i5, '  NBLI=', i5, '  IOLDV=', i5, '  MGITR=', i5, '  IMGSOR=', i5, '  WWSOR=', f7.3)
+106     format('  ILES=', i2, '  INSMDL=', i2, '  ITEMDL=', i2, '  IDVMON=', i2, '  CSGSTS='f12.4, '  CSGSHF=', f12.4, '  IFILTER=', i5)
+107     format('  IBMON=', i2, '  MASSON=', i2, '  IMOVINGON=', i2, '  IHTRANS=', i2)
+108     format('  GRIDFILE=', a25)
+109     format('  PREV_FLD=', a25)
+110     format(i5, 3i6)
 
-      RETURN
-      END SUBROUTINE READSETTINGS
-!=======================================================================
-!=======================================================================
-      SUBROUTINE READBCS
-!=======================================================================
-      USE MOD_COMMON
-      IMPLICIT NONE
-      CHARACTER*10 :: DUMMY
-
-      OPEN(10,FILE='boundary.in')
-      READ(10,*) DUMMY
-      READ(10,*) BC_YBTM,BC_YTOP
-      READ(10,*) DUMMY
-      READ(10,*) BC_ZBTM,BC_ZTOP
-      READ(10,*) DUMMY
-      READ(10,*) BC_T_YBTM, BC_T_YTOP
-      READ(10,*) DUMMY
-      READ(10,*) VAL_T_YBTM, VAL_T_YTOP
-      READ(10,*) DUMMY
-      READ(10,*) BC_T_ZBTM, BC_T_ZTOP
-      READ(10,*) DUMMY
-      READ(10,*) VAL_T_ZBTM, VAL_T_ZTOP
-      READ(10,*) DUMMY
-      READ(10,*) ICH,ICONJG
-      CLOSE(10)
-
-      OPEN(11,FILE='../output/ibmpre/ibmpre_prdic.bin')
-      READ(11,*) XPRDIC,YPRDIC,ZPRDIC,IINTP
-      CLOSE(11)
-
-      IF (XPRDIC .EQ. 1) THEN
-        BC_XBTM = 4 ! 4:   PERIODIC B.C.
-        BC_XTOP = 4 
-      ELSE
-        BC_XBTM = 2 ! 2:   VELOCITY INLET B.C.
-        BC_XTOP = 3 ! 3:   CONVECTIVE OUTLET B.C.
-      ENDIF
-
-      IF (YPRDIC .EQ. 1) THEN
-        BC_YBTM = 4
-        BC_YTOP = 4
-      ENDIF
-
-      IF (ZPRDIC .EQ. 1) THEN
-        BC_ZBTM = 4
-        BC_ZTOP = 4
-      ENDIF
-
-      WRITE(*,*) '========= BOUNDARY CONDITIONS ========='
-      WRITE(*,*) ''
-      WRITE(*,*) '(0: WALL; 1: FARF; 2: VELIN; 3: CONVOUT; 4: PRDIC)'
-      WRITE(*,101) BC_XBTM,BC_XTOP
-      WRITE(*,102) BC_YBTM,BC_YTOP
-      WRITE(*,103) BC_ZBTM,BC_ZTOP
-      WRITE(*,*) ''
-      WRITE(*,104) ICH, ICONJG, IINTP
-      WRITE(*,*) ''
-
- 101  FORMAT('  BC_XBTM=',I2,'  BC_XTOP=',I2)
- 102  FORMAT('  BC_YBTM=',I2,'  BC_YTOP=',I2)
- 103  FORMAT('  BC_ZBTM=',I2,'  BC_ZTOP=',I2)
- 104  FORMAT('  ICH=',I2,'  ICONJG=',I2,'  IINTP=',I2)
-
-      RETURN
-      END SUBROUTINE READBCS
+        return
+      end subroutine readsettings
 !=======================================================================
 !=======================================================================
-      SUBROUTINE READGEOM
+      subroutine readbcs
 !=======================================================================
-      USE MOD_COMMON
-      IMPLICIT NONE
-      INTEGER*8    :: I,J,K
+        use mod_common
+        implicit none
+        character*10 :: dummy
 
-      OPEN(10,FILE=GRIDFILE)
-      READ(10,*) N1,N2,N3
-      READ(10,*) N1M,N2M,N3M
-      READ(10,*) XL,YL,ZL
+        open (10, file='boundary.in')
+        read (10, *) dummy
+        read (10, *) bc_ybtm, bc_ytop
+        read (10, *) dummy
+        read (10, *) bc_zbtm, bc_ztop
+        read (10, *) dummy
+        read (10, *) bc_t_ybtm, bc_t_ytop
+        read (10, *) dummy
+        read (10, *) val_t_ybtm, val_t_ytop
+        read (10, *) dummy
+        read (10, *) bc_t_zbtm, bc_t_ztop
+        read (10, *) dummy
+        read (10, *) val_t_zbtm, val_t_ztop
+        read (10, *) dummy
+        read (10, *) ich, iconjg
+        close (10)
 
-      CALL ALLO(N1,N2,N3)
+        open (11, file='../output/ibmpre/ibmpre_prdic.bin')
+        read (11, *) xprdic, yprdic, zprdic, iintp
+        close (11)
 
-      READ(10,*) (X(I),I=1,N1)
-      READ(10,*) (Y(J),J=1,N2)
-      READ(10,*) (Z(K),K=1,N3)
-      READ(10,*) (IPV(I),I=1,N1M)
-      READ(10,*) (JPV(J),J=1,N2M)
-      READ(10,*) (KPV(K),K=1,N3M)
-      READ(10,*) (IMV(I),I=1,N1M)
-      READ(10,*) (JMV(J),J=1,N2M)
-      READ(10,*) (KMV(K),K=1,N3M)
-      READ(10,*) (FIXIL(I),I=1,N1M)
-      READ(10,*) (FIXJL(J),J=1,N2M)
-      READ(10,*) (FIXKL(K),K=1,N3M)
-      READ(10,*) (FIXIU(I),I=1,N1M)
-      READ(10,*) (FIXJU(J),J=1,N2M)
-      READ(10,*) (FIXKU(K),K=1,N3M)
-      READ(10,*) (C2CX(I),I=0,N1)
-      READ(10,*) (C2CY(J),J=0,N2)
-      READ(10,*) (C2CZ(K),K=0,N3)
-      READ(10,*) (C2CXI(I),I=0,N1)
-      READ(10,*) (C2CYI(J),J=0,N2)
-      READ(10,*) (C2CZI(K),K=0,N3)
-      READ(10,*) (F2FX(I),I=0,N1)
-      READ(10,*) (F2FY(J),J=0,N2)
-      READ(10,*) (F2FZ(K),K=0,N3)
-      READ(10,*) (F2FXI(I),I=0,N1)
-      READ(10,*) (F2FYI(J),J=0,N2)
-      READ(10,*) (F2FZI(K),K=0,N3)
-      READ(10,*) (XMP(I),I=0,N1)
-      READ(10,*) (YMP(J),J=0,N2)
-      READ(10,*) (ZMP(K),K=0,N3)
+        if (xprdic .eq. 1) then
+          bc_xbtm = 4 ! 4:   PERIODIC B.C.
+          bc_xtop = 4
+        else
+          bc_xbtm = 2 ! 2:   VELOCITY INLET B.C.
+          bc_xtop = 3 ! 3:   CONVECTIVE OUTLET B.C.
+        end if
 
-      CLOSE(10)
+        if (yprdic .eq. 1) then
+          bc_ybtm = 4
+          bc_ytop = 4
+        end if
 
-      RETURN
-      END SUBROUTINE READGEOM
-!=======================================================================
-!=======================================================================
-      SUBROUTINE ALLOINIT
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
-      INTEGER*8    :: N
+        if (zprdic .eq. 1) then
+          bc_zbtm = 4
+          bc_ztop = 4
+        end if
 
-      OPEN(11,FILE='../output/ibmpre/ibmpre_fcpts.bin')
-      READ(11,*) NINTP(1), NINTP(2), NINTP(3)
-      READ(11,*) NBODY(1), NBODY(2), NBODY(3)
-      DO N = 1,3
-        NBODY(N) = NBODY(N) + NINTP(N)
-      ENDDO
-      CLOSE(11)
+        write (*, *) '========= BOUNDARY CONDITIONS ========='
+        write (*, *) ''
+        write (*, *) '(0: WALL; 1: FARF; 2: VELIN; 3: CONVOUT; 4: PRDIC)'
+        write (*, 101) bc_xbtm, bc_xtop
+        write (*, 102) bc_ybtm, bc_ytop
+        write (*, 103) bc_zbtm, bc_ztop
+        write (*, *) ''
+        write (*, 104) ich, iconjg, iintp
+        write (*, *) ''
 
-      OPEN(11,FILE='../output/ibmpre/ibmpre_nutzero.bin')
-      READ(11,*) NZERO
-      CLOSE(11)
+101     format('  BC_XBTM=', i2, '  BC_XTOP=', i2)
+102     format('  BC_YBTM=', i2, '  BC_YTOP=', i2)
+103     format('  BC_ZBTM=', i2, '  BC_ZTOP=', i2)
+104     format('  ICH=', i2, '  ICONJG=', i2, '  IINTP=', i2)
 
-      IF (IHTRANS .EQ. 1) THEN
-        OPEN(11,FILE='../output/ibmpre/ibmpre_fcpts_t.bin')
-        READ(11,*) NINTP(4)
-        READ(11,*) NBODY(4)
-        NBODY(4) = NBODY(4) + NINTP(4)
-        CLOSE(11)
-      ENDIF
-
-      RETURN
-      END SUBROUTINE ALLOINIT
+        return
+      end subroutine readbcs
 !=======================================================================
 !=======================================================================
-      SUBROUTINE ALLO_ARRAY
+      subroutine readgeom
 !=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
+        use mod_common
+        implicit none
+        integer(8) :: i, j, k
 
-      IF (IHTRANS .EQ. 0) THEN
-        CALL BASIC_ALLO()
-      ELSE
-        CALL THERMAL_ALLO()
-      ENDIF
+        open (10, file=gridfile)
+        read (10, *) n1, n2, n3
+        read (10, *) n1m, n2m, n3m
+        read (10, *) xl, yl, zl
 
-      IF (ILES .EQ. 1) THEN
-        CALL LES_ALLO()
-        IF (IHTRANS .EQ. 1) CALL LES_THERMAL_ALLO()
-      ENDIF
+        call allo(n1, n2, n3)
 
-      IF (ICONJG .EQ. 1) THEN
-        CALL CONJG_ALLO()
-      ENDIF
+        read (10, *) (x(i), i=1, n1)
+        read (10, *) (y(j), j=1, n2)
+        read (10, *) (z(k), k=1, n3)
+        read (10, *) (ipv(i), i=1, n1m)
+        read (10, *) (jpv(j), j=1, n2m)
+        read (10, *) (kpv(k), k=1, n3m)
+        read (10, *) (imv(i), i=1, n1m)
+        read (10, *) (jmv(j), j=1, n2m)
+        read (10, *) (kmv(k), k=1, n3m)
+        read (10, *) (fixil(i), i=1, n1m)
+        read (10, *) (fixjl(j), j=1, n2m)
+        read (10, *) (fixkl(k), k=1, n3m)
+        read (10, *) (fixiu(i), i=1, n1m)
+        read (10, *) (fixju(j), j=1, n2m)
+        read (10, *) (fixku(k), k=1, n3m)
+        read (10, *) (c2cx(i), i=0, n1)
+        read (10, *) (c2cy(j), j=0, n2)
+        read (10, *) (c2cz(k), k=0, n3)
+        read (10, *) (c2cxi(i), i=0, n1)
+        read (10, *) (c2cyi(j), j=0, n2)
+        read (10, *) (c2czi(k), k=0, n3)
+        read (10, *) (f2fx(i), i=0, n1)
+        read (10, *) (f2fy(j), j=0, n2)
+        read (10, *) (f2fz(k), k=0, n3)
+        read (10, *) (f2fxi(i), i=0, n1)
+        read (10, *) (f2fyi(j), j=0, n2)
+        read (10, *) (f2fzi(k), k=0, n3)
+        read (10, *) (xmp(i), i=0, n1)
+        read (10, *) (ymp(j), j=0, n2)
+        read (10, *) (zmp(k), k=0, n3)
 
-      IF (IAVG .EQ. 1) CALL AVG_ALLO()
+        close (10)
 
-      RETURN
-      END SUBROUTINE ALLO_ARRAY
-!=======================================================================
-!=======================================================================
-      SUBROUTINE IBMPREREAD
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
-      INTEGER*8    :: N,L,DUMMY
-      INTEGER*8    :: I,J,K,ITMP
-
-      OPEN(11,FILE='../output/ibmpre/ibmpre_fcpts.bin')
-      READ(11,*) DUMMY ! NINTP, ALREADY READ IN ALLOINIT SUBROUTINE
-      READ(11,*) DUMMY ! NBODY, ALREADY READ IN ALLOINIT SUBROUTINE
-      DO N = 1,NBODY(1)
-        READ(11,*) IFC(N,1), JFC(N,1), KFC(N,1)
-      ENDDO
-      DO N = 1,NBODY(2)
-        READ(11,*) IFC(N,2), JFC(N,2), KFC(N,2)
-      ENDDO
-      DO N = 1,NBODY(3)
-        READ(11,*) IFC(N,3), JFC(N,3), KFC(N,3)
-      ENDDO
-      DO N = 1,NINTP(1)
-        READ(11,*) INTPINDX(N,1,1), INTPINDX(N,1,2), INTPINDX(N,1,3)
-      ENDDO
-      DO N = 1,NINTP(2)
-        READ(11,*) INTPINDX(N,2,1), INTPINDX(N,2,2), INTPINDX(N,2,3)
-      ENDDO
-      DO N = 1,NINTP(3)
-        READ(11,*) INTPINDX(N,3,1), INTPINDX(N,3,2), INTPINDX(N,3,3)
-      ENDDO
-      DO N = 1,NINTP(1)
-        READ(11,*) (((GEOMFAC(N,1,I,J,K),K=0,2),J=0,2),I=0,2)
-      ENDDO
-      DO N = 1,NINTP(2)
-        READ(11,*) (((GEOMFAC(N,2,I,J,K),K=0,2),J=0,2),I=0,2)
-      ENDDO
-      DO N = 1,NINTP(3)
-        READ(11,*) (((GEOMFAC(N,3,I,J,K),K=0,2),J=0,2),I=0,2)
-      ENDDO
-      CLOSE(11)
-
-      IF (IHTRANS .EQ. 1) THEN
-        OPEN(11,FILE='../output/ibmpre/ibmpre_fcpts_t.bin')
-        READ(11,*) DUMMY ! NINTP, ALREADY READ IN ALLOINIT SUBROUTINE
-        READ(11,*) DUMMY ! NBODY, ALREADY READ IN ALLOINIT SUBROUTINE
-        DO N = 1,NBODY(4)
-          READ(11,*) IFC(N,4), JFC(N,4), KFC(N,4)
-        ENDDO
-        DO N = 1,NINTP(4)
-          READ(11,*) INTPINDX(N,4,1), INTPINDX(N,4,2), INTPINDX(N,4,3)
-        ENDDO
-        DO N = 1,NINTP(4)
-          READ(11,*) (((GEOMFAC(N,4,I,J,K),K=0,2),J=0,2),I=0,2)
-        ENDDO
-      ENDIF
-
-      WRITE(*,*) '========= LOADING IBM-PREPROCESSING DATA ========='
-      WRITE(*,*) ''
-      WRITE(*,35) NINTP(1),NINTP(2),NINTP(3)
-      WRITE(*,36) NBODY(1),NBODY(2),NBODY(3)
-      IF (IHTRANS .EQ. 1) WRITE(*,37) NINTP(4),NBODY(4)
-      WRITE(*,*) ''
- 35   FORMAT('  NINTP_U :',I12,'  NINTP_V :',I12,'  NINTP_W :',I12)
- 36   FORMAT('  NBODY_U :',I12,'  NBODY_V :',I12,'  NBODY_W :',I12)
- 37   FORMAT('  NINTP_T :',I12,'  NBODY_T :',I12)
-
-      RETURN
-      END SUBROUTINE IBMPREREAD
+        return
+      end subroutine readgeom
 !=======================================================================
 !=======================================================================
-      SUBROUTINE NUTZEROREAD
+      subroutine alloinit
 !=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K
-      INTEGER*8 :: N
+        use mod_common
+        use mod_flowarray
+        implicit none
+        integer(8) :: n
 
-      OPEN(14,FILE='../output/ibmpre/ibmpre_nutzero.bin')
-      READ(14,*) NZERO
-      READ(14,*) (INZ(N),N=1,NZERO)
-      READ(14,*) (JNZ(N),N=1,NZERO)
-      READ(14,*) (KNZ(N),N=1,NZERO)
-      CLOSE(14)
+        open (11, file='../output/ibmpre/ibmpre_fcpts.bin')
+        read (11, *) nintp(1), nintp(2), nintp(3)
+        read (11, *) nbody(1), nbody(2), nbody(3)
+        do n = 1, 3
+          nbody(n) = nbody(n) + nintp(n)
+        end do
+        close (11)
 
-      OPEN(15,FILE='../output/ibmpre/ibmpre_wallfdvm.bin')
-      READ(15,*) ((( NWALL_DVM(I,J,K) ,I=1,N1M),J=1,N2M),K=1,N3M)
-      CLOSE(15)
+        open (11, file='../output/ibmpre/ibmpre_nutzero.bin')
+        read (11, *) nzero
+        close (11)
 
-      WRITE(*,*) '========= LOADING LES-PREPROCESSING DATA ========='
-      WRITE(*,*) ''
-      WRITE(*,30) NZERO
-      WRITE(*,*) ''
- 30   FORMAT('  # OF NUTZERO PTS = ',I10)
+        if (ihtrans .eq. 1) then
+          open (11, file='../output/ibmpre/ibmpre_fcpts_t.bin')
+          read (11, *) nintp(4)
+          read (11, *) nbody(4)
+          nbody(4) = nbody(4) + nintp(4)
+          close (11)
+        end if
 
-      RETURN
-      END SUBROUTINE NUTZEROREAD
-!=======================================================================
-!=======================================================================
-      SUBROUTINE CONJGREAD
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K
-      INTEGER*8     :: L
-
-      OPEN(15,FILE='../output/ibmpre/ibmpre_conjg.bin')
-      READ(15,*) ((( CSTAR(I,J,K) ,I=1,N1M),J=1,N2M),K=1,N3M)
-      READ(15,*) (((( KSTAR(I,J,K,L) ,I=1,N1M),J=1,N2M),K=1,N3M),L=1,6)
-      CLOSE(15)
-
-      WRITE(*,*) '========= LOADING CONJUGATE H.TRANS DATA ========='
-      WRITE(*,*) ''
-
-      RETURN
-      END SUBROUTINE CONJGREAD
+        return
+      end subroutine alloinit
 !=======================================================================
 !=======================================================================
-       SUBROUTINE MAKEFLD
+      subroutine allo_array
 !=======================================================================
-!$    use omp_lib
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,P,T,QMASS
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K
-      REAL*8        :: FUNCBODY
-      REAL*8        :: FLOWAREA(N1), FL, FL_S, ADJ
-      REAL*8        :: T_SOLID
+        use mod_common
+        use mod_flowarray
+        implicit none
 
-      IHIST = 0
-      TIME = 0.
+        if (ihtrans .eq. 0) then
+          call basic_allo()
+        else
+          call thermal_allo()
+        end if
 
-      U = 0.
-      V = 0.
-      W = 0.
-      P = 0.
+        if (iles .eq. 1) then
+          call les_allo()
+          if (ihtrans .eq. 1) call les_thermal_allo()
+        end if
 
-      FLOWAREA = 0.
+        if (iconjg .eq. 1) then
+          call conjg_allo()
+        end if
 
-      WRITE(*,*) '========= MAKING INITIAL FIELD ========='
-      WRITE(*,*) ''
+        if (iavg .eq. 1) call avg_allo()
+
+        return
+      end subroutine allo_array
+!=======================================================================
+!=======================================================================
+      subroutine ibmpreread
+!=======================================================================
+        use mod_common
+        use mod_flowarray
+        implicit none
+        integer(8) :: n, l, dummy
+        integer(8) :: i, j, k, itmp
+
+        open (11, file='../output/ibmpre/ibmpre_fcpts.bin')
+        read (11, *) dummy ! NINTP, ALREADY READ IN ALLOINIT SUBROUTINE
+        read (11, *) dummy ! NBODY, ALREADY READ IN ALLOINIT SUBROUTINE
+        do n = 1, nbody(1)
+          read (11, *) ifc(n, 1), jfc(n, 1), kfc(n, 1)
+        end do
+        do n = 1, nbody(2)
+          read (11, *) ifc(n, 2), jfc(n, 2), kfc(n, 2)
+        end do
+        do n = 1, nbody(3)
+          read (11, *) ifc(n, 3), jfc(n, 3), kfc(n, 3)
+        end do
+        do n = 1, nintp(1)
+          read (11, *) intpindx(n, 1, 1), intpindx(n, 1, 2), intpindx(n, 1, 3)
+        end do
+        do n = 1, nintp(2)
+          read (11, *) intpindx(n, 2, 1), intpindx(n, 2, 2), intpindx(n, 2, 3)
+        end do
+        do n = 1, nintp(3)
+          read (11, *) intpindx(n, 3, 1), intpindx(n, 3, 2), intpindx(n, 3, 3)
+        end do
+        do n = 1, nintp(1)
+          read (11, *) (((geomfac(n, 1, i, j, k), k=0, 2), j=0, 2), i=0, 2)
+        end do
+        do n = 1, nintp(2)
+          read (11, *) (((geomfac(n, 2, i, j, k), k=0, 2), j=0, 2), i=0, 2)
+        end do
+        do n = 1, nintp(3)
+          read (11, *) (((geomfac(n, 3, i, j, k), k=0, 2), j=0, 2), i=0, 2)
+        end do
+        close (11)
+
+        if (ihtrans .eq. 1) then
+          open (11, file='../output/ibmpre/ibmpre_fcpts_t.bin')
+          read (11, *) dummy ! NINTP, ALREADY READ IN ALLOINIT SUBROUTINE
+          read (11, *) dummy ! NBODY, ALREADY READ IN ALLOINIT SUBROUTINE
+          do n = 1, nbody(4)
+            read (11, *) ifc(n, 4), jfc(n, 4), kfc(n, 4)
+          end do
+          do n = 1, nintp(4)
+            read (11, *) intpindx(n, 4, 1), intpindx(n, 4, 2), intpindx(n, 4, 3)
+          end do
+          do n = 1, nintp(4)
+            read (11, *) (((geomfac(n, 4, i, j, k), k=0, 2), j=0, 2), i=0, 2)
+          end do
+        end if
+
+        write (*, *) '========= LOADING IBM-PREPROCESSING DATA ========='
+        write (*, *) ''
+        write (*, 35) nintp(1), nintp(2), nintp(3)
+        write (*, 36) nbody(1), nbody(2), nbody(3)
+        if (ihtrans .eq. 1) write (*, 37) nintp(4), nbody(4)
+        write (*, *) ''
+35      format('  NINTP_U :', i12, '  NINTP_V :', i12, '  NINTP_W :', i12)
+36      format('  NBODY_U :', i12, '  NBODY_V :', i12, '  NBODY_W :', i12)
+37      format('  NINTP_T :', i12, '  NBODY_T :', i12)
+
+        return
+      end subroutine ibmpreread
+!=======================================================================
+!=======================================================================
+      subroutine nutzeroread
+!=======================================================================
+        use mod_common
+        use mod_flowarray
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: n
+
+        open (14, file='../output/ibmpre/ibmpre_nutzero.bin')
+        read (14, *) nzero
+        read (14, *) (inz(n), n=1, nzero)
+        read (14, *) (jnz(n), n=1, nzero)
+        read (14, *) (knz(n), n=1, nzero)
+        close (14)
+
+        open (15, file='../output/ibmpre/ibmpre_wallfdvm.bin')
+        read (15, *) (((nwall_dvm(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+        close (15)
+
+        write (*, *) '========= LOADING LES-PREPROCESSING DATA ========='
+        write (*, *) ''
+        write (*, 30) nzero
+        write (*, *) ''
+30      format('  # OF NUTZERO PTS = ', i10)
+
+        return
+      end subroutine nutzeroread
+!=======================================================================
+!=======================================================================
+      subroutine conjgread
+!=======================================================================
+        use mod_common
+        use mod_flowarray
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: l
+
+        open (15, file='../output/ibmpre/ibmpre_conjg.bin')
+        read (15, *) (((cstar(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+        read (15, *) ((((kstar(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 6)
+        close (15)
+
+        write (*, *) '========= LOADING CONJUGATE H.TRANS DATA ========='
+        write (*, *) ''
+
+        return
+      end subroutine conjgread
+!=======================================================================
+!=======================================================================
+      subroutine makefld
+!=======================================================================
+!$      USE OMP_LIB
+        use mod_common
+        use mod_flowarray, only: u, v, w, p, t, qmass
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: funcbody
+        real(8) :: flowarea(n1), fl, fl_s, adj
+        real(8) :: t_solid
+
+        ihist = 0
+        time = 0.
+
+        u = 0.
+        v = 0.
+        w = 0.
+        p = 0.
+
+        flowarea = 0.
+
+        write (*, *) '========= MAKING INITIAL FIELD ========='
+        write (*, *) ''
 
 !$OMP PARALLEL DO
-      DO I = 0,N1    ! Start from 0 to cover the inlet ghost cell
-        DO J = 0,N2
-          DO K = 0,N3
-            ! Apply profile ONLY in the fluid domain
-            IF(FUNCBODY(X(I),YMP(J),ZMP(K),TIME).GE.1.E-10) THEN
-               U(I,J,K) = 1.5D0 * UBULK_I * (1.0D0 - YMP(J)**2)
-            ELSE
-               U(I,J,K) = 0.0D0
-            ENDIF
-          ENDDO
-        ENDDO
-      ENDDO
+        do i = 0, n1    ! START FROM 0 TO COVER THE INLET GHOST CELL
+          do j = 0, n2
+            do k = 0, n3
+              ! APPLY PROFILE ONLY IN THE FLUID DOMAIN
+              if (funcbody(x(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                u(i, j, k) = 1.5d0 * ubulk_i * (1.0d0 - ymp(j)**2)
+              else
+                u(i, j, k) = 0.0d0
+              end if
+            end do
+          end do
+        end do
 !$OMP END PARALLEL DO
 
-      IF (BC_YBTM .EQ. 0) THEN
-        DO I = 1,N1
-          DO K = 0,N3
-            U(I,0,K) = 0.
-            U(I,1,K) = 0.
-          ENDDO
-        ENDDO
-      ENDIF
+        if (bc_ybtm .eq. 0) then
+          do i = 1, n1
+            do k = 0, n3
+              u(i, 0, k) = 0.
+              u(i, 1, k) = 0.
+            end do
+          end do
+        end if
 
-      IF (BC_YTOP .EQ. 0) THEN
-        DO I = 1,N1
-          DO K = 0,N3
-            U(I,N2M,K) = 0.
-            U(I,N2,K) = 0.
-          ENDDO
-        ENDDO
-      ENDIF
+        if (bc_ytop .eq. 0) then
+          do i = 1, n1
+            do k = 0, n3
+              u(i, n2m, k) = 0.
+              u(i, n2, k) = 0.
+            end do
+          end do
+        end if
 
-      IF (BC_ZBTM .EQ. 0) THEN
-        DO I = 1,N1
-          DO J = 0,N2
-            U(I,J,0) = 0.
-            U(I,J,1) = 0.
-          ENDDO
-        ENDDO
-      ENDIF
+        if (bc_zbtm .eq. 0) then
+          do i = 1, n1
+            do j = 0, n2
+              u(i, j, 0) = 0.
+              u(i, j, 1) = 0.
+            end do
+          end do
+        end if
 
-      IF (BC_ZTOP .EQ. 0) THEN
-        DO I = 1,N1
-          DO J = 0,N2
-            U(I,J,N3M) = 0.
-            U(I,J,N3) = 0.
-          ENDDO
-        ENDDO
-      ENDIF   
+        if (bc_ztop .eq. 0) then
+          do i = 1, n1
+            do j = 0, n2
+              u(i, j, n3m) = 0.
+              u(i, j, n3) = 0.
+            end do
+          end do
+        end if
 
-      IF (IHTRANS .EQ. 1) THEN
-        IF (T_INF .EQ. 0) THEN
-          T_SOLID = -1.0D0
-          T = -1.0D0
-        ELSE
-          T_SOLID = 1.0D0
-          T = 1.0D0
-        ENDIF
+        if (ihtrans .eq. 1) then
+          if (t_inf .eq. 0) then
+            t_solid = -1.0d0
+            t = -1.0d0
+          else
+            t_solid = 1.0d0
+            t = 1.0d0
+          end if
 
 !$OMP PARALLEL DO
-        DO I = 0,N1
-          DO J = 1,N2M
-            DO K = 0,N3
-              IF(FUNCBODY(XMP(I),YMP(J),ZMP(K),TIME).GE.1.E-10) THEN
-                T(I,J,K) = 0.0D0  ! Fluid Domain
-              ENDIF
-            ENDDO
-          ENDDO
-        ENDDO
+          do i = 0, n1
+            do j = 1, n2m
+              do k = 0, n3
+                if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                  t(i, j, k) = 0.0d0  ! FLUID DOMAIN
+                end if
+              end do
+            end do
+          end do
 !$OMP END PARALLEL DO
 
-        ! --- APPLY INITIAL THERMAL BOUNDARY CONDITIONS ---
-        IF (XPRDIC .EQ. 0) THEN
+          ! --- APPLY INITIAL THERMAL BOUNDARY CONDITIONS ---
+          if (xprdic .eq. 0) then
 !$OMP PARALLEL DO
-          DO K = 0,N3
-            DO J = 0,N2
-              ! Separate Solid vs Fluid Dirichlets geometrically
-              IF(FUNCBODY(XMP(0),YMP(J),ZMP(K),TIME).GE.1.E-10) THEN
-                T(0,J,K) = 0.0D0
-              ELSE
-                T(0,J,K) = T_SOLID
-              ENDIF
-            ENDDO
-          ENDDO
+            do k = 0, n3
+              do j = 0, n2
+                ! SEPARATE SOLID VS FLUID DIRICHLETS GEOMETRICALLY
+                if (funcbody(xmp(0), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                  t(0, j, k) = 0.0d0
+                else
+                  t(0, j, k) = t_solid
+                end if
+              end do
+            end do
 !$OMP END PARALLEL DO
-        ENDIF
+          end if
 
-        IF (YPRDIC .EQ. 0) THEN
+          if (yprdic .eq. 0) then
 !$OMP PARALLEL DO
-          DO K = 0,N3
-            DO I = 0,N1
-              IF (BC_T_YBTM .EQ. 0) THEN
-                T(I,0,K) = VAL_T_YBTM
-              ELSE IF (BC_T_YBTM .EQ. 1) THEN
-                T(I,0,K) = T(I,1,K) - VAL_T_YBTM / C2CYI(1)
-              ENDIF
+            do k = 0, n3
+              do i = 0, n1
+                if (bc_t_ybtm .eq. 0) then
+                  t(i, 0, k) = val_t_ybtm
+                else if (bc_t_ybtm .eq. 1) then
+                  t(i, 0, k) = t(i, 1, k) - val_t_ybtm / c2cyi(1)
+                end if
 
-              IF (BC_T_YTOP .EQ. 0) THEN
-                T(I,N2,K) = VAL_T_YTOP
-              ELSE IF (BC_T_YTOP .EQ. 1) THEN
-                T(I,N2,K) = T(I,N2M,K) + VAL_T_YTOP / C2CYI(N2)
-              ENDIF
-            ENDDO
-          ENDDO
+                if (bc_t_ytop .eq. 0) then
+                  t(i, n2, k) = val_t_ytop
+                else if (bc_t_ytop .eq. 1) then
+                  t(i, n2, k) = t(i, n2m, k) + val_t_ytop / c2cyi(n2)
+                end if
+              end do
+            end do
 !$OMP END PARALLEL DO
-        ENDIF
+          end if
 
-        IF (ZPRDIC .EQ. 0) THEN
+          if (zprdic .eq. 0) then
 !$OMP PARALLEL DO
-          DO J = 0,N2
-            DO I = 0,N1
-              IF (BC_T_ZBTM .EQ. 0) THEN
-                T(I,J,0) = VAL_T_ZBTM
-              ELSE IF (BC_T_ZBTM .EQ. 1) THEN
-                T(I,J,0) = T(I,J,1) - VAL_T_ZBTM / C2CZI(1)
-              ENDIF
+            do j = 0, n2
+              do i = 0, n1
+                if (bc_t_zbtm .eq. 0) then
+                  t(i, j, 0) = val_t_zbtm
+                else if (bc_t_zbtm .eq. 1) then
+                  t(i, j, 0) = t(i, j, 1) - val_t_zbtm / c2czi(1)
+                end if
 
-              IF (BC_T_ZTOP .EQ. 0) THEN
-                T(I,J,N3) = VAL_T_ZTOP
-              ELSE IF (BC_T_ZTOP .EQ. 1) THEN
-                T(I,J,N3) = T(I,J,N3M) + VAL_T_ZTOP / C2CZI(N3)
-              ENDIF
-            ENDDO
-          ENDDO
+                if (bc_t_ztop .eq. 0) then
+                  t(i, j, n3) = val_t_ztop
+                else if (bc_t_ztop .eq. 1) then
+                  t(i, j, n3) = t(i, j, n3m) + val_t_ztop / c2czi(n3)
+                end if
+              end do
+            end do
 !$OMP END PARALLEL DO
-        ENDIF
-        ! -------------------------------------------------
-      ENDIF
+          end if
+          ! -------------------------------------------------
+        end if
 
-      RETURN
-      END SUBROUTINE MAKEFLD
+        return
+      end subroutine makefld
 !=======================================================================
 !=======================================================================
-       SUBROUTINE PREFLD
+      subroutine prefld
 !=======================================================================
-!$    use omp_lib
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,T,P
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K
-      INTEGER*8     :: NN1,NN2,NN3
-      REAL*8        :: RRE,PPR,GGR
-      
-      WRITE(*,*) '========= LOADING PREVIOUS FIELD ========='
-      WRITE(*,*) ''
+!$      USE OMP_LIB
+        use mod_common
+        use mod_flowarray, only: u, v, w, t, p
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: nn1, nn2, nn3
+        real(8) :: rre, ppr, ggr
 
-      OPEN(12,FILE=PREV_FLD,FORM='UNFORMATTED')
-      READ(12) NN1, NN2, NN3, RRE, PPR, GGR
+        write (*, *) '========= LOADING PREVIOUS FIELD ========='
+        write (*, *) ''
 
-      IF ((NN1 .NE. N1) .OR. (NN2 .NE. N2) .OR. (NN3 .NE. N3)) THEN
-        WRITE(*,*) ' --- PREVIOUS FIELD DOES NOT MATCH WITH THE GRID SYSTEM.'
-        CLOSE(12)
-        STOP
+        open (12, file=prev_fld, form='unformatted')
+        read (12) nn1, nn2, nn3, rre, ppr, ggr
 
-      ELSE
+        if ((nn1 .ne. n1) .or. (nn2 .ne. n2) .or. (nn3 .ne. n3)) then
+          write (*, *) ' --- PREVIOUS FIELD DOES NOT MATCH WITH THE GRID SYSTEM.'
+          close (12)
+          stop
 
-        READ(12) IHIST, M, TIME, DT
-        READ(12) XPRDIC, YPRDIC, ZPRDIC
-        READ(12) BC_XBTM, BC_XTOP, BC_YBTM, BC_YTOP, BC_ZBTM, BC_ZTOP
-        READ(12) ICH, ICONJG
-        READ(12) ((( U(I,J,K) ,I=1,N1),J=0,N2),K=0,N3)
-        READ(12) ((( V(I,J,K) ,I=0,N1),J=1,N2),K=0,N3)
-        READ(12) ((( W(I,J,K) ,I=0,N1),J=0,N2),K=1,N3)
-        READ(12) ((( P(I,J,K) ,I=1,N1M),J=1,N2M),K=1,N3M)
-        IF (IHTRANS .EQ. 1) THEN
-          IF (T_INF .EQ. 0) THEN
-            T = -1.
-          ELSE
-            T = 1.
-          ENDIF
-          READ(12) ((( T(I,J,K), I=1,N1M),J=1,N2M),K=1,N3M)
-        ENDIF
-        CLOSE(12)
+        else
 
-        IF (IPZERO .EQ. 1) P = 0.
+          read (12) ihist, m, time, dt
+          read (12) xprdic, yprdic, zprdic
+          read (12) bc_xbtm, bc_xtop, bc_ybtm, bc_ytop, bc_zbtm, bc_ztop
+          read (12) ich, iconjg
+          read (12) (((u(i, j, k), i=1, n1), j=0, n2), k=0, n3)
+          read (12) (((v(i, j, k), i=0, n1), j=1, n2), k=0, n3)
+          read (12) (((w(i, j, k), i=0, n1), j=0, n2), k=1, n3)
+          read (12) (((p(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+          if (ihtrans .eq. 1) then
+            if (t_inf .eq. 0) then
+              t = -1.
+            else
+              t = 1.
+            end if
+            read (12) (((t(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+          end if
+          close (12)
 
-        WRITE(*,*) ''
-        WRITE(*,*) ' ----------- PREVIOUS FIELD INFORMATION -----------'
-        WRITE(*,100) PREV_FLD
-        WRITE(*,101) RRE, PPR, GGR
-        WRITE(*,102) NN1, NN2, NN3
-        WRITE(*,103) IHIST, M, TIME, DT
-        WRITE(*,*) ''
- 100    FORMAT(' PREVIOUS FIELD LOCATION : ', A25)
- 101    FORMAT(' RE = ',ES12.3,' PR = ',ES12.3,' GR = ',ES12.3)
- 102    FORMAT(' N1 = ',I12,' N2 = ',I12,' N3 = ',I12)
- 103    FORMAT(' IHIST = ',I9,' M = ',I9,' TIME = ',F10.5,' DT = ',F12.8)
+          if (ipzero .eq. 1) p = 0.
 
-        IF (XPRDIC .EQ. 1) THEN
+          write (*, *) ''
+          write (*, *) ' ----------- PREVIOUS FIELD INFORMATION -----------'
+          write (*, 100) prev_fld
+          write (*, 101) rre, ppr, ggr
+          write (*, 102) nn1, nn2, nn3
+          write (*, 103) ihist, m, time, dt
+          write (*, *) ''
+100       format(' PREVIOUS FIELD LOCATION : ', a25)
+101       format(' RE = ', es12.3, ' PR = ', es12.3, ' GR = ', es12.3)
+102       format(' N1 = ', i12, ' N2 = ', i12, ' N3 = ', i12)
+103       format(' IHIST = ', i9, ' M = ', i9, ' TIME = ', f10.5, ' DT = ', f12.8)
+
+          if (xprdic .eq. 1) then
 !$OMP PARALLEL DO
-          DO J=0,N2
-          DO K=0,N3
-             U(0 ,J,K)=U(N1M,J,K)
-             U(N1,J,K)=U(1  ,J,K)
-          ENDDO
-          ENDDO
-!$OMP END PARALLEL DO
-
-!$OMP PARALLEL DO
-          DO J=1,N2
-          DO K=0,N3
-             V(0 ,J,K)=V(N1M,J,K)
-             V(N1,J,K)=V(1  ,J,K)
-          ENDDO
-          ENDDO
+            do j = 0, n2
+              do k = 0, n3
+                u(0, j, k) = u(n1m, j, k)
+                u(n1, j, k) = u(1, j, k)
+              end do
+            end do
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO
-          DO J=0,N2
-          DO K=1,N3
-             W(0 ,J,K)=W(N1M,J,K)
-             W(N1,J,K)=W(1  ,J,K)
-          ENDDO
-          ENDDO
-!$OMP END PARALLEL DO
-
-          IF (IHTRANS .EQ. 1) THEN
-!$OMP PARALLEL DO
-           DO J=0,N2
-            DO K=0,N3
-               T(0 ,J,K)=T(N1M,J,K)
-               T(N1,J,K)=T(1  ,J,K)
-            ENDDO
-            ENDDO
-!$OMP END PARALLEL DO
-          ENDIF
-        ENDIF            
-
-        IF (YPRDIC .EQ. 1) THEN
-!$OMP PARALLEL DO
-          DO K=0,N3
-          DO I=1,N1
-             U(I,0,K) =U(I,N2M,K)
-             U(I,N2,K)=U(I,1,K)
-          ENDDO
-          ENDDO
+            do j = 1, n2
+              do k = 0, n3
+                v(0, j, k) = v(n1m, j, k)
+                v(n1, j, k) = v(1, j, k)
+              end do
+            end do
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO
-          DO K=0,N3
-          DO I=0,N1 
-             V(I,0,K) =V(I,N2M,K)
-             V(I,N2,K)=V(I,1,K)
-          ENDDO
-          ENDDO
+            do j = 0, n2
+              do k = 1, n3
+                w(0, j, k) = w(n1m, j, k)
+                w(n1, j, k) = w(1, j, k)
+              end do
+            end do
+!$OMP END PARALLEL DO
+
+            if (ihtrans .eq. 1) then
+!$OMP PARALLEL DO
+              do j = 0, n2
+                do k = 0, n3
+                  t(0, j, k) = t(n1m, j, k)
+                  t(n1, j, k) = t(1, j, k)
+                end do
+              end do
+!$OMP END PARALLEL DO
+            end if
+          end if
+
+          if (yprdic .eq. 1) then
+!$OMP PARALLEL DO
+            do k = 0, n3
+              do i = 1, n1
+                u(i, 0, k) = u(i, n2m, k)
+                u(i, n2, k) = u(i, 1, k)
+              end do
+            end do
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO
-          DO K=1,N3
-          DO I=0,N1
-             W(I,0,K) =W(I,N2M,K)
-             W(I,N2,K)=W(I,1,K)
-          ENDDO
-          ENDDO
-!$OMP END PARALLEL DO
-
-          IF (IHTRANS .EQ. 1) THEN
-!$OMP PARALLEL DO
-           DO K=0,N3
-            DO I=0,N1
-               T(I,0 ,K)=T(I,N2M,K)
-               T(I,N2,K)=T(I,1  ,K)
-            ENDDO
-            ENDDO
-!$OMP END PARALLEL DO
-          ENDIF
-
-        ENDIF
-
-        IF (ZPRDIC .EQ. 1) THEN
-!$OMP PARALLEL DO
-          DO I=1,N1
-          DO J=0,N2
-             U(I,J,0) =U(I,J,N3M)
-             U(I,J,N3)=U(I,J,1)
-          ENDDO
-          ENDDO
+            do k = 0, n3
+              do i = 0, n1
+                v(i, 0, k) = v(i, n2m, k)
+                v(i, n2, k) = v(i, 1, k)
+              end do
+            end do
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO
-          DO I=0,N1
-          DO J=1,N2
-             V(I,J,0) =V(I,J,N3M)
-             V(I,J,N3)=V(I,J,1)
-          ENDDO
-          ENDDO
+            do k = 1, n3
+              do i = 0, n1
+                w(i, 0, k) = w(i, n2m, k)
+                w(i, n2, k) = w(i, 1, k)
+              end do
+            end do
+!$OMP END PARALLEL DO
+
+            if (ihtrans .eq. 1) then
+!$OMP PARALLEL DO
+              do k = 0, n3
+                do i = 0, n1
+                  t(i, 0, k) = t(i, n2m, k)
+                  t(i, n2, k) = t(i, 1, k)
+                end do
+              end do
+!$OMP END PARALLEL DO
+            end if
+
+          end if
+
+          if (zprdic .eq. 1) then
+!$OMP PARALLEL DO
+            do i = 1, n1
+              do j = 0, n2
+                u(i, j, 0) = u(i, j, n3m)
+                u(i, j, n3) = u(i, j, 1)
+              end do
+            end do
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO
-          DO I=0,N1
-          DO J=0,N2
-             W(I,J,0) =W(I,J,N3M)
-             W(I,J,N3)=W(I,J,1)
-          ENDDO
-          ENDDO
+            do i = 0, n1
+              do j = 1, n2
+                v(i, j, 0) = v(i, j, n3m)
+                v(i, j, n3) = v(i, j, 1)
+              end do
+            end do
 !$OMP END PARALLEL DO
 
-          IF (IHTRANS .EQ. 1) THEN
 !$OMP PARALLEL DO
-           DO I=0,N1
-            DO J=0,N2
-               T(I,J,0)=W(I,J,N3M)
-               T(I,J,N3)=T(I,J,1)
-            ENDDO
-            ENDDO
-!$OMP END PARALLEL DO
-          ENDIF
-
-        ENDIF
-
-      ENDIF
-
-      RETURN
-      END SUBROUTINE PREFLD
-!=======================================================================
-!=======================================================================
-       SUBROUTINE ADDPERTURB
-!=======================================================================
-!$    use omp_lib
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,P,QMASS
-      IMPLICIT NONE
-      REAL*8        :: PTB_ARRAY(0:N1,0:N2,0:N3)
-      INTEGER*8     :: I,J,K
-      REAL*8        :: FUNCBODY
-      REAL*8        :: FLOWAREA, PERTB_RATE, ADJ, FLOWRATE
-
-      CALL RANDOM_NUMBER(PTB_ARRAY)
-      PTB_ARRAY = (PTB_ARRAY - .5d0) * 2.d0 * EPS_PTR
-      ! NOW PTB_ARRAY ~ UNIFORMDIST.(-EPS_PTR, +EPS_PTR)
-
-      DO I = 2,N1M
-        FLOWAREA = 0
-        PERTB_RATE = 0.
-!$OMP PARALLEL DO reduction(+:FLOWAREA, PERTB_RATE)
-        DO J = 1,N2M
-          DO K = 1,N3M
-              IF (FUNCBODY(X(I),YMP(J),ZMP(K),TIME).GT.1.E-10) THEN
-                U(I,J,K) = U(I,J,K) + PTB_ARRAY(I,J,K)
-                FLOWAREA = FLOWAREA + F2FY(J) * F2FZ(K)
-                PERTB_RATE = PERTB_RATE + PTB_ARRAY(I,J,K) * F2FY(J) * F2FZ(K)
-              ENDIF
-          ENDDO
-        ENDDO
-!$OMP END PARALLEL DO
-          ADJ = PERTB_RATE / FLOWAREA
-          FLOWRATE = 0
-!$OMP PARALLEL DO reduction(+:FLOWRATE)
-        DO J = 1,N2M
-          DO K = 1,N3M
-              IF (FUNCBODY(X(I),YMP(J),ZMP(K),TIME).GT.1.E-10) THEN
-                U(I,J,K) = U(I,J,K) - ADJ
-                FLOWRATE = FLOWRATE + U(I,J,K) * F2FY(J) * F2FZ(K)
-              ENDIF
-          ENDDO
-        ENDDO
-!$OMP END PARALLEL DO
-      ! WRITE(*,*)FLOWRATE
-      ENDDO
-
-      CALL RANDOM_NUMBER(PTB_ARRAY)
-      PTB_ARRAY = (PTB_ARRAY - .5d0) * 2.d0 * EPS_PTR
-      ! NOW PTB_ARRAY ~ UNIFORMDIST.(-EPS_PTR, +EPS_PTR)
-
-      DO J = 2,N2M
-        FLOWAREA = 0
-        PERTB_RATE = 0.
-!$OMP PARALLEL DO reduction(+:FLOWAREA, PERTB_RATE)
-        DO K = 1,N3M
-          DO I = 1,N1M
-              IF (FUNCBODY(XMP(I),Y(J),ZMP(K),TIME).GT.1.E-10) THEN
-                V(I,J,K) = V(I,J,K) + PTB_ARRAY(I,J,K)
-                FLOWAREA = FLOWAREA + F2FZ(K) * F2FX(I)
-                PERTB_RATE = PERTB_RATE + PTB_ARRAY(I,J,K) * F2FZ(K) * F2FX(I)
-              ENDIF
-          ENDDO
-        ENDDO
-!$OMP END PARALLEL DO
-        ADJ = PERTB_RATE / FLOWAREA
-        FLOWRATE = 0
-!$OMP PARALLEL DO reduction(+:FLOWRATE)
-        DO K = 1,N3M
-          DO I = 1,N1M
-              IF (FUNCBODY(XMP(I),Y(J),ZMP(K),TIME).GT.1.E-10) THEN
-                V(I,J,K) = V(I,J,K) - ADJ
-                FLOWRATE = FLOWRATE + V(I,J,K) * F2FZ(K) * F2FX(I)
-              ENDIF
-          ENDDO
-        ENDDO
-!$OMP END PARALLEL DO
-      ! WRITE(*,*)FLOWRATE
-      ENDDO
-
-      CALL RANDOM_NUMBER(PTB_ARRAY)
-      PTB_ARRAY = (PTB_ARRAY - .5d0) * 2.d0 * EPS_PTR
-      ! NOW PTB_ARRAY ~ UNIFORMDIST.(-EPS_PTR, +EPS_PTR)
-
-      DO K = 3,N3M
-        FLOWAREA = 0
-        PERTB_RATE = 0.
-!$OMP PARALLEL DO reduction(+:FLOWAREA, PERTB_RATE)
-        DO I = 1,N1M
-          DO J = 1,N2M
-              IF (FUNCBODY(XMP(I),YMP(J),Z(K),TIME).GT.1.E-10) THEN
-                W(I,J,K) = W(I,J,K) + PTB_ARRAY(I,J,K)
-                FLOWAREA = FLOWAREA + F2FX(I) * F2FY(J)
-                PERTB_RATE = PERTB_RATE + PTB_ARRAY(I,J,K) * F2FX(I) * F2FY(J)
-              ENDIF
-          ENDDO
-        ENDDO
-!$OMP END PARALLEL DO
-        ADJ = PERTB_RATE / FLOWAREA
-        FLOWRATE = 0
-!$OMP PARALLEL DO reduction(+:FLOWRATE)
-        DO I = 1,N1M
-          DO J = 1,N2M
-              IF (FUNCBODY(XMP(I),YMP(J),Z(K),TIME).GT.1.E-10) THEN
-                W(I,J,K) = W(I,J,K) - ADJ
-                FLOWRATE = FLOWRATE + W(I,J,K) * F2FX(I) * F2FY(J)
-              ENDIF
-          ENDDO
-        ENDDO
-!$OMP END PARALLEL DO
-      ENDDO
-
-! --- ENFORCE EXACT DISCRETE BULK VELOCITY ON EVERY X-PLANE ---
-      DO I = 0,N1
-        FLOWAREA = 0.0D0
-        FLOWRATE = 0.0D0
-        
-!$OMP PARALLEL DO reduction(+:FLOWAREA, FLOWRATE)
-        DO J = 1,N2M
-          DO K = 1,N3M
-              ! Compute the actual discrete cross-sectional area and flow rate
-              IF (FUNCBODY(X(I),YMP(J),ZMP(K),TIME).GT.1.E-10) THEN
-                FLOWAREA = FLOWAREA + F2FY(J) * F2FZ(K)
-                FLOWRATE = FLOWRATE + U(I,J,K) * F2FY(J) * F2FZ(K)
-              ENDIF
-          ENDDO
-        ENDDO
+            do i = 0, n1
+              do j = 0, n2
+                w(i, j, 0) = w(i, j, n3m)
+                w(i, j, n3) = w(i, j, 1)
+              end do
+            end do
 !$OMP END PARALLEL DO
 
-        IF (FLOWAREA .GT. 0.0D0) THEN
-            ! Calculate the multiplicative scaling factor needed to hit UBULK_I
-            ADJ = (UBULK_I * FLOWAREA) / FLOWRATE
-            
+            if (ihtrans .eq. 1) then
 !$OMP PARALLEL DO
-            DO J = 0,N2
-              DO K = 0,N3
-                  ! Apply scaling only to the fluid phase
-                  IF (FUNCBODY(X(I),YMP(J),ZMP(K),TIME).GT.1.E-10) THEN
-                    U(I,J,K) = U(I,J,K) * ADJ
-                  ENDIF
-              ENDDO
-            ENDDO
+              do i = 0, n1
+                do j = 0, n2
+                  t(i, j, 0) = w(i, j, n3m)
+                  t(i, j, n3) = t(i, j, 1)
+                end do
+              end do
 !$OMP END PARALLEL DO
-        ENDIF
-      ENDDO
+            end if
 
-      WRITE(*,*) '--- ADDING ISOTROPIC PERTURBATION FROM THE UNIFORM DIST.'
-      WRITE(*,201) EPS_PTR*100.
-      WRITE(*,*) ''
- 201  FORMAT(' --- MAX. SIZE OF PERTURBATION = ', F5.1, '% OF U_BULK')
+          end if
 
-      RETURN
-      END SUBROUTINE ADDPERTURB
-!=======================================================================
-!=======================================================================
-      SUBROUTINE DTTIMEINIT
-!=======================================================================
-      USE MOD_COMMON
-      IMPLICIT NONE
+        end if
 
-      IF (IDTOPT .EQ. 0) DT = DT_SIZE ! FOR CONSTANT USAGE PURPOSE
-      IF ((IDTOPT .NE.0) .AND. (IREAD .EQ. 0)) DT = DT_SIZE 
-                                      ! FOR INITAL USAGE PURPOSE
-      IF (IRESET .EQ. 1) THEN
-        IHIST = 0
-        TIME  = 0.
-      ENDIF
-      NTIME = 0
+        return
+      end subroutine prefld
+!=======================================================================
+!=======================================================================
+      subroutine addperturb
+!=======================================================================
+!$      USE OMP_LIB
+        use mod_common
+        use mod_flowarray, only: u, w
+        implicit none
+        real(8) :: ptb
+        integer(8) :: i, j, k
+        real(8) :: funcbody
+        real(8), parameter :: ret = 180.0d0
 
-      IF (IAVG .EQ. 1) THEN
-        TIMEINIT = TIME
-        IHISTINIT = IHIST
-      ENDIF
+        do i = 1, n1m
+!$OMP PARALLEL DO PRIVATE(PTB)
+          do j = 0, n2
+            do k = 0, n3
+              if ((funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) .and. (ymp(j) .gt. 2.d0/3.d0)) then
+                ptb = eps_ptr * ubulk_i * cos(zmp(k)/zl*acos(-1.d0)) &
+                      * abs(y(n2 - 2) - ymp(j)) * ret                &
+                      * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0 + .5d0)
+                u(i, j, k) = u(i, j, k) + ptb
+              end if
+            end do
+          end do
+!$OMP END PARALLEL DO
+        end do
 
-      RETURN
-      END SUBROUTINE DTTIMEINIT
-!=======================================================================
-!=======================================================================
-       SUBROUTINE RK3COEFINIT
-!=======================================================================
-      USE MOD_COMMON
-      IMPLICIT NONE
+        do k = 1, n3
+!$OMP PARALLEL DO PRIVATE(PTB)
+          do i = 1, n1m
+            do j = 0, n2
+              if ((funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) .and. (ymp(j) .gt. 2.d0/3.d0)) then
+                ptb = eps_ptr * ubulk_i * sin(xmp(i)/xl*acos(-1.d0)) &
+                      * abs(y(n2 - 2) - ymp(j)) * ret                &
+                      * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0)
+                w(i, j, k) = w(i, j, k) + ptb
+              end if
+            end do
+          end do
+!$OMP END PARALLEL DO
+        end do
 
-      GAMMA(1) = 8./15.
-      GAMMA(2) = 5./12.
-      GAMMA(3) = 3./4.
-      RO(1) = 0.
-      RO(2) = -17./60.
-      RO(3) = -5./12.
+        write (*, *) '--- ADDING SINUSOIDAL PERTURBATION'
+        write (*, 201) eps_ptr * 100.
+        write (*, *) ''
+201     format(' --- MAX. SIZE OF PERTURBATION = ', f5.1, '% OF U_BULK')
 
-      RETURN
-      END SUBROUTINE RK3COEFINIT
+        return
+      end subroutine addperturb
 !=======================================================================
 !=======================================================================
-      SUBROUTINE CONVERGENCE_CHECK
+      subroutine addperturb_isotropic
 !=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,QMASS
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K
-      REAL*8 :: DVG11,DVG12,DVG13,DVG1
+!$      USE OMP_LIB
+        use mod_common
+        use mod_flowarray, only: u, v, w
+        implicit none
+        real(8) :: ptb_array(0:n1, 0:n2, 0:n3)
+        integer(8) :: i, j, k
+        real(8) :: funcbody
+        real(8) :: flowarea, pertb_rate, adj, flowrate
 
-      DVMAX = 0.
+        call random_number(ptb_array)
+        ptb_array = (ptb_array - .5d0) * 2.d0 * eps_ptr
+
+        do i = 2, n1m
+          flowarea = 0
+          pertb_rate = 0.
+!$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
+          do j = 1, n2m
+            do k = 1, n3m
+              if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
+                u(i, j, k) = u(i, j, k) + ptb_array(i, j, k)
+                flowarea = flowarea + f2fy(j) * f2fz(k)
+                pertb_rate = pertb_rate + ptb_array(i, j, k) * f2fy(j) * f2fz(k)
+              end if
+            end do
+          end do
+!$OMP END PARALLEL DO
+          adj = pertb_rate / flowarea
+          flowrate = 0
+!$OMP PARALLEL DO REDUCTION(+:FLOWRATE)
+          do j = 1, n2m
+            do k = 1, n3m
+              if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
+                u(i, j, k) = u(i, j, k) - adj
+                flowrate = flowrate + u(i, j, k) * f2fy(j) * f2fz(k)
+              end if
+            end do
+          end do
+!$OMP END PARALLEL DO
+        end do
+
+        call random_number(ptb_array)
+        ptb_array = (ptb_array - .5d0) * 2.d0 * eps_ptr
+
+        do j = 2, n2m
+          flowarea = 0
+          pertb_rate = 0.
+!$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
+          do k = 1, n3m
+            do i = 1, n1m
+              if (funcbody(xmp(i), y(j), zmp(k), time) .gt. 1.e-10) then
+                v(i, j, k) = v(i, j, k) + ptb_array(i, j, k)
+                flowarea = flowarea + f2fz(k) * f2fx(i)
+                pertb_rate = pertb_rate + ptb_array(i, j, k) * f2fz(k) * f2fx(i)
+              end if
+            end do
+          end do
+!$OMP END PARALLEL DO
+          adj = pertb_rate / flowarea
+          flowrate = 0
+!$OMP PARALLEL DO REDUCTION(+:FLOWRATE)
+          do k = 1, n3m
+            do i = 1, n1m
+              if (funcbody(xmp(i), y(j), zmp(k), time) .gt. 1.e-10) then
+                v(i, j, k) = v(i, j, k) - adj
+                flowrate = flowrate + v(i, j, k) * f2fz(k) * f2fx(i)
+              end if
+            end do
+          end do
+!$OMP END PARALLEL DO
+        end do
+
+        call random_number(ptb_array)
+        ptb_array = (ptb_array - .5d0) * 2.d0 * eps_ptr
+
+        do k = 3, n3m
+          flowarea = 0
+          pertb_rate = 0.
+!$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
+          do i = 1, n1m
+            do j = 1, n2m
+              if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
+                w(i, j, k) = w(i, j, k) + ptb_array(i, j, k)
+                flowarea = flowarea + f2fx(i) * f2fy(j)
+                pertb_rate = pertb_rate + ptb_array(i, j, k) * f2fx(i) * f2fy(j)
+              end if
+            end do
+          end do
+!$OMP END PARALLEL DO
+          adj = pertb_rate / flowarea
+          flowrate = 0
+!$OMP PARALLEL DO REDUCTION(+:FLOWRATE)
+          do i = 1, n1m
+            do j = 1, n2m
+              if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
+                w(i, j, k) = w(i, j, k) - adj
+                flowrate = flowrate + w(i, j, k) * f2fx(i) * f2fy(j)
+              end if
+            end do
+          end do
+!$OMP END PARALLEL DO
+        end do
+
+        do i = 0, n1
+          flowarea = 0.0d0
+          flowrate = 0.0d0
+
+!$OMP PARALLEL DO REDUCTION(+:FLOWAREA, FLOWRATE)
+          do j = 1, n2m
+            do k = 1, n3m
+              if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
+                flowarea = flowarea + f2fy(j) * f2fz(k)
+                flowrate = flowrate + u(i, j, k) * f2fy(j) * f2fz(k)
+              end if
+            end do
+          end do
+!$OMP END PARALLEL DO
+
+          if (flowarea .gt. 0.0d0) then
+            adj = (ubulk_i * flowarea) / flowrate
+
+!$OMP PARALLEL DO
+            do j = 0, n2
+              do k = 0, n3
+                if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
+                  u(i, j, k) = u(i, j, k) * adj
+                end if
+              end do
+            end do
+!$OMP END PARALLEL DO
+          end if
+        end do
+
+        write (*, *) '--- ADDING ISOTROPIC PERTURBATION FROM THE UNIFORM DIST.'
+        write (*, 201) eps_ptr * 100.
+        write (*, *) ''
+201     format(' --- MAX. SIZE OF PERTURBATION = ', f5.1, '% OF U_BULK')
+
+        return
+      end subroutine addperturb_isotropic
+!=======================================================================
+!=======================================================================
+      subroutine dttimeinit
+!=======================================================================
+        use mod_common
+        implicit none
+
+        if (idtopt .eq. 0) dt = dt_size ! FOR CONSTANT USAGE PURPOSE
+        if ((idtopt .ne. 0) .and. (iread .eq. 0)) dt = dt_size
+        ! FOR INITAL USAGE PURPOSE
+        if (ireset .eq. 1) then
+          ihist = 0
+          time = 0.
+        end if
+        ntime = 0
+
+        if (iavg .eq. 1) then
+          timeinit = time
+          ihistinit = ihist
+        end if
+
+        return
+      end subroutine dttimeinit
+!=======================================================================
+!=======================================================================
+      subroutine rk3coefinit
+!=======================================================================
+        use mod_common
+        implicit none
+
+        gamma(1) = 8./15.
+        gamma(2) = 5./12.
+        gamma(3) = 3./4.
+        ro(1) = 0.
+        ro(2) = -17./60.
+        ro(3) = -5./12.
+
+        return
+      end subroutine rk3coefinit
+!=======================================================================
+!=======================================================================
+      subroutine convergence_check
+!=======================================================================
+        use mod_common
+        use mod_flowarray, only: u, v, w, qmass
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: dvg11, dvg12, dvg13, dvg1
+
+        dvmax = 0.
 
 !$OMP PARALLEL DO                        &
-!$OMP private(DVG11,DVG12,DVG13,DVG1)    &
-!$OMP reduction(MAX:DVMAX)
-      DO K=1,N3M
-      DO J=1,N2M
-      DO I=1,N1M
-         DVG11=(U(I+1,J,K)-U(I,J,K))*F2FXI(I)
-         DVG12=(V(I,J+1,K)-V(I,J,K))*F2FYI(J)
-         DVG13=(W(I,J,K+1)-W(I,J,K))*F2FZI(K)
-         IF (MASSON.EQ.1) THEN
-          DVG1=DVG11+DVG12+DVG13-QMASS(I,J,K)
-         ELSE
-          DVG1=DVG11+DVG12+DVG13
-         ENDIF
-         DVMAX=AMAX1(ABS(DVG1),DVMAX)
-      ENDDO
-      ENDDO
-      ENDDO
+!$OMP PRIVATE(DVG11,DVG12,DVG13,DVG1)    &
+!$OMP REDUCTION(MAX:DVMAX)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              dvg11 = (u(i + 1, j, k) - u(i, j, k)) * f2fxi(i)
+              dvg12 = (v(i, j + 1, k) - v(i, j, k)) * f2fyi(j)
+              dvg13 = (w(i, j, k + 1) - w(i, j, k)) * f2fzi(k)
+              if (masson .eq. 1) then
+                dvg1 = dvg11 + dvg12 + dvg13 - qmass(i, j, k)
+              else
+                dvg1 = dvg11 + dvg12 + dvg13
+              end if
+              dvmax = amax1(abs(dvg1), dvmax)
+            end do
+          end do
+        end do
 
-      RETURN
-      END SUBROUTINE CONVERGENCE_CHECK
+        return
+      end subroutine convergence_check
 !=======================================================================
 !=======================================================================
-      SUBROUTINE MASSCHECK
+      subroutine masscheck
 !=======================================================================
 !
-!     Calculate maximum mass source/sink in IBM
+!     CALCULATE MAXIMUM MASS SOURCE/SINK IN IBM
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : QMASS
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K
+        use mod_common
+        use mod_flowarray, only: qmass
+        implicit none
+        integer(8) :: i, j, k
 
-      QMMAX = 0.
+        qmmax = 0.
 
 !$OMP PARALLEL DO &
-!$OMP reduction(MAX:QMMAX)
-      DO 100 K=1,N3M
-      DO 100 J=1,N2M
-      DO 100 I=1,N1M
-      QMMAX = AMAX1(QMMAX,ABS(QMASS(I,J,K)))
- 100  CONTINUE
+!$OMP REDUCTION(MAX:QMMAX)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              qmmax = amax1(qmmax, abs(qmass(i, j, k)))
+            end do
+          end do
+        end do
 
-      RETURN
-      END SUBROUTINE MASSCHECK
+        return
+      end subroutine masscheck
 !=======================================================================
-      SUBROUTINE DEALLO_ARRAY
+      subroutine deallo_array
 !=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
+        use mod_common
+        use mod_flowarray
+        implicit none
 
-      IF (IHTRANS .EQ. 0) THEN
-        CALL BASIC_DEALLO()
-      ELSE
-        CALL THERMAL_DEALLO()
-      ENDIF
+        if (ihtrans .eq. 0) then
+          call basic_deallo()
+        else
+          call thermal_deallo()
+        end if
 
-      IF (ILES .EQ. 1) THEN
-        CALL LES_DEALLO()
-        IF (IHTRANS .EQ. 1) CALL LES_THERMAL_DEALLO()
-      ENDIF
+        if (iles .eq. 1) then
+          call les_deallo()
+          if (ihtrans .eq. 1) call les_thermal_deallo()
+        end if
 
-      IF (IAVG .EQ. 1) CALL AVG_DEALLO()
+        if (iavg .eq. 1) call avg_deallo()
 
-      RETURN
-      END SUBROUTINE DEALLO_ARRAY
+        return
+      end subroutine deallo_array
 !=======================================================================

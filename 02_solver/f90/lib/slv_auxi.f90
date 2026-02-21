@@ -1,665 +1,676 @@
 !=======================================================================
-       SUBROUTINE STEPINIT
+       subroutine stepinit
 !=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
-      REAL*8      ::  DTCFL
-      INTEGER*8   ::  ICFL,JCFL,KCFL
+         use mod_common
+         use mod_flowarray
+         implicit none
+         real(8) :: dtcfl
+         integer(8) :: icfl, jcfl, kcfl
 
-      NTIME = NTIME + 1
-      M = NTIME
-      FCVAVG = 0.
-      IF (ICH .EQ. 1) PMIAVG = 0.
+         ntime = ntime + 1
+         m = ntime
+         fcvavg = 0.
+         if (ich .eq. 1) pmiavg = 0.
 
-      CALL CFL(CFLMAX,ICFL,JCFL,KCFL)         ! CALCULATE CFL NUMBER
-      
-      IF (IDTOPT.NE.0 .AND. CFLMAX.NE.0.) THEN
-         DTCFL = DMIN1(DT*CFLFAC/CFLMAX, DT*(0.80+0.20*CFLFAC/CFLMAX))
-         IF (IDTOPT.EQ.1) DT = DTCFL
-      ENDIF
-      
-      IF (CFLMAX.GT.(CFLFAC*1.1)) THEN
-         PRINT*,' '
-         WRITE(*,310) NTIME,CFLMAX,TIME
-      ELSE
-         PRINT*,' '
-         WRITE(*,320) NTIME,TIME,DT
-      ENDIF
- 310  FORMAT(I15,'   CFL NUMBER EXCEED GIVEN CFL LIMIT :',ES18.5,' AT ',F12.5)
- 320  FORMAT('--------------------------',I6,'  TIME=',F10.5,'  DT=',F12.8)
+         call cfl(cflmax, icfl, jcfl, kcfl)         ! CALCULATE CFL NUMBER
 
-      RETURN
-      END SUBROUTINE STEPINIT
-!=======================================================================
-!=======================================================================
-       SUBROUTINE CFL(CFLM,ICFL,JCFL,KCFL)
-!=======================================================================
-!
-!     Calculate the maximum CFL number of flow field
-!     (http://en.wikipedia.org/wiki/Courant-Friedrichs-Lewy_condition)
-!
-!     CFL#=U_i*DT/DX_i
-!     CFLI=(Uc/DX+Vc/DY+Wc/DZ)*DT  (c for cell center)
-!     CFLMPT: index where the CFL# is maximum
-!
-!-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W
-      IMPLICIT NONE
-      REAL*8       :: CFLM
-      REAL*8       :: CFLI(0:3)
-      INTEGER*8    :: ICFL,JCFL,KCFL
-      INTEGER*8    :: I,J,K
+         if (idtopt .ne. 0 .and. cflmax .ne. 0.) then
+           dtcfl = dmin1(dt * cflfac / cflmax, dt * (0.80 + 0.20 * cflfac / cflmax))
+           if (idtopt .eq. 1) dt = dtcfl
+         end if
 
-      CFLM = 0.
+         if (cflmax .gt. (cflfac * 1.1)) then
+           print *, ' '
+           write (*, 310) ntime, cflmax, time
+         else
+           print *, ' '
+           write (*, 320) ntime, time, dt
+         end if
+310      format(i15, '   CFL NUMBER EXCEED GIVEN CFL LIMIT :', es18.5, ' AT ', f12.5)
+320      format('--------------------------', i6, '  TIME=', f10.5, '  DT=', f12.8)
 
-!$OMP PARALLEL DO private(CFLI) reduction(MAX:CFLM)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            CFLI(1)=ABS(U(I,J,K)+U(I+1,J,K))*0.5*F2FXI(I)
-            CFLI(2)=ABS(V(I,J,K)+V(I,J+1,K))*0.5*F2FYI(J)
-            CFLI(3)=ABS(W(I,J,K)+W(I,J,K+1))*0.5*F2FZI(K)
-            CFLI(0)=(CFLI(1)+CFLI(2)+CFLI(3))*DT
-            IF (CFLI(0) .GE. CFLM) THEN
-              CFLM=CFLI(0)
-              ICFL=I
-              JCFL=J
-              KCFL=K
-            ENDIF
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-      CFLMAX = CFLM
-      
-      IF(NTIME .NE. 1) THEN
-        WRITE(*,149) CFLMAX,XMP(ICFL),YMP(JCFL),ZMP(KCFL),ICFL,JCFL,KCFL
- 149    FORMAT('CFLMAX =  ',F10.7,' @ ',3F10.4,' , ',3I5)
-      ENDIF
-
-      RETURN
-      END SUBROUTINE CFL
+         return
+       end subroutine stepinit
 !=======================================================================
 !=======================================================================
-       SUBROUTINE SUBSTEPINIT(SUBSTEP)
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
-      INTEGER*8    :: SUBSTEP        ! RK3 SUBSTEP = 1, 2, 3
-
-      ALPHA    = 0.5*(GAMMA(SUBSTEP)+RO(SUBSTEP))
-      DTCONST  = DT *(GAMMA(SUBSTEP)+RO(SUBSTEP))
-      DTCONSTI = 1./DTCONST
-      TEST1    = RESID1*DTCONSTI               ! POISS. CONVG. CRITERION
-      ACOEF    = ALPHA*DT/RE
-      ACOEFI   = 1./ACOEF
-      PMIAVG   = PMIAVG + PMI(0) !*2.*ALPHA
-      SUBDT    = SUBDT + DTCONST               ! SUBTIME FOR RK3 METHOD
-      MSUB     = SUBSTEP
-
-      RETURN
-      END SUBROUTINE SUBSTEPINIT
-!=======================================================================
-!=======================================================================
-       SUBROUTINE QVOLCALC(QQ)
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U
-      IMPLICIT NONE
-      REAL*8       :: QQ,FUNCBODY
-      INTEGER*8    :: I,J,K
-
-      QQ = 0.
-
-!$OMP PARALLEL DO reduction(+:QQ)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            IF (FUNCBODY(X(I),YMP(J),ZMP(K)).GE.1.E-10) THEN 
-              QQ = QQ + U(I,J,K)*C2CX(I)*F2FY(J)*F2FZ(K)
-            ENDIF
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-      RETURN
-      END SUBROUTINE QVOLCALC
-!=======================================================================
-!=======================================================================
-       SUBROUTINE TVOLCALC(QQ)
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : T,CSTAR
-      IMPLICIT NONE
-      REAL*8       :: QQ,FUNCBODY
-      INTEGER*8    :: I,J,K
-
-      QQ = 0.
-
-!$OMP PARALLEL DO reduction(+:QQ)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            QQ = QQ + T(I,J,K) / CSTAR(I,J,K) * F2FX(I)*F2FY(J)*F2FZ(K)
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-      RETURN
-      END SUBROUTINE TVOLCALC
-!=======================================================================
-!=======================================================================
-       SUBROUTINE QVOLCORR
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
-      REAL*8                   :: FUNCBODY
-      REAL*8                   :: FLOWVOL
-      INTEGER*8                :: I,J,K
-
-      FLOWVOL = 0.
-
-!$OMP PARALLEL DO reduction(+:FLOWVOL)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            IF (FUNCBODY(X(I),YMP(J),ZMP(K)).GE.1.E-10) THEN 
-              FLOWVOL = FLOWVOL + C2CX(I)*F2FY(J)*F2FZ(K)
-            ENDIF
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-      ! PHCAP = (QVOL(2) - QVOL(1)) / FLOWVOL
-      PHCAP = (QVOL(2) - UBULK_I*FLOWVOL) / FLOWVOL
-
-      RETURN
-      END SUBROUTINE QVOLCORR
-!=======================================================================
-!=======================================================================
-       SUBROUTINE TVOLCORR
-!=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
-      REAL*8                   :: CVOL
-      INTEGER*8                :: I,J,K
-
-      THCAP = 0.
-      CVOL = 0.
-
-!$OMP PARALLEL DO reduction(+:CVOL)
-      DO K=1,N3M
-        DO J=1,N2M
-          DO I=1,N1M
-            CVOL = CVOL + 1. / CSTAR(I,J,K) * F2FX(I)*F2FY(J)*F2FZ(K)
-          ENDDO
-        ENDDO
-      ENDDO
-!$OMP END PARALLEL DO
-
-      THCAP = (TVOL(2) - TVOL(1)) / CVOL 
-
-      RETURN
-      END SUBROUTINE TVOLCORR
-!=======================================================================
-!=======================================================================
-      SUBROUTINE UCALC(PHI)
+       subroutine cfl(cflm, icfl, jcfl, kcfl)
 !=======================================================================
 !
-!     Calculate velocity (u_i) from u_i hat
-!     u_i hat is derived from pseudo-pressure, phi.
+!     CALCULATE THE MAXIMUM CFL NUMBER OF FLOW FIELD
+!     (HTTP://EN.WIKIPEDIA.ORG/WIKI/COURANT-FRIEDRICHS-LEWY_CONDITION)
 !
-!     Definition of pseudo-pressure, phi, is as follows:
-!     ({u_i}^k - u_i hat)/(2.*alpha_k*dt) = - d({phi}^k)/d(x_i)
-!
-!     From the definition of phi, following equation is derived:
-!     {u_i}^k = u_i hat - 2.*a_k*DT*d({phi}^k)/d(x_i)
+!     CFL#=U_I*DT/DX_I
+!     CFLI=(UC/DX+VC/DY+WC/DZ)*DT  (C FOR CELL CENTER)
+!     CFLMPT: INDEX WHERE THE CFL# IS MAXIMUM
 !
 !-----------------------------------------------------------------------
-       USE MOD_COMMON
-       USE MOD_FLOWARRAY, ONLY : U,V,W,T
-       IMPLICIT NONE
-       INTEGER*8     :: I,J,K
-       REAL*8        :: IDUM,FUNCBODY
-       INTEGER*8     :: IM,KM
-       REAL*8        :: PHI(0:N1,0:N2,0:N3),FLXCR
+         use mod_common
+         use mod_flowarray, only: u, v, w
+         implicit none
+         real(8) :: cflm
+         real(8) :: cfli(0:3)
+         integer(8) :: icfl, jcfl, kcfl
+         integer(8) :: i, j, k
+
+         cflm = 0.
+
+!$OMP PARALLEL DO PRIVATE(CFLI) REDUCTION(MAX:CFLM)
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
+               cfli(1) = abs(u(i, j, k) + u(i + 1, j, k)) * 0.5 * f2fxi(i)
+               cfli(2) = abs(v(i, j, k) + v(i, j + 1, k)) * 0.5 * f2fyi(j)
+               cfli(3) = abs(w(i, j, k) + w(i, j, k + 1)) * 0.5 * f2fzi(k)
+               cfli(0) = (cfli(1) + cfli(2) + cfli(3)) * dt
+               if (cfli(0) .ge. cflm) then
+                 cflm = cfli(0)
+                 icfl = i
+                 jcfl = j
+                 kcfl = k
+               end if
+             end do
+           end do
+         end do
+!$OMP END PARALLEL DO
+
+         cflmax = cflm
+
+         if (ntime .ne. 1) then
+           write (*, 149) cflmax, xmp(icfl), ymp(jcfl), zmp(kcfl), icfl, jcfl, kcfl
+149        format('CFLMAX =  ', f10.7, ' @ ', 3f10.4, ' , ', 3i5)
+         end if
+
+         return
+       end subroutine cfl
+!=======================================================================
+!=======================================================================
+       subroutine substepinit(substep)
+!=======================================================================
+         use mod_common
+         use mod_flowarray
+         implicit none
+         integer(8) :: substep        ! RK3 SUBSTEP = 1, 2, 3
+
+         alpha = 0.5 * (gamma(substep) + ro(substep))
+         dtconst = dt * (gamma(substep) + ro(substep))
+         dtconsti = 1./dtconst
+         test1 = resid1 * dtconsti               ! POISS. CONVG. CRITERION
+         acoef = alpha * dt / re
+         acoefi = 1./acoef
+         pmiavg = pmiavg + pmi(0) !*2.*ALPHA
+         subdt = subdt + dtconst               ! SUBTIME FOR RK3 METHOD
+         msub = substep
+
+         return
+       end subroutine substepinit
+!=======================================================================
+!=======================================================================
+       subroutine qvolcalc(qq)
+!=======================================================================
+         use mod_common
+         use mod_flowarray, only: u
+         implicit none
+         real(8) :: qq, funcbody
+         integer(8) :: i, j, k
+
+         qq = 0.
+
+!$OMP PARALLEL DO REDUCTION(+:QQ)
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
+               if (funcbody(x(i), ymp(j), zmp(k)) .ge. 1.e-10) then
+                 qq = qq + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
+               end if
+             end do
+           end do
+         end do
+!$OMP END PARALLEL DO
+
+         return
+       end subroutine qvolcalc
+!=======================================================================
+!=======================================================================
+       subroutine tvolcalc(qq)
+!=======================================================================
+         use mod_common
+         use mod_flowarray, only: t, cstar
+         implicit none
+         real(8) :: qq, funcbody
+         integer(8) :: i, j, k
+
+         qq = 0.
+
+!$OMP PARALLEL DO REDUCTION(+:QQ)
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
+               qq = qq + t(i, j, k) / cstar(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
+             end do
+           end do
+         end do
+!$OMP END PARALLEL DO
+
+         return
+       end subroutine tvolcalc
+!=======================================================================
+!=======================================================================
+       subroutine qvolcorr
+!=======================================================================
+         use mod_common
+         use mod_flowarray
+         implicit none
+         real(8) :: funcbody
+         real(8) :: flowvol
+         integer(8) :: i, j, k
+
+         flowvol = 0.
+
+!$OMP PARALLEL DO REDUCTION(+:FLOWVOL)
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
+               if (funcbody(x(i), ymp(j), zmp(k)) .ge. 1.e-10) then
+                 flowvol = flowvol + c2cx(i) * f2fy(j) * f2fz(k)
+               end if
+             end do
+           end do
+         end do
+!$OMP END PARALLEL DO
+
+         ! PHCAP = (QVOL(2) - QVOL(1)) / FLOWVOL
+         phcap = (qvol(2) - ubulk_i * flowvol) / flowvol
+
+         return
+       end subroutine qvolcorr
+!=======================================================================
+!=======================================================================
+       subroutine tvolcorr
+!=======================================================================
+         use mod_common
+         use mod_flowarray
+         implicit none
+         real(8) :: cvol
+         integer(8) :: i, j, k
+
+         thcap = 0.
+         cvol = 0.
+
+!$OMP PARALLEL DO REDUCTION(+:CVOL)
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
+               cvol = cvol + 1./cstar(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
+             end do
+           end do
+         end do
+!$OMP END PARALLEL DO
+
+         thcap = (tvol(2) - tvol(1)) / cvol
+
+         return
+       end subroutine tvolcorr
+!=======================================================================
+!=======================================================================
+       subroutine ucalc(phi)
+!=======================================================================
+!
+!     CALCULATE VELOCITY (U_I) FROM U_I HAT
+!     U_I HAT IS DERIVED FROM PSEUDO-PRESSURE, PHI.
+!
+!     DEFINITION OF PSEUDO-PRESSURE, PHI, IS AS FOLLOWS:
+!     ({U_I}^K - U_I HAT)/(2.*ALPHA_K*DT) = - D({PHI}^K)/D(X_I)
+!
+!     FROM THE DEFINITION OF PHI, FOLLOWING EQUATION IS DERIVED:
+!     {U_I}^K = U_I HAT - 2.*A_K*DT*D({PHI}^K)/D(X_I)
+!
+!-----------------------------------------------------------------------
+         use mod_common
+         use mod_flowarray, only: u, v, w, t
+         implicit none
+         integer(8) :: i, j, k
+         real(8) :: idum, funcbody
+         integer(8) :: im, km
+         real(8) :: phi(0:n1, 0:n2, 0:n3), flxcr
 
 !$OMP PARALLEL DO &
-!$OMP private(IM)
-      DO 21 K=1,N3M
-      DO 21 J=1,N2M
-      DO 21 I=I_BGPX,N1M                  ! I=1,N1 => BOUNDARY
-         IM=IMV(I)
-         U(I,J,K)=U(I,J,K)                                   &
-                 -DTCONST*(PHI(I,J,K)-PHI(IM,J,K))*C2CXI(I)  
-         IF(ICH.EQ.1) THEN
-           IF (FUNCBODY(X(I),YMP(J),ZMP(K)).GE.1.E-10) THEN 
-              U(I,J,K)=U(I,J,K)-PHCAP
-           ENDIF
-         ENDIF
-   21 CONTINUE
+!$OMP PRIVATE(IM)
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = i_bgpx, n1m                  ! I=1,N1 => BOUNDARY
+               im = imv(i)
+               u(i, j, k) = u(i, j, k) &
+                            - dtconst * (phi(i, j, k) - phi(im, j, k)) * c2cxi(i)
+               if (ich .eq. 1) then
+                 if (funcbody(x(i), ymp(j), zmp(k)) .ge. 1.e-10) then
+                   u(i, j, k) = u(i, j, k) - phcap
+                 end if
+               end if
+             end do
+           end do
+         end do
 
 !$OMP PARALLEL DO
-      DO 31 K=1,N3M
-      DO 31 J=2,N2M                       ! J=1,N2 => BOUNDARY
-      DO 31 I=1,N1M
-         V(I,J,K)=V(I,J,K)-DTCONST*(PHI(I,J,K)-PHI(I,J-1,K))*C2CYI(J)
-   31 CONTINUE
+         do k = 1, n3m
+           do j = 2, n2m                       ! J=1,N2 => BOUNDARY
+             do i = 1, n1m
+               v(i, j, k) = v(i, j, k) - dtconst * (phi(i, j, k) - phi(i, j - 1, k)) * c2cyi(j)
+             end do
+           end do
+         end do
 
 !$OMP PARALLEL DO &
-!$OMP private(KM)
-      DO 41 K=K_BGPZ,N3M                  ! K=0,N3 => BOUNDARY
-         KM=KMV(K)
-      DO 41 J=1,N2M
-      DO 41 I=1,N1M
-         W(I,J,K)=W(I,J,K)-DTCONST*(PHI(I,J,K)-PHI(I,J,KM))*C2CZI(K)
-   41 CONTINUE
+!$OMP PRIVATE(KM)
+         do k = k_bgpz, n3m                  ! K=0,N3 => BOUNDARY
+           km = kmv(k)
+           do j = 1, n2m
+             do i = 1, n1m
+               w(i, j, k) = w(i, j, k) - dtconst * (phi(i, j, k) - phi(i, j, km)) * c2czi(k)
+             end do
+           end do
+         end do
 
-      IDUM = IHIST
-      FLXCR = 0.
+         idum = ihist
+         flxcr = 0.
 
 !!!!!!     NEUMANN & DIRICHLET BOUNDARY CONDITION
-      IF (JUT.EQ.1) THEN
+         if (jut .eq. 1) then
 !$OMP PARALLEL DO
-         DO K=0,N3
-         DO I=1,N1
-            U(I,N2,K)=U(I,N2M,K)
-         ENDDO
-         ENDDO
-      ENDIF
-      IF (JWT.EQ.1) THEN
+           do k = 0, n3
+             do i = 1, n1
+               u(i, n2, k) = u(i, n2m, k)
+             end do
+           end do
+         end if
+         if (jwt .eq. 1) then
 !$OMP PARALLEL DO
-         DO K=1,N3
-         DO I=0,N1
-            W(I,N2,K)=W(I,N2M,K)
-         ENDDO
-         ENDDO
-      ENDIF
-      IF (JUB.EQ.1) THEN
+           do k = 1, n3
+             do i = 0, n1
+               w(i, n2, k) = w(i, n2m, k)
+             end do
+           end do
+         end if
+         if (jub .eq. 1) then
 !$OMP PARALLEL DO
-         DO K=0,N3
-         DO I=1,N1
-            U(I,0,K)=U(I,1,K)
-         ENDDO
-         ENDDO
-      ENDIF
-      IF (JWB.EQ.1) THEN
+           do k = 0, n3
+             do i = 1, n1
+               u(i, 0, k) = u(i, 1, k)
+             end do
+           end do
+         end if
+         if (jwb .eq. 1) then
 !$OMP PARALLEL DO
-         DO K=1,N3
-         DO I=0,N1
-            W(I,0,K)=W(I,1,K)
-         ENDDO
-         ENDDO
-      ENDIF
-      IF (KUT.EQ.1) THEN
+           do k = 1, n3
+             do i = 0, n1
+               w(i, 0, k) = w(i, 1, k)
+             end do
+           end do
+         end if
+         if (kut .eq. 1) then
 !$OMP PARALLEL DO
-         DO J=0,N2
-         DO I=1,N1
-            U(I,J,N3)=U(I,J,N3M)
-         ENDDO
-         ENDDO
-      ENDIF
-      IF (KVT.EQ.1) THEN
+           do j = 0, n2
+             do i = 1, n1
+               u(i, j, n3) = u(i, j, n3m)
+             end do
+           end do
+         end if
+         if (kvt .eq. 1) then
 !$OMP PARALLEL DO
-         DO J=1,N2
-         DO I=0,N1
-            V(I,J,N3)=V(I,J,N3M)
-         ENDDO
-         ENDDO
-      ENDIF
-      IF (KUB.EQ.1) THEN
+           do j = 1, n2
+             do i = 0, n1
+               v(i, j, n3) = v(i, j, n3m)
+             end do
+           end do
+         end if
+         if (kub .eq. 1) then
 !$OMP PARALLEL DO
-         DO J=0,N2
-         DO I=1,N1
-            U(I,J,0)=U(I,J,1)
-         ENDDO
-         ENDDO
-      ENDIF
-      IF (KVB.EQ.1) THEN
+           do j = 0, n2
+             do i = 1, n1
+               u(i, j, 0) = u(i, j, 1)
+             end do
+           end do
+         end if
+         if (kvb .eq. 1) then
 !$OMP PARALLEL DO
-         DO J=1,N2
-         DO I=0,N1
-            V(I,J,0)=V(I,J,1)
-         ENDDO
-         ENDDO
-      ENDIF
+           do j = 1, n2
+             do i = 0, n1
+               v(i, j, 0) = v(i, j, 1)
+             end do
+           end do
+         end if
 
 !     Z PERIODICITY
-      IF (ZPRDIC .EQ. 1) THEN
+         if (zprdic .eq. 1) then
 !$OMP PARALLEL DO
-      DO J=0,N2
-      DO I=1,N1
-         U(I,J,0) =U(I,J,N3M)
-         U(I,J,N3)=U(I,J,1)
-      ENDDO
-      ENDDO
+           do j = 0, n2
+             do i = 1, n1
+               u(i, j, 0) = u(i, j, n3m)
+               u(i, j, n3) = u(i, j, 1)
+             end do
+           end do
 
 !$OMP PARALLEL DO
-      DO J=1,N2
-      DO I=0,N1
-         V(I,J,0) =V(I,J,N3M)
-         V(I,J,N3)=V(I,J,1)
-      ENDDO
-      ENDDO
+           do j = 1, n2
+             do i = 0, n1
+               v(i, j, 0) = v(i, j, n3m)
+               v(i, j, n3) = v(i, j, 1)
+             end do
+           end do
 
 !$OMP PARALLEL DO
-      DO J=0,N2
-      DO I=0,N1
-         W(I,J,0) =W(I,J,N3M)
-         W(I,J,N3)=W(I,J,1)
-      ENDDO
-      ENDDO
-      ENDIF
+           do j = 0, n2
+             do i = 0, n1
+               w(i, j, 0) = w(i, j, n3m)
+               w(i, j, n3) = w(i, j, 1)
+             end do
+           end do
+         end if
 
 !     X PERIODICITY
-      IF (XPRDIC .EQ. 1) THEN
+         if (xprdic .eq. 1) then
 !$OMP PARALLEL DO
-      DO K=0,N3
-      DO J=0,N2
-         U(0 ,J,K)=U(N1M,J,K)
-         U(N1,J,K)=U(1  ,J,K)
-      ENDDO
-      ENDDO
+           do k = 0, n3
+             do j = 0, n2
+               u(0, j, k) = u(n1m, j, k)
+               u(n1, j, k) = u(1, j, k)
+             end do
+           end do
 
 !$OMP PARALLEL DO
-      DO K=0,N3
-      DO J=1,N2
-         V(0 ,J,K)=V(N1M,J,K)
-         V(N1,J,K)=V(1  ,J,K)
-      ENDDO
-      ENDDO
+           do k = 0, n3
+             do j = 1, n2
+               v(0, j, k) = v(n1m, j, k)
+               v(n1, j, k) = v(1, j, k)
+             end do
+           end do
 
 !$OMP PARALLEL DO
-      DO K=1,N3
-      DO J=0,N2
-         W(0 ,J,K)=W(N1M,J,K)
-         W(N1,J,K)=W(1  ,J,K)
-      ENDDO
-      ENDDO
-      ENDIF
+           do k = 1, n3
+             do j = 0, n2
+               w(0, j, k) = w(n1m, j, k)
+               w(n1, j, k) = w(1, j, k)
+             end do
+           end do
+         end if
 
-      RETURN
-      END
+         return
+       end
 
 !=======================================================================
-      SUBROUTINE PCALC(PHI,DIVGSUM)
+       subroutine pcalc(phi, divgsum)
 !=======================================================================
 !
-!     Calculate pressure from DIVGSUM & PHI
+!     CALCULATE PRESSURE FROM DIVGSUM & PHI
 !
-!     ({u_i}^k-u_i hat)/(2.*a_k*DT)
-!                             = - [ d(p^k)/d(x_i) - d(p^(k-1))/d(x_i) ]
-!                               + 0.5*[L({u_i}^k) - L(u_i hat)]
-!                             = - d({phi}^k)/d(x_i)
+!     ({U_I}^K-U_I HAT)/(2.*A_K*DT)
+!                             = - [ D(P^K)/D(X_I) - D(P^(K-1))/D(X_I) ]
+!                               + 0.5*[L({U_I}^K) - L(U_I HAT)]
+!                             = - D({PHI}^K)/D(X_I)
 !
-!     By the definition of phi, final equation is derived as follows:
-!       p^k = p^(k-1) + {phi}^k - (a_k*DT/Re)*(d2({phi^k})/d(x_j)d(x_j))
+!     BY THE DEFINITION OF PHI, FINAL EQUATION IS DERIVED AS FOLLOWS:
+!       P^K = P^(K-1) + {PHI}^K - (A_K*DT/RE)*(D2({PHI^K})/D(X_J)D(X_J))
 !
 !-----------------------------------------------------------------------
-       USE MOD_COMMON
-       USE MOD_FLOWARRAY, ONLY : U,V,W,P
-       IMPLICIT NONE
-       INTEGER*8     :: I,J,K
-       REAL*8        :: PHIREF
-       REAL*8        :: PHI(0:N1,0:N2,0:N3),DIVGSUM(0:N1,0:N2,0:N3)
-       REAL*8        :: FUNCBODY
-
+         use mod_common
+         use mod_flowarray, only: u, v, w, p
+         implicit none
+         integer(8) :: i, j, k
+         real(8) :: phiref
+         real(8) :: phi(0:n1, 0:n2, 0:n3), divgsum(0:n1, 0:n2, 0:n3)
+         real(8) :: funcbody
 
 !$OMP PARALLEL DO
-      DO 92 K=1,N3M
-      DO 92 J=1,N2M
-      DO 92 I=1,N1M
-      P(I,J,K)=P(I,J,K)+PHI(I,J,K)-0.5*DTCONST*DIVGSUM(I,J,K)*1./RE
-   92 CONTINUE
-
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
+               p(i, j, k) = p(i, j, k) + phi(i, j, k) - 0.5 * dtconst * divgsum(i, j, k) * 1./re
+             end do
+           end do
+         end do
 
 !     SET THE AVERAGE PHI AT THE UPPER WALL TO BE ZERO.
-      PHIREF = 0.
+         phiref = 0.
 !$OMP PARALLEL DO &
-!$OMP reduction(+:PHIREF)
-      DO 80 K=1,N3M
-      DO 80 J=1,N2M
-      PHIREF=PHI(N1M,J,K)*F2FY(J)*F2FZ(K)+PHIREF
-   80 CONTINUE
-      PHIREF=PHIREF/(YL*ZL)
+!$OMP REDUCTION(+:PHIREF)
+         do k = 1, n3m
+           do j = 1, n2m
+             phiref = phi(n1m, j, k) * f2fy(j) * f2fz(k) + phiref
+           end do
+         end do
+         phiref = phiref / (yl * zl)
 
 !$OMP PARALLEL DO
-      DO 93 K=1,N3M
-      DO 93 J=1,N2M
-      DO 93 I=1,N1M
-       P(I,J,K)=P(I,J,K)-PHIREF
-   93 CONTINUE
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
+               p(i, j, k) = p(i, j, k) - phiref
+             end do
+           end do
+         end do
 
 !     Z PERIODICITY
-      IF (ZPRDIC .EQ. 1) THEN
+         if (zprdic .eq. 1) then
 !$OMP PARALLEL DO
-      DO J=1,N2M
-      DO I=1,N1M
-         P(I,J,0) =P(I,J,N3M)
-         P(I,J,N3)=P(I,J,1)
-      ENDDO
-      ENDDO
-      ENDIF
+           do j = 1, n2m
+             do i = 1, n1m
+               p(i, j, 0) = p(i, j, n3m)
+               p(i, j, n3) = p(i, j, 1)
+             end do
+           end do
+         end if
 
 !     X PERIODICITY
-      IF (XPRDIC .EQ. 1) THEN
+         if (xprdic .eq. 1) then
 !$OMP PARALLEL DO
-      DO K=1,N3M
-      DO J=1,N2M
-         P(0 ,J,K)=P(N1M,J,K)
-         P(N1,J,K)=P(1  ,J,K)
-      ENDDO
-      ENDDO
-      ENDIF
+           do k = 1, n3m
+             do j = 1, n2m
+               p(0, j, k) = p(n1m, j, k)
+               p(n1, j, k) = p(1, j, k)
+             end do
+           end do
+         end if
 
-      RETURN
-      END
+         return
+       end
 
 !=======================================================================
-      SUBROUTINE TCALC
+       subroutine tcalc
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_FLOWARRAY, ONLY : T,CSTAR
-       IMPLICIT NONE
-       INTEGER*8     :: I,J,K
-       REAL*8        :: FUNCBODY,HFLUX,TTEMP
+         use mod_common
+         use mod_flowarray, only: t, cstar
+         implicit none
+         integer(8) :: i, j, k
+         real(8) :: funcbody, hflux, ttemp
 
-       IF ((ICH .EQ. 1) .AND. (XPRDIC .EQ. 0)) THEN
+         if ((ich .eq. 1) .and. (xprdic .eq. 0)) then
 !$OMP PARALLEL DO
-         DO 31 K=1,N3M
-         DO 31 J=1,N2M                       
-         DO 31 I=1,N1M
-            T(I,J,K)=T(I,J,K)-THCAP
-   31    CONTINUE
-       ENDIF
+           do k = 1, n3m
+             do j = 1, n2m
+               do i = 1, n1m
+                 t(i, j, k) = t(i, j, k) - thcap
+               end do
+             end do
+           end do
+         end if
 
-      RETURN
-      END
+         return
+       end
 
 !=======================================================================
-      SUBROUTINE LAGFORCE
+       subroutine lagforce
 !=======================================================================
 !
-!     Material derivate of velocity, one of major contribution of the
-!       force on a body
+!     MATERIAL DERIVATE OF VELOCITY, ONE OF MAJOR CONTRIBUTION OF THE
+!       FORCE ON A BODY
 !
-!     Reference
-!       Lee et al., 2011, Sources of spurious force oscillations
-!       from an immersed boundary method for moving-body problems,
-!       J. Comp. Phys., 230, 2677-2695.
+!     REFERENCE
+!       LEE ET AL., 2011, SOURCES OF SPURIOUS FORCE OSCILLATIONS
+!       FROM AN IMMERSED BOUNDARY METHOD FOR MOVING-BODY PROBLEMS,
+!       J. COMP. PHYS., 230, 2677-2695.
 !
-!     Variables
-!       DUDTA,DVDTA,DWDTA: Volume integration of material derivative of
-!                          velocity over a body
-!       DUDTR: Time derivative of velocity
-!       RK3XO,RK3XOO: Convective terms at each RK3 sub-step
+!     VARIABLES
+!       DUDTA,DVDTA,DWDTA: VOLUME INTEGRATION OF MATERIAL DERIVATIVE OF
+!                          VELOCITY OVER A BODY
+!       DUDTR: TIME DERIVATIVE OF VELOCITY
+!       RK3XO,RK3XOO: CONVECTIVE TERMS AT EACH RK3 SUB-STEP
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY :  RK3XO,RK3YO,RK3ZO,DUDTR  &
-                                ,RK3XOO,RK3YOO,RK3ZOO,IFC,JFC,KFC
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K,N,L,II,JJ,KK
+         use mod_common
+         use mod_flowarray, only: rk3xo, rk3yo, rk3zo, dudtr &
+                                  , rk3xoo, rk3yoo, rk3zoo, ifc, jfc, kfc
+         implicit none
+         integer(8) :: i, j, k, n, l, ii, jj, kk
 
-      IF(MSUB .EQ. 1) THEN
-        DUDTA = 0.
-        DVDTA = 0.
-        DWDTA = 0.
-      ENDIF
+         if (msub .eq. 1) then
+           dudta = 0.
+           dvdta = 0.
+           dwdta = 0.
+         end if
 
-!$OMP PARALLEL DO private(II,JJ,KK)
-      DO L=1,3
-      DO N=1,NBODY(L)
-        II=IFC(N,L)
-        JJ=JFC(N,L)
-        KK=KFC(N,L)
-        !Intermediate information
-        IF( L .EQ. 1) THEN
-          DUDTA=DUDTA+C2CX(II)*F2FY(JJ)*F2FZ(KK)*(DUDTR(N,L)-              &
-                (GAMMA(MSUB)*RK3XO(II,JJ,KK)+RO(MSUB)*RK3XOO(II,JJ,KK)))
-        ELSEIF( L .EQ. 2) THEN
-          DVDTA=DVDTA+F2FX(II)*C2CY(JJ)*F2FZ(KK)*(DUDTR(N,L)-              &
-                (GAMMA(MSUB)*RK3YO(II,JJ,KK)+RO(MSUB)*RK3YOO(II,JJ,KK)))
-        ELSEIF( L .EQ. 3) THEN
-          DWDTA=DWDTA+F2FX(II)*F2FY(JJ)*C2CZ(KK)*(DUDTR(N,L)-              &
-                (GAMMA(MSUB)*RK3ZO(II,JJ,KK)+RO(MSUB)*RK3ZOO(II,JJ,KK)))
-        ENDIF
+!$OMP PARALLEL DO PRIVATE(II,JJ,KK)
+         do l = 1, 3
+           do n = 1, nbody(l)
+             ii = ifc(n, l)
+             jj = jfc(n, l)
+             kk = kfc(n, l)
+             !INTERMEDIATE INFORMATION
+             if (l .eq. 1) then
+               dudta = dudta + c2cx(ii) * f2fy(jj) * f2fz(kk) * (dudtr(n, l) - &
+                                                                 (gamma(msub) * rk3xo(ii, jj, kk) + ro(msub) * rk3xoo(ii, jj, kk)))
+             elseif (l .eq. 2) then
+               dvdta = dvdta + f2fx(ii) * c2cy(jj) * f2fz(kk) * (dudtr(n, l) - &
+                                                                 (gamma(msub) * rk3yo(ii, jj, kk) + ro(msub) * rk3yoo(ii, jj, kk)))
+             elseif (l .eq. 3) then
+               dwdta = dwdta + f2fx(ii) * f2fy(jj) * c2cz(kk) * (dudtr(n, l) - &
+                                                                 (gamma(msub) * rk3zo(ii, jj, kk) + ro(msub) * rk3zoo(ii, jj, kk)))
+             end if
 
-      ENDDO
-      ENDDO
+           end do
+         end do
 !$OMP END PARALLEL DO
 
-      RETURN
-      END SUBROUTINE LAGFORCE
+         return
+       end subroutine lagforce
 !=======================================================================
 !=======================================================================
-      SUBROUTINE CALC_BOUNDARY_HEAT_FLUX
+       subroutine calc_boundary_heat_flux
 !=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : T, KSTAR
-      IMPLICIT NONE
-      INTEGER*8 :: I, K
-      REAL*8    :: DTDY_BTM, DTDY_TOP
-      REAL*8    :: Q_BTM, Q_TOP, Q_TOTAL
-      REAL*8    :: AREA, K_SOLID_BTM, K_SOLID_TOP
+         use mod_common
+         use mod_flowarray, only: t, kstar
+         implicit none
+         integer(8) :: i, k
+         real(8) :: dtdy_btm, dtdy_top
+         real(8) :: q_btm, q_top, q_total
+         real(8) :: area, k_solid_btm, k_solid_top
 
-      Q_BTM = 0.D0
-      Q_TOP = 0.D0
+         q_btm = 0.d0
+         q_top = 0.d0
 
-!$OMP PARALLEL DO private(DTDY_BTM, DTDY_TOP, AREA, K_SOLID_BTM, K_SOLID_TOP) reduction(+:Q_BTM, Q_TOP)
-      DO K=1,N3M
-      DO I=1,N1M
-         AREA = F2FX(I) * F2FZ(K)
-         
-         ! Extract the solid thermal conductivity at the boundaries
-         K_SOLID_BTM = KSTAR(I, 1, K, 4)   ! South face of J=1
-         K_SOLID_TOP = KSTAR(I, N2M, K, 3) ! North face of J=N2M
+!$OMP PARALLEL DO PRIVATE(DTDY_BTM, DTDY_TOP, AREA, K_SOLID_BTM, K_SOLID_TOP) REDUCTION(+:Q_BTM, Q_TOP)
+         do k = 1, n3m
+           do i = 1, n1m
+             area = f2fx(i) * f2fz(k)
 
-         ! --- Bottom Wall (J=0 to J=1) ---
-         ! Gradient: dT/dy at the bottom wall
-         DTDY_BTM = (T(I,1,K) - T(I,0,K)) * C2CYI(1)
-         ! Heat flows UP (+y) into the domain. Fourier's Law: q = -k * dT/dy
-         Q_BTM = Q_BTM - (K_SOLID_BTM / (RE * PR)) * DTDY_BTM * AREA
+             ! EXTRACT THE SOLID THERMAL CONDUCTIVITY AT THE BOUNDARIES
+             k_solid_btm = kstar(i, 1, k, 4)   ! SOUTH FACE OF J=1
+             k_solid_top = kstar(i, n2m, k, 3) ! NORTH FACE OF J=N2M
 
-         ! --- Top Wall (J=N2M to J=N2) ---
-         ! Gradient: dT/dy at the top wall
-         DTDY_TOP = (T(I,N2,K) - T(I,N2M,K)) * C2CYI(N2)
-         ! Heat flows DOWN (-y) into the domain, so the sign is flipped.
-         Q_TOP = Q_TOP + (K_SOLID_TOP / (RE * PR)) * DTDY_TOP * AREA
-         
-      ENDDO
-      ENDDO
+             ! --- BOTTOM WALL (J=0 TO J=1) ---
+             ! GRADIENT: DT/DY AT THE BOTTOM WALL
+             dtdy_btm = (t(i, 1, k) - t(i, 0, k)) * c2cyi(1)
+             ! HEAT FLOWS UP (+Y) INTO THE DOMAIN. FOURIER'S LAW: Q = -K * DT/DY
+             q_btm = q_btm - (k_solid_btm / (re * pr)) * dtdy_btm * area
+
+             ! --- TOP WALL (J=N2M TO J=N2) ---
+             ! GRADIENT: DT/DY AT THE TOP WALL
+             dtdy_top = (t(i, n2, k) - t(i, n2m, k)) * c2cyi(n2)
+             ! HEAT FLOWS DOWN (-Y) INTO THE DOMAIN, SO THE SIGN IS FLIPPED.
+             q_top = q_top + (k_solid_top / (re * pr)) * dtdy_top * area
+
+           end do
+         end do
 !$OMP END PARALLEL DO
 
-      Q_TOTAL = Q_BTM + Q_TOP
+         q_total = q_btm + q_top
 
-      ! Write to the fnusselt.dat tracker
-      WRITE(2002, 110) TIME, Q_BTM, Q_TOP, Q_TOTAL
- 110  FORMAT(F12.5, 3ES15.6)
+         ! WRITE TO THE FNUSSELT.DAT TRACKER
+         write (2002, 110) time, q_btm, q_top, q_total
+110      format(f12.5, 3es15.6)
 
-      RETURN
-      END SUBROUTINE CALC_BOUNDARY_HEAT_FLUX
+         return
+       end subroutine calc_boundary_heat_flux
 !=======================================================================
 !=======================================================================
-      SUBROUTINE DRAGLIFT
+       subroutine draglift
 !=======================================================================
-!     Calculates the total x, y, z aerodynamic forces acting on the
-!     Immersed Boundary (IB) bodies.
+!     CALCULATES THE TOTAL X, Y, Z AERODYNAMIC FORCES ACTING ON THE
+!     IMMERSED BOUNDARY (IB) BODIES.
 !
-!     Requires DUDTA, DVDTA, DWDTA to be pre-calculated by the 
-!     LAGFORCE subroutine during the RK3 substeps.
+!     REQUIRES DUDTA, DVDTA, DWDTA TO BE PRE-CALCULATED BY THE
+!     LAGFORCE SUBROUTINE DURING THE RK3 SUBSTEPS.
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
-      INTEGER*8 :: I, J, K, N, L, II, JJ, KK
-      REAL*8    :: CD(3), VOL_SOLID_GEOM, VOL_CELL
-      REAL*8    :: DTI, FUNCBODY
+         use mod_common
+         use mod_flowarray
+         implicit none
+         integer(8) :: i, j, k, n, l, ii, jj, kk
+         real(8) :: cd(3), vol_solid_geom, vol_cell
+         real(8) :: dti, funcbody
 
-      DTI = 1.0D0 / DT
+         dti = 1.0d0 / dt
 
-      CD = 0.0D0
-      VOL_SOLID_GEOM = 0.0D0
+         cd = 0.0d0
+         vol_solid_geom = 0.0d0
 
-      ! 1. Calculate the EXACT geometric solid volume using FUNCBODY.
-      !    This perfectly isolates the fluid volume from the solid slabs 
-      !    so the global PMIAVG penalty can be neutralized.
-!$OMP PARALLEL DO reduction(+:VOL_SOLID_GEOM)
-      DO K = 1, N3M
-        DO J = 1, N2M
-          DO I = 1, N1M
-            IF (FUNCBODY(X(I), YMP(J), ZMP(K), TIME) .LT. 1.D-10) THEN
-               VOL_SOLID_GEOM = VOL_SOLID_GEOM + C2CX(I)*F2FY(J)*F2FZ(K)
-            ENDIF
-          ENDDO
-        ENDDO
-      ENDDO
+         ! 1. CALCULATE THE EXACT GEOMETRIC SOLID VOLUME USING FUNCBODY.
+         !    THIS PERFECTLY ISOLATES THE FLUID VOLUME FROM THE SOLID SLABS
+         !    SO THE GLOBAL PMIAVG PENALTY CAN BE NEUTRALIZED.
+!$OMP PARALLEL DO REDUCTION(+:VOL_SOLID_GEOM)
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
+               if (funcbody(x(i), ymp(j), zmp(k), time) .lt. 1.d-10) then
+                 vol_solid_geom = vol_solid_geom + c2cx(i) * f2fy(j) * f2fz(k)
+               end if
+             end do
+           end do
+         end do
 !$OMP END PARALLEL DO
 
-      ! 2. Integrate the raw IBM forcing (FCVAVG) over the active IBM nodes
-!$OMP PARALLEL DO private(N, L, II, JJ, KK, VOL_CELL) reduction(-:CD)
-      DO L = 1, 3
-        DO N = 1, NBODY(L)
-           II = IFC(N,L)
-           JJ = JFC(N,L)
-           KK = KFC(N,L)
-           
-           VOL_CELL = C2CX(II) * F2FY(JJ) * F2FZ(KK)
+         ! 2. INTEGRATE THE RAW IBM FORCING (FCVAVG) OVER THE ACTIVE IBM NODES
+!$OMP PARALLEL DO PRIVATE(N, L, II, JJ, KK, VOL_CELL) REDUCTION(-:CD)
+         do l = 1, 3
+           do n = 1, nbody(l)
+             ii = ifc(n, l)
+             jj = jfc(n, l)
+             kk = kfc(n, l)
 
-           ! Raw IBM Force (Term 1 of Eq. 11)
-           CD(L) = CD(L) - FCVAVG(N,L) * VOL_CELL
-        ENDDO
-      ENDDO
+             vol_cell = c2cx(ii) * f2fy(jj) * f2fz(kk)
+
+             ! RAW IBM FORCE (TERM 1 OF EQ. 11)
+             cd(l) = cd(l) - fcvavg(n, l) * vol_cell
+           end do
+         end do
 !$OMP END PARALLEL DO
 
-      ! 3. Add the material derivative (Term 2 of Eq. 11)
-      !    These are directly supplied by your existing LAGFORCE subroutine.
-      !    For stationary bodies, DUDT are effectively zero, so this might have a negligible contribution.
-      CD(1) = CD(1) + DUDTA
-      CD(2) = CD(2) + DVDTA
-      CD(3) = CD(3) + DWDTA
+         ! 3. ADD THE MATERIAL DERIVATIVE (TERM 2 OF EQ. 11)
+         !    THESE ARE DIRECTLY SUPPLIED BY YOUR EXISTING LAGFORCE SUBROUTINE.
+         !    FOR STATIONARY BODIES, DUDT ARE EFFECTIVELY ZERO, SO THIS MIGHT HAVE A NEGLIGIBLE CONTRIBUTION.
+         cd(1) = cd(1) + dudta
+         cd(2) = cd(2) + dvdta
+         cd(3) = cd(3) + dwdta
 
-      ! 4. Non-dimensionalize Total Force to evaluate Wall Shear Stress (tau_w)
-      !    Divide by the total wetted surface area: 2 walls * (L_x * L_z)
-      CD(1) = CD(1) / (XL * ZL * 2.D0)
-      CD(2) = CD(2) / (XL * ZL * 2.D0)
-      CD(3) = CD(3) / (XL * ZL * 2.D0)
+         ! 4. NON-DIMENSIONALIZE TOTAL FORCE TO EVALUATE WALL SHEAR STRESS (TAU_W)
+         !    DIVIDE BY THE TOTAL WETTED SURFACE AREA: 2 WALLS * (L_X * L_Z)
+         cd(1) = cd(1) / (xl * zl * 2.d0)
+         cd(2) = cd(2) / (xl * zl * 2.d0)
+         cd(3) = cd(3) / (xl * zl * 2.d0)
 
-      ! 5. Output to history file
-      IF (MOD(NTIME, NPIN) .EQ. 0) THEN
-         WRITE(2001, 110) TIME, CD(1), CD(2), CD(3)
-      ENDIF
-  110 FORMAT(F13.5, 3ES15.6)
+         ! 5. OUTPUT TO HISTORY FILE
+         if (mod(ntime, npin) .eq. 0) then
+           write (2001, 110) time, cd(1), cd(2), cd(3)
+         end if
+110      format(f13.5, 3es15.6)
 
-      RETURN
-      END SUBROUTINE DRAGLIFT
+         return
+       end subroutine draglift
 !=======================================================================

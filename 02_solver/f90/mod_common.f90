@@ -1,34 +1,34 @@
-MODULE MOD_COMMON
+module mod_common
 !!!!!!!!!!!!!!!!!!!!! BASIC INPUTS (SETTINGS.INPUT)
-      REAL*8                 :: RE, PR, GR, EPS_PTR, UBULK_I, DT_SIZE,      &
-                                CFLFAC, RESID1, WWSOR, CSGSTS, CSGSHF
-      INTEGER*8              :: IRESET, IREAD, IAVG, IPZERO, NTST, NPRINT,  &
-                                NPRIAVG, NPIN, IDTOPT, NLEV, MODE, NBLI,    &
-                                IOLDV, MGITR, IMGSOR, ILES, INSMDL, ITEMDL, &
-                                IDVMON, FILTER, IBMON, MASSON, GRDIR, T_INF,&
-                                IMOVINGON, IHTRANS, NTRACE, NTR, TRPTS(64,3)
-      CHARACTER*25           :: GRIDFILE
-      CHARACTER*25           :: PREV_FLD
+  real(8) :: re, pr, gr, eps_ptr, ubulk_i, dt_size, &
+             cflfac, resid1, wwsor, csgsts, csgshf
+  integer(8) :: ireset, iread, iavg, ipzero, ntst, nprint, &
+                npriavg, npin, idtopt, nlev, mode, nbli, &
+                ioldv, mgitr, imgsor, iles, insmdl, itemdl, &
+                idvmon, filter, ibmon, masson, grdir, t_inf, &
+                imovingon, ihtrans, ntrace, ntr, trpts(64, 3)
+  character*25 :: gridfile
+  character*25 :: prev_fld
 
 !!!!!!!!!!!!!!!!!!!!! BOUNDARY CONDITIONS (BOUNDARY.INPUT & IBMPRE_PRDIC.BIN)
-      INTEGER*8              :: XPRDIC, YPRDIC, ZPRDIC, IINTP
-      INTEGER*8              :: BC_XBTM, BC_XTOP, BC_YBTM, BC_YTOP,        &
-                                BC_ZBTM, BC_ZTOP
-      INTEGER*8              :: BC_T_YBTM, BC_T_YTOP, BC_T_ZBTM, BC_T_ZTOP
-      REAL*8                 :: VAL_T_YBTM, VAL_T_YTOP, VAL_T_ZBTM, VAL_T_ZTOP
-      INTEGER*8              :: I_BGPX, J_BGPY, K_BGPZ
-      REAL*8, DIMENSION(:,:), ALLOCATABLE  :: DUOUT,DVOUT,DWOUT,DTOUT
-      REAL*8, DIMENSION(:,:), ALLOCATABLE  :: UOUT,VOUT,WOUT,TOUT
-      INTEGER*8              :: JUT,JUB,JWT,JWB,KUT,KUB,KVT,KVB
+  integer(8) :: xprdic, yprdic, zprdic, iintp
+  integer(8) :: bc_xbtm, bc_xtop, bc_ybtm, bc_ytop, &
+                bc_zbtm, bc_ztop
+  integer(8) :: bc_t_ybtm, bc_t_ytop, bc_t_zbtm, bc_t_ztop
+  real(8) :: val_t_ybtm, val_t_ytop, val_t_zbtm, val_t_ztop
+  integer(8) :: i_bgpx, j_bgpy, k_bgpz
+  real(8), dimension(:, :), allocatable :: duout, dvout, dwout, dtout
+  real(8), dimension(:, :), allocatable :: uout, vout, wout, tout
+  integer(8) :: jut, jub, jwt, jwb, kut, kub, kvt, kvb
 
 !!!!!!!!!!!!!!!!!!!!! GRID & MESH & DOMAIN (GRID.DAT)
-      INTEGER*8              :: N1,N1M,N1MD,N1MH,N2,N2M,N2MD,N2MH,N3,N3M,N3MD,N3MH
-      REAL*8                 :: XL,YL,ZL
-      REAL*8, DIMENSION(:), ALLOCATABLE    :: X,Y,Z,XMP,YMP,ZMP
-      INTEGER*8, DIMENSION(:), ALLOCATABLE :: IPV,JPV,KPV,IMV,JMV,KMV
-      INTEGER*8, DIMENSION(:), ALLOCATABLE :: FIXIL,FIXIU,FIXJL,FIXJU,FIXKL,FIXKU
-      REAL*8, DIMENSION(:), ALLOCATABLE    :: F2FX,F2FY,F2FZ,F2FXI,F2FYI,F2FZI
-      REAL*8, DIMENSION(:), ALLOCATABLE    :: C2CX,C2CY,C2CZ,C2CXI,C2CYI,C2CZI
+  integer(8) :: n1, n1m, n1md, n1mh, n2, n2m, n2md, n2mh, n3, n3m, n3md, n3mh
+  real(8) :: xl, yl, zl
+  real(8), dimension(:), allocatable :: x, y, z, xmp, ymp, zmp
+  integer(8), dimension(:), allocatable :: ipv, jpv, kpv, imv, jmv, kmv
+  integer(8), dimension(:), allocatable :: fixil, fixiu, fixjl, fixju, fixkl, fixku
+  real(8), dimension(:), allocatable :: f2fx, f2fy, f2fz, f2fxi, f2fyi, f2fzi
+  real(8), dimension(:), allocatable :: c2cx, c2cy, c2cz, c2cxi, c2cyi, c2czi
 !     N_,N_M,N_MD,N_MH                    : THE NUMBER OF GRID POINTS FOR X,Y,Z DIRECTIONS
 !     XL,YL,ZL                            : DOMAIN SIZES
 !     X,Y,Z                               : POSITIONS OF GRID POINTS
@@ -41,24 +41,24 @@ MODULE MOD_COMMON
 !     XMP,YMP,ZMP                         : POSITION OF CELL CENTER POINTS
 
 !!!!!!!!!!!!!!!!!!!!! IBM & LES VARIABLES (GRID.DAT)
-      INTEGER*8              :: NINTP(4), NBODY(4)
-      INTEGER*8              :: NZERO
-      REAL*8                 :: NUTAVG, NUTMAX, ALPAVG, ALPMAX
+  integer(8) :: nintp(4), nbody(4)
+  integer(8) :: nzero
+  real(8) :: nutavg, nutmax, alpavg, alpmax
 !     NINTP, NBODY : THE NUMBER OF INTERPOLATION AND INNER POINTS FOR IBM
 !     NZERO : NUMBER OF ZERO SGS EDDY VISCOSITY POINT
 !     TZERO : NUMBER OF ZERO SGS EDDY DIFFUSIVITY POINT
 
 !!!!!!!!!!!!!!!!!!!!! N-S EQUATION
-      INTEGER*8              :: NTIME, IHIST, M, MSUB, NV, NAV
-      REAL*8                 :: DT, TIME, SUBDT
-      REAL*8                 :: DVMAX, CFLMAX, QMMAX
-      REAL*8                 :: GAMMA(3)
-      REAL*8                 :: RO(3)
-      REAL*8                 :: ALPHA
-      REAL*8                 :: DTCONST,DTCONSTI,TEST1,ACOEF,ACOEFI
-      REAL*8, DIMENSION(:),  ALLOCATABLE    :: AIU,CIU,AIVW,CIVW, &
-                                               AJV,CJV,AJUW,CJUW, &
-                                               AKW,CKW,AKUV,CKUV
+  integer(8) :: ntime, ihist, m, msub, nv, nav
+  real(8) :: dt, time, subdt
+  real(8) :: dvmax, cflmax, qmmax
+  real(8) :: gamma(3)
+  real(8) :: ro(3)
+  real(8) :: alpha
+  real(8) :: dtconst, dtconsti, test1, acoef, acoefi
+  real(8), dimension(:), allocatable :: aiu, ciu, aivw, civw, &
+                                        ajv, cjv, ajuw, cjuw, &
+                                        akw, ckw, akuv, ckuv
 !     NTIME,IHIST  : TIME STEP INDEX FOR CURRENT SIMULATION, TOTAL TIME STEP INDEX
 !     M,MSUB       : TIME STEP INDEX (SAME TO NTIME), RUNGE-KUTTA SUB-TIME STEP INDEX
 !     NV,NAV       : FIELD ADRESS
@@ -73,8 +73,8 @@ MODULE MOD_COMMON
 !     AKW(:),CKW(:),AKUV(:),CKUV(:)
 
 !!!!!!!!!!!!!!!!!!!!! CONSTANT FLOW RATE, WALL TEMPERATURE CONDITION
-      INTEGER*8              :: ICH,ICONJG
-      REAL*8                 :: PMI(0:4), PMIAVG, QVOL(0:2), TVOL(0:2), QFLUX, PHCAP, THCAP
+  integer(8) :: ich, iconjg
+  real(8) :: pmi(0:4), pmiavg, qvol(0:2), tvol(0:2), qflux, phcap, thcap
 !     CMFR : CONSTANT MEAN FLOW RATE OPTION
 !     PMI,PMIAVG,QVOL,QFLUX,PHCAP    : DP/DX (MEAN PRESSURE GRADIENT),
 !                                      AVERAGED DP/DX
@@ -83,95 +83,95 @@ MODULE MOD_COMMON
 !                                      CORRECTION TERM FOR VOLUME FLOW RATE CONSTANT SIMULATION
 
 !!!!!!!!!!!!!!!!!!!!! CALCULATION-TIME MEASUREMENTS
-      REAL*8                :: TOTAL_TIME_B,TOTAL_TIME_E,                          &
-                               TIME_BEGIN,TIME_END,SGSTIME_B(3),SGSTIME_E(3),      &
-                               RHSNLHSTIME_B(3),RHSNLHSTIME_E(3),                  &
-                               POISSTIME_B(3),POISSTIME_E(3)
+  real(8) :: total_time_b, total_time_e, &
+             time_begin, time_end, sgstime_b(3), sgstime_e(3), &
+             rhsnlhstime_b(3), rhsnlhstime_e(3), &
+             poisstime_b(3), poisstime_e(3)
 
 !!!!!!!!!!!!!!!!!!!!! NON-DIMENSIONAL QUANTITIES
-      REAL*8                :: FORCESUM(3),FORCESUMA(3)
-      REAL*8                :: DUDTA,DVDTA,DWDTA
+  real(8) :: forcesum(3), forcesuma(3)
+  real(8) :: dudta, dvdta, dwdta
 !     FORCESUM(3),FORCESUMA(3) : FORCE OBTAINED FROM THE MOMENTUM FORCING IN IBM
 !     DUDTA,DVDTA,DWDTA        : INERTIA CONTRIBUTION IN IBM FORCING
 
 !!!!!!!!!!!!!!!!!!!!! FIELD AVERAGE
-      REAL*8                :: TIMEINIT
-      INTEGER*8             :: IHISTINIT
+  real(8) :: timeinit
+  integer(8) :: ihistinit
 !     TIMEINIT,TIMEINITZ   : START AND END TIME FOR AVERAGE FIELD
 !     IHISTINIT,IHISTINITZ : START AND END TIME STEP FOR AVERAGE FIELD
 
-CONTAINS
+contains
 !=======================================================================
-SUBROUTINE ALLO(NN1,NN2,NN3)
+  subroutine allo(nn1, nn2, nn3)
 !=======================================================================
-      IMPLICIT NONE
-      INTEGER*8, INTENT(IN) :: NN1,NN2,NN3
+    implicit none
+    integer(8), intent(in) :: nn1, nn2, nn3
 
-      N1MD = N1M*2
-      N2MD = N2M*2
-      N3MD = N3M*2
-      N1MH = N1M/2+1
-      N2MH = N2M/2+1
-      N3MH = N3M/2+1
+    n1md = n1m * 2
+    n2md = n2m * 2
+    n3md = n3m * 2
+    n1mh = n1m / 2 + 1
+    n2mh = n2m / 2 + 1
+    n3mh = n3m / 2 + 1
 
-      ALLOCATE(X(N1))
-      ALLOCATE(Y(N2))
-      ALLOCATE(Z(N3))
-      ALLOCATE(XMP(0:N1))
-      ALLOCATE(YMP(0:N2))
-      ALLOCATE(ZMP(0:N3))
+    allocate (x(n1))
+    allocate (y(n2))
+    allocate (z(n3))
+    allocate (xmp(0:n1))
+    allocate (ymp(0:n2))
+    allocate (zmp(0:n3))
 
-      ALLOCATE(IPV(N1M))
-      ALLOCATE(IMV(N1M))
-      ALLOCATE(JPV(N2M))
-      ALLOCATE(JMV(N2M))
-      ALLOCATE(KPV(N3M))
-      ALLOCATE(KMV(N3M))
+    allocate (ipv(n1m))
+    allocate (imv(n1m))
+    allocate (jpv(n2m))
+    allocate (jmv(n2m))
+    allocate (kpv(n3m))
+    allocate (kmv(n3m))
 
-      ALLOCATE(FIXIL(N1M))
-      ALLOCATE(FIXIU(N1M))
-      ALLOCATE(FIXJL(N2M))
-      ALLOCATE(FIXJU(N2M))
-      ALLOCATE(FIXKL(N3M))
-      ALLOCATE(FIXKU(N3M))
+    allocate (fixil(n1m))
+    allocate (fixiu(n1m))
+    allocate (fixjl(n2m))
+    allocate (fixju(n2m))
+    allocate (fixkl(n3m))
+    allocate (fixku(n3m))
 
-      ALLOCATE(F2FX(0:N1))
-      ALLOCATE(F2FY(0:N2))
-      ALLOCATE(F2FZ(0:N3))
-      ALLOCATE(F2FXI(0:N1))
-      ALLOCATE(F2FYI(0:N2))
-      ALLOCATE(F2FZI(0:N3))
+    allocate (f2fx(0:n1))
+    allocate (f2fy(0:n2))
+    allocate (f2fz(0:n3))
+    allocate (f2fxi(0:n1))
+    allocate (f2fyi(0:n2))
+    allocate (f2fzi(0:n3))
 
-      ALLOCATE(C2CX(0:N1))
-      ALLOCATE(C2CY(0:N2))
-      ALLOCATE(C2CZ(0:N3))
-      ALLOCATE(C2CXI(0:N1))
-      ALLOCATE(C2CYI(0:N2))
-      ALLOCATE(C2CZI(0:N3))
+    allocate (c2cx(0:n1))
+    allocate (c2cy(0:n2))
+    allocate (c2cz(0:n3))
+    allocate (c2cxi(0:n1))
+    allocate (c2cyi(0:n2))
+    allocate (c2czi(0:n3))
 
-      ALLOCATE(AIU(N1))
-      ALLOCATE(CIU(N1))
-      ALLOCATE(AIVW(N1))
-      ALLOCATE(CIVW(N1))
-      ALLOCATE(AJV(N2))
-      ALLOCATE(CJV(N2))
-      ALLOCATE(AJUW(N2))
-      ALLOCATE(CJUW(N2))
-      ALLOCATE(AKW(N3))
-      ALLOCATE(CKW(N3))
-      ALLOCATE(AKUV(N3))
-      ALLOCATE(CKUV(N3))
+    allocate (aiu(n1))
+    allocate (ciu(n1))
+    allocate (aivw(n1))
+    allocate (civw(n1))
+    allocate (ajv(n2))
+    allocate (cjv(n2))
+    allocate (ajuw(n2))
+    allocate (cjuw(n2))
+    allocate (akw(n3))
+    allocate (ckw(n3))
+    allocate (akuv(n3))
+    allocate (ckuv(n3))
 
-      ALLOCATE(DUOUT(0:N2,0:N3))
-      ALLOCATE(DVOUT(0:N2,0:N3))
-      ALLOCATE(DWOUT(0:N2,0:N3))
-      ALLOCATE(DTOUT(0:N2,0:N3))
+    allocate (duout(0:n2, 0:n3))
+    allocate (dvout(0:n2, 0:n3))
+    allocate (dwout(0:n2, 0:n3))
+    allocate (dtout(0:n2, 0:n3))
 
-      ALLOCATE(UOUT(N2M,N3M))
-      ALLOCATE(VOUT(N2M,N3M))
-      ALLOCATE(WOUT(N2M,N3M))
-      ALLOCATE(TOUT(N2M,N3M))
+    allocate (uout(n2m, n3m))
+    allocate (vout(n2m, n3m))
+    allocate (wout(n2m, n3m))
+    allocate (tout(n2m, n3m))
 
-END SUBROUTINE ALLO
+  end subroutine allo
 
-END MODULE MOD_COMMON
+end module mod_common

@@ -43,6 +43,9 @@ END MODULE
       ZPRDIC= 1
  
        CALL READINPUTFILE
+      IF (NFLD .GE. 1) THEN
+       CALL READ_PERIODIC_FLAGS(FLDNAME(1))
+      ENDIF
        CALL GEOM('../output/grid/grid.dat')
         
        CALL FINDIPJPKP
@@ -90,6 +93,24 @@ END MODULE
       STOP
       END
 
+   !=======================================================================
+      SUBROUTINE READ_PERIODIC_FLAGS(fileprevel)
+   !=======================================================================
+      USE MOD_IBMPRE
+      IMPLICIT NONE
+      CHARACTER*20 :: fileprevel
+      INTEGER*8    :: NN1,NN2,NN3,IHIST,M
+      REAL*8       :: RRE,TPR,TGR,TIME,DT
+
+      OPEN(12,FILE='../output/field/'//fileprevel,FORM='UNFORMATTED')
+      READ(12) NN1,NN2,NN3,RRE,TPR,TGR
+      READ(12) IHIST,M,TIME,DT
+      READ(12) XPRDIC, YPRDIC, ZPRDIC
+      CLOSE(12)
+
+      RETURN
+      END
+
 !=======================================================================
       SUBROUTINE MAKEFTAIL(IDEX,LL)
 !=======================================================================
@@ -115,7 +136,7 @@ END MODULE
           IJK='_k'
         ENDIF
 
-        ftailijk=IJK//NN3(1:1)//NN2(1:1)//NN1(1:1)//'.dat'
+      ftailijk=IJK//NN3(1:1)//NN2(1:1)//NN1(1:1)//'.vtk'
 
       RETURN
       END
@@ -442,27 +463,82 @@ END MODULE
       INTEGER*8    :: I,J,K
       INTEGER*8    :: II,JJ,KK
       REAL*8       :: VXX(M2M,M3M),WXX(M2M,M3M),VORMAG
-      REAL*8       :: FUNCBODY
 
 
       II=IPOINT
 
       OPEN(102,FILE='../output/post/'//tname1//ftailijk)
-      WRITE(102,135)'variables= "z","y","u","v","w","p","wx","wy","wz","vormag","lamda2"'
-      WRITE(102,*)'ZONE T="ZONE1" , I=',N3M,', J=',N2M,', F=POINT'
+      WRITE(102,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(102,'(A)') 'LESwHT instantaneous x-plane'
+      WRITE(102,'(A)') 'ASCII'
+      WRITE(102,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(102,*) 'DIMENSIONS ',N3M,N2M,1
+      WRITE(102,*) 'POINTS ',N3M*N2M,' double'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) XMP(II),YMP(J),ZMP(K)
+      ENDDO
+      ENDDO
+      WRITE(102,*) 'POINT_DATA ',N3M*N2M
+      WRITE(102,'(A)') 'VECTORS velocity double'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) UC(II,J,K),VC(II,J,K),WC(II,J,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS pressure double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) P(II,J,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS vort_x double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) VORX(II,J,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS vort_y double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) VORY(II,J,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS vort_z double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) VORZ(II,J,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS vort_mag double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
       DO J=1,N2M
       DO K=1,N3M
        VORMAG= SQRT(VORX(II,J,K)**2+VORY(II,J,K)**2+VORZ(II,J,K)**2)
-
-       WRITE(102,101) ZMP(K),YMP(J),UC(II,J,K),VC(II,J,K),WC(II,J,K)   &
-                     ,P(II,J,K),VORX(II,J,K),VORY(II,J,K),VORZ(II,J,K) &
-                     ,VORMAG,VLAMBDA2(II,J,K)
-
+       WRITE(102,*) VORMAG
       ENDDO
       ENDDO
+      WRITE(102,'(A)') 'SCALARS lambda2 double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) VLAMBDA2(II,J,K)
+      ENDDO
+      ENDDO
+      IF (IHTRANS .EQ. 1) THEN
+       WRITE(102,'(A)') 'SCALARS temperature double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO J=1,N2M
+       DO K=1,N3M
+        WRITE(102,*) T(II,J,K)
+       ENDDO
+       ENDDO
+      ENDIF
       CLOSE(102)
-  101 format(2F14.6,9ES13.5)
-  135 format(a100)
 
 
       IF (IUNIGRID.EQ.1) THEN
@@ -477,7 +553,7 @@ END MODULE
         +FACUNIY(J)     *(1.-FACUNIZ(K))*V(II  ,JJ+1 ,KK  )   &
         +(1.-FACUNIY(J))*FACUNIZ(K)     *V(II  ,JJ   ,KK+1)   &
         +(1.-FACUNIY(J))*(1.-FACUNIZ(K))*V(II  ,JJ   ,KK  )
-       
+
          WXX(J,K)=                                            &
          FACUNIY(J)     *FACUNIZ(K)     *W(II  ,JJ+1 ,KK+1)   &
         +FACUNIY(J)     *(1.-FACUNIZ(K))*W(II  ,JJ+1 ,KK  )   &
@@ -487,47 +563,123 @@ END MODULE
         ENDDO
 
        OPEN(104,FILE='../output/post/'//tname3//ftailijk)
-       WRITE(104,135)'variables= "z","y","w","v"'
-       WRITE(104,*)'ZONE T="ZONE1" , I=',KNUMUNI,', J=',JNUMUNI,', F=POINT'
+       WRITE(104,'(A)') '# vtk DataFile Version 3.0'
+       WRITE(104,'(A)') 'LESwHT instantaneous x-plane uniform'
+       WRITE(104,'(A)') 'ASCII'
+       WRITE(104,'(A)') 'DATASET STRUCTURED_GRID'
+       WRITE(104,*) 'DIMENSIONS ',KNUMUNI,JNUMUNI,1
+       WRITE(104,*) 'POINTS ',KNUMUNI*JNUMUNI,' double'
        DO J=1,N2M,2
        DO K=1,N3M,2
-       WRITE(104,136) ZUNI(K),YUNI(J),WXX(J,K),VXX(J,K)
+        WRITE(104,*) XMP(II),YUNI(J),ZUNI(K)
+       ENDDO
+       ENDDO
+       WRITE(104,*) 'POINT_DATA ',KNUMUNI*JNUMUNI
+       WRITE(104,'(A)') 'SCALARS v double 1'
+       WRITE(104,'(A)') 'LOOKUP_TABLE default'
+       DO J=1,N2M,2
+       DO K=1,N3M,2
+        WRITE(104,*) VXX(J,K)
+       ENDDO
+       ENDDO
+       WRITE(104,'(A)') 'SCALARS w double 1'
+       WRITE(104,'(A)') 'LOOKUP_TABLE default'
+       DO J=1,N2M,2
+       DO K=1,N3M,2
+        WRITE(104,*) WXX(J,K)
        ENDDO
        ENDDO
        CLOSE(104)
-  136 format(2F14.6,2ES13.5)
 
       ENDIF
 
       RETURN
       END
-!=======================================================================
+
+   !=======================================================================
       SUBROUTINE OUTPUTJ(JPOINT)
-!=======================================================================
+   !=======================================================================
       USE MOD_IBMPRE
       IMPLICIT NONE
       INTEGER*8    :: JPOINT
       INTEGER*8    :: I,J,K
       INTEGER*8    :: II,JJ,KK,IIP,KKP
       REAL*8       :: UXX(M1M,M3M),WXX(M1M,M3M),VORMAG
-      REAL*8       :: FUNCBODY
 
       JJ=JPOINT
 
       OPEN(102,FILE='../output/post/'//tname1//ftailijk)
-      WRITE(102,135)'variables= "x","z","u","v","w","P","wx","wy","wz","vormag","lamda2"'
-      WRITE(102,*)'ZONE T="ZONE1", I=',N1M,', J=',N3M,', F=POINT'
+      WRITE(102,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(102,'(A)') 'LESwHT instantaneous y-plane'
+      WRITE(102,'(A)') 'ASCII'
+      WRITE(102,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(102,*) 'DIMENSIONS ',N1M,N3M,1
+      WRITE(102,*) 'POINTS ',N1M*N3M,' double'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) XMP(I),YMP(JJ),ZMP(K)
+      ENDDO
+      ENDDO
+      WRITE(102,*) 'POINT_DATA ',N1M*N3M
+      WRITE(102,'(A)') 'VECTORS velocity double'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) UC(I,JJ,K),VC(I,JJ,K),WC(I,JJ,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS pressure double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) P(I,JJ,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS vort_x double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) VORX(I,JJ,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS vort_y double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) VORY(I,JJ,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS vort_z double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) VORZ(I,JJ,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS vort_mag double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
       DO K=1,N3M
       DO I=1,N1M
        VORMAG= SQRT(VORX(I,JJ,K)**2+VORY(I,JJ,K)**2+VORZ(I,JJ,K)**2)
-      WRITE(102,101) XMP(I),ZMP(K),UC(I,JJ,K),VC(I,JJ,K),WC(I,JJ,K),   &
-                     P(I,JJ,K),VORX(I,JJ,K),VORY(I,JJ,K),VORZ(I,JJ,K), &
-                     VORMAG,VLAMBDA2(I,JJ,K)
+       WRITE(102,*) VORMAG
       ENDDO
       ENDDO
+      WRITE(102,'(A)') 'SCALARS lambda2 double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) VLAMBDA2(I,JJ,K)
+      ENDDO
+      ENDDO
+      IF (IHTRANS .EQ. 1) THEN
+       WRITE(102,'(A)') 'SCALARS temperature double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO K=1,N3M
+       DO I=1,N1M
+        WRITE(102,*) T(I,JJ,K)
+       ENDDO
+       ENDDO
+      ENDIF
       CLOSE(102)
-  101 format(2F14.6,9ES13.5)
-  135 format(a100)
 
       IF (IUNIGRID.EQ.1) THEN
           DO K=1,N3M
@@ -538,129 +690,188 @@ END MODULE
           IIP=II+1
           KKP=KK+1
            UXX(I,K)=                                             &
-             FACUNIX(I)     *FACUNIZ(K)     *U(IIP  ,JJ  ,KKP )  &
-            +FACUNIX(I)     *(1.-FACUNIZ(K))*U(IIP  ,JJ  ,KK  )  &
-            +(1.-FACUNIX(I))*FACUNIZ(K)     *U(II   ,JJ  ,KKP )  &
-            +(1.-FACUNIX(I))*(1.-FACUNIZ(K))*U(II   ,JJ  ,KK  )
-         
+          FACUNIX(I)     *FACUNIZ(K)     *U(IIP  ,JJ  ,KKP )  &
+         +FACUNIX(I)     *(1.-FACUNIZ(K))*U(IIP  ,JJ  ,KK  )  &
+         +(1.-FACUNIX(I))*FACUNIZ(K)     *U(II   ,JJ  ,KKP )  &
+         +(1.-FACUNIX(I))*(1.-FACUNIZ(K))*U(II   ,JJ  ,KK  )
+
            WXX(I,K)=                                              &
-             FACUNIX(I)     *FACUNIZ(K)     *W(IIP  ,JJ  ,KKP)    &
-            +FACUNIX(I)     *(1.-FACUNIZ(K))*W(IIP  ,JJ  ,KK  )   &
-            +(1.-FACUNIX(I))*FACUNIZ(K)     *W(II   ,JJ  ,KKP)    &
-            +(1.-FACUNIX(I))*(1.-FACUNIZ(K))*W(II   ,JJ  ,KK  )
+          FACUNIX(I)     *FACUNIZ(K)     *W(IIP  ,JJ  ,KKP)    &
+         +FACUNIX(I)     *(1.-FACUNIZ(K))*W(IIP  ,JJ  ,KK  )   &
+         +(1.-FACUNIX(I))*FACUNIZ(K)     *W(II   ,JJ  ,KKP)    &
+         +(1.-FACUNIX(I))*(1.-FACUNIZ(K))*W(II   ,JJ  ,KK  )
           ENDDO
           ENDDO
 
          OPEN(104,FILE='../output/post/'//tname3//ftailijk)
-         WRITE(104,135)'variables= "x","z","u","w"'
-         WRITE(104,*)'ZONE T="ZONE1", I=',INUMUNI,', J=',KNUMUNI,', F=POINT'
+         WRITE(104,'(A)') '# vtk DataFile Version 3.0'
+         WRITE(104,'(A)') 'LESwHT instantaneous y-plane uniform'
+         WRITE(104,'(A)') 'ASCII'
+         WRITE(104,'(A)') 'DATASET STRUCTURED_GRID'
+         WRITE(104,*) 'DIMENSIONS ',INUMUNI,KNUMUNI,1
+         WRITE(104,*) 'POINTS ',INUMUNI*KNUMUNI,' double'
          DO K=1,N3M,2
          DO I=1,N1M,2
-         WRITE(104,136) XUNI(I),ZUNI(K),UXX(I,K),WXX(I,K)
+          WRITE(104,*) XUNI(I),YMP(JJ),ZUNI(K)
+         ENDDO
+         ENDDO
+         WRITE(104,*) 'POINT_DATA ',INUMUNI*KNUMUNI
+         WRITE(104,'(A)') 'SCALARS u double 1'
+         WRITE(104,'(A)') 'LOOKUP_TABLE default'
+         DO K=1,N3M,2
+         DO I=1,N1M,2
+          WRITE(104,*) UXX(I,K)
+         ENDDO
+         ENDDO
+         WRITE(104,'(A)') 'SCALARS w double 1'
+         WRITE(104,'(A)') 'LOOKUP_TABLE default'
+         DO K=1,N3M,2
+         DO I=1,N1M,2
+          WRITE(104,*) WXX(I,K)
          ENDDO
          ENDDO
          CLOSE(104)
-  136 format(2F14.6,2ES13.5)
       ENDIF
 
       RETURN
       END
 
-!=======================================================================
+   !=======================================================================
       SUBROUTINE OUTPUTK(KPOINT)
-!=======================================================================
+   !=======================================================================
       USE MOD_IBMPRE
       IMPLICIT NONE
       INTEGER*8    :: KPOINT
       INTEGER*8    :: I,J,K
       INTEGER*8    :: II,JJ,KK,IIP,JJP
       REAL*8       :: UXX(M1M,M2M),VXX(M1M,M2M),VORMAG
-      REAL*8       :: FUNCBODY
 
       KK=KPOINT
 
-      IF (IHTRANS .NE. 1) THEN
-
       OPEN(102,FILE='../output/post/'//tname1//ftailijk)
-      WRITE(102,135)'variables= "x","y","u","v","P","wz","vormag","lamda2"'
-      WRITE(102,*)'ZONE T="ZONE1", I=',N1M,', J=',N2M,', F=POINT'
+      WRITE(102,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(102,'(A)') 'LESwHT instantaneous z-plane'
+      WRITE(102,'(A)') 'ASCII'
+      WRITE(102,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(102,*) 'DIMENSIONS ',N1M,N2M,1
+      WRITE(102,*) 'POINTS ',N1M*N2M,' double'
       DO J=1,N2M
       DO I=1,N1M
-       VORMAG= SQRT(VORX(I,J,KK)**2+VORY(I,J,KK)**2+VORZ(I,J,KK)**2)
-      WRITE(102,101) XMP(I),YMP(J),UC(I,J,KK),VC(I,J,KK),P(I,J,KK)   &
-                    ,VORZ(I,J,KK),VORMAG,VLAMBDA2(I,J,KK)
+       WRITE(102,*) XMP(I),YMP(J),ZMP(KK)
       ENDDO
       ENDDO
-      CLOSE(102)
-  101 format(2F14.6,6ES13.5)
-  135 format(a100)
-
-      ELSE
-
-      OPEN(102,FILE='../output/post/'//tname1//ftailijk)
-      WRITE(102,137)'variables= "x","y","u","v","T","P","wz","vormag","lamda2"'
-      WRITE(102,*)'ZONE T="ZONE1", I=',N1M,', J=',N2M,', F=POINT'
+      WRITE(102,*) 'POINT_DATA ',N1M*N2M
+      WRITE(102,'(A)') 'VECTORS velocity double'
       DO J=1,N2M
       DO I=1,N1M
-       VORMAG= SQRT(VORX(I,J,KK)**2+VORY(I,J,KK)**2+VORZ(I,J,KK)**2)
-      WRITE(102,102) XMP(I),YMP(J),UC(I,J,KK),VC(I,J,KK),T(I,J,KK),P(I,J,KK)   &
-                    ,VORZ(I,J,KK),VORMAG,VLAMBDA2(I,J,KK)
+       WRITE(102,*) UC(I,J,KK),VC(I,J,KK),WC(I,J,KK)
       ENDDO
       ENDDO
-      CLOSE(102)
-  102 format(2F14.6,7ES13.5)
-  137 format(a100)
-
+      IF (IHTRANS .EQ. 1) THEN
+       WRITE(102,'(A)') 'SCALARS temperature double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO J=1,N2M
+       DO I=1,N1M
+        WRITE(102,*) T(I,J,KK)
+       ENDDO
+       ENDDO
       ENDIF
+      WRITE(102,'(A)') 'SCALARS pressure double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO I=1,N1M
+       WRITE(102,*) P(I,J,KK)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS vort_z double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO I=1,N1M
+       WRITE(102,*) VORZ(I,J,KK)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS vort_mag double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO I=1,N1M
+       VORMAG= SQRT(VORX(I,J,KK)**2+VORY(I,J,KK)**2+VORZ(I,J,KK)**2)
+       WRITE(102,*) VORMAG
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS lambda2 double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO I=1,N1M
+       WRITE(102,*) VLAMBDA2(I,J,KK)
+      ENDDO
+      ENDDO
+      CLOSE(102)
 
       IF (IUNIGRID.EQ.1) THEN
 
           DO J=1,N2M
           DO I=1,N1M
-          
+
           II=IUNI(I)
           JJ=JUNI(J)
           IIP=II+1
           JJP=JJ+1
-          
+
           UXX(I,J)=                                              &
-             FACUNIX(I)     *FACUNIY(J)     *U(IIP  ,JJP  ,KK)   &
-            +FACUNIX(I)     *(1.-FACUNIY(J))*U(IIP  ,JJ   ,KK)   &
-            +(1.-FACUNIX(I))*FACUNIY(J)     *U(II   ,JJP  ,KK)   &
-            +(1.-FACUNIX(I))*(1.-FACUNIY(J))*U(II   ,JJ   ,KK)
-          
+          FACUNIX(I)     *FACUNIY(J)     *U(IIP  ,JJP  ,KK)   &
+         +FACUNIX(I)     *(1.-FACUNIY(J))*U(IIP  ,JJ   ,KK)   &
+         +(1.-FACUNIX(I))*FACUNIY(J)     *U(II   ,JJP  ,KK)   &
+         +(1.-FACUNIX(I))*(1.-FACUNIY(J))*U(II   ,JJ   ,KK)
+
           VXX(I,J)=                                              &
-             FACUNIX(I)     *FACUNIY(J)     *V(IIP  ,JJP  ,KK)   &
-            +FACUNIX(I)     *(1.-FACUNIY(J))*V(IIP  ,JJ   ,KK)   &
-            +(1.-FACUNIX(I))*FACUNIY(J)     *V(II   ,JJP  ,KK)   &
-            +(1.-FACUNIX(I))*(1.-FACUNIY(J))*V(II   ,JJ   ,KK)
+          FACUNIX(I)     *FACUNIY(J)     *V(IIP  ,JJP  ,KK)   &
+         +FACUNIX(I)     *(1.-FACUNIY(J))*V(IIP  ,JJ   ,KK)   &
+         +(1.-FACUNIX(I))*FACUNIY(J)     *V(II   ,JJP  ,KK)   &
+         +(1.-FACUNIX(I))*(1.-FACUNIY(J))*V(II   ,JJ   ,KK)
           ENDDO
           ENDDO
 
          OPEN(104,FILE='../output/post/'//tname3//ftailijk)
-         WRITE(104,135)'variables= "x","y","u","v"'
-         WRITE(104,*)'ZONE T="ZONE1", I=',INUMUNI,', J=',JNUMUNI,', F=POINT'
+         WRITE(104,'(A)') '# vtk DataFile Version 3.0'
+         WRITE(104,'(A)') 'LESwHT instantaneous z-plane uniform'
+         WRITE(104,'(A)') 'ASCII'
+         WRITE(104,'(A)') 'DATASET STRUCTURED_GRID'
+         WRITE(104,*) 'DIMENSIONS ',INUMUNI,JNUMUNI,1
+         WRITE(104,*) 'POINTS ',INUMUNI*JNUMUNI,' double'
          DO J=1,N2M,2
          DO I=1,N1M,2
-         WRITE(104,136) XUNI(I),YUNI(J),UXX(I,J),VXX(I,J)
+          WRITE(104,*) XUNI(I),YUNI(J),ZMP(KK)
+         ENDDO
+         ENDDO
+         WRITE(104,*) 'POINT_DATA ',INUMUNI*JNUMUNI
+         WRITE(104,'(A)') 'SCALARS u double 1'
+         WRITE(104,'(A)') 'LOOKUP_TABLE default'
+         DO J=1,N2M,2
+         DO I=1,N1M,2
+          WRITE(104,*) UXX(I,J)
+         ENDDO
+         ENDDO
+         WRITE(104,'(A)') 'SCALARS v double 1'
+         WRITE(104,'(A)') 'LOOKUP_TABLE default'
+         DO J=1,N2M,2
+         DO I=1,N1M,2
+          WRITE(104,*) VXX(I,J)
          ENDDO
          ENDDO
          CLOSE(104)
-  136 format(2F12.6,2ES12.4)
       ENDIF
 
       RETURN
       END
 
-!=======================================================================
+   !=======================================================================
       SUBROUTINE OUTPUT_3D
-!=======================================================================
+   !=======================================================================
       USE MOD_IBMPRE
       IMPLICIT NONE
       INTEGER*8    :: I,J,K
       INTEGER*8    :: INUM,JNUM,KNUM
       REAL*8       :: VORMAG
-      REAL*8       :: FUNCBODY
 
        INUM = 0
        JNUM = 0
@@ -677,91 +888,202 @@ END MODULE
 
 
       IF (ILD2.EQ.1) THEN
-      OPEN(101,FILE='../output/post/'//tname2//'_ld2.dat')
-      WRITE(101,110)'variables= "x","y","z","lambda2"'
-      WRITE(101,*)'ZONE T="ZONE1" , I=',INUM,' J=',JNUM,' K=',KNUM,' F=POINT'
+      OPEN(101,FILE='../output/post/'//tname2//'_ld2.vtk')
+      WRITE(101,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(101,'(A)') 'LESwHT instantaneous 3D lambda2'
+      WRITE(101,'(A)') 'ASCII'
+      WRITE(101,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(101,*) 'DIMENSIONS ',INUM,JNUM,KNUM
+      WRITE(101,*) 'POINTS ',INUM*JNUM*KNUM,' double'
       DO K=KSTART,KEND,KSKIP
       DO J=JSTART,JEND,JSKIP
       DO I=ISTART,IEND,ISKIP
-      WRITE(101,100) XMP(I),YMP(J),ZMP(K),VLAMBDA2(I,J,K)
+       WRITE(101,*) XMP(I),YMP(J),ZMP(K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(101,*) 'POINT_DATA ',INUM*JNUM*KNUM
+      WRITE(101,'(A)') 'SCALARS lambda2 double 1'
+      WRITE(101,'(A)') 'LOOKUP_TABLE default'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(101,*) VLAMBDA2(I,J,K)
       ENDDO
       ENDDO
       ENDDO
       CLOSE(101)
-  100 format(3F8.3,ES13.5)
       ENDIF
 
       IF (IUVWP.EQ.1) THEN
-      OPEN(102,FILE='../output/post/'//tname2//'_uvwp.dat')
-      WRITE(102,110)'variables= "x","y","z","u","v","w","p"'
-      WRITE(102,*)'ZONE T="ZONE1" , I=',INUM,' J=',JNUM,' K=',KNUM,' F=POINT'
+      OPEN(102,FILE='../output/post/'//tname2//'_uvwp.vtk')
+      WRITE(102,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(102,'(A)') 'LESwHT instantaneous 3D uvwp'
+      WRITE(102,'(A)') 'ASCII'
+      WRITE(102,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(102,*) 'DIMENSIONS ',INUM,JNUM,KNUM
+      WRITE(102,*) 'POINTS ',INUM*JNUM*KNUM,' double'
       DO K=KSTART,KEND,KSKIP
       DO J=JSTART,JEND,JSKIP
       DO I=ISTART,IEND,ISKIP
-      WRITE(102,103) XMP(I),YMP(J),ZMP(K),UC(I,J,K),VC(I,J,K),WC(I,J,K),P(I,J,K)
+       WRITE(102,*) XMP(I),YMP(J),ZMP(K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(102,*) 'POINT_DATA ',INUM*JNUM*KNUM
+      WRITE(102,'(A)') 'VECTORS velocity double'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(102,*) UC(I,J,K),VC(I,J,K),WC(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS pressure double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(102,*) P(I,J,K)
       ENDDO
       ENDDO
       ENDDO
       CLOSE(102)
-  103 format(3F8.3,4ES13.5)
       ENDIF
 
       IF (IWXYZ.EQ.1) THEN
-      OPEN(103,FILE='../output/post/'//tname2//'_vorxyz.dat')
-      WRITE(103,110)'variables= "x","y","z","wx","wy","wz","vormag"'
-      WRITE(103,*)'ZONE T="ZONE1" , I=',INUM,' J=',JNUM,' K=',KNUM,' F=POINT'
+      OPEN(103,FILE='../output/post/'//tname2//'_vorxyz.vtk')
+      WRITE(103,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(103,'(A)') 'LESwHT instantaneous 3D vorticity'
+      WRITE(103,'(A)') 'ASCII'
+      WRITE(103,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(103,*) 'DIMENSIONS ',INUM,JNUM,KNUM
+      WRITE(103,*) 'POINTS ',INUM*JNUM*KNUM,' double'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) XMP(I),YMP(J),ZMP(K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(103,*) 'POINT_DATA ',INUM*JNUM*KNUM
+      WRITE(103,'(A)') 'VECTORS vorticity double'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) VORX(I,J,K),VORY(I,J,K),VORZ(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(103,'(A)') 'SCALARS vort_mag double 1'
+      WRITE(103,'(A)') 'LOOKUP_TABLE default'
       DO K=KSTART,KEND,KSKIP
       DO J=JSTART,JEND,JSKIP
       DO I=ISTART,IEND,ISKIP
        VORMAG= SQRT(VORX(I,J,K)**2+VORY(I,J,K)**2+VORZ(I,J,K)**2)
-       WRITE(103,104) XMP(I),YMP(J),ZMP(K),VORX(I,J,K),VORY(I,J,K),VORZ(I,J,K),VORMAG
+       WRITE(103,*) VORMAG
       ENDDO
       ENDDO
       ENDDO
       CLOSE(103)
-  104 format(3F8.3,4ES13.5)
       ENDIF
 
       IF (IALL.EQ.1) THEN
-      OPEN(103,FILE='../output/post/'//tname2//'_all.dat')
-      WRITE(103,110)'variables= "x","y","z","u","v","w","p","wx","wy","wz","vormag","lambda2"'
-      WRITE(103,*)'ZONE T="ZONE1" , I=',INUM,' J=',JNUM,' K=',KNUM,' F=POINT'
+      OPEN(103,FILE='../output/post/'//tname2//'_all.vtk')
+      WRITE(103,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(103,'(A)') 'LESwHT instantaneous 3D all'
+      WRITE(103,'(A)') 'ASCII'
+      WRITE(103,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(103,*) 'DIMENSIONS ',INUM,JNUM,KNUM
+      WRITE(103,*) 'POINTS ',INUM*JNUM*KNUM,' double'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) XMP(I),YMP(J),ZMP(K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(103,*) 'POINT_DATA ',INUM*JNUM*KNUM
+      WRITE(103,'(A)') 'VECTORS velocity double'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) UC(I,J,K),VC(I,J,K),WC(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(103,'(A)') 'SCALARS pressure double 1'
+      WRITE(103,'(A)') 'LOOKUP_TABLE default'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) P(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(103,'(A)') 'VECTORS vorticity double'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) VORX(I,J,K),VORY(I,J,K),VORZ(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(103,'(A)') 'SCALARS vort_mag double 1'
+      WRITE(103,'(A)') 'LOOKUP_TABLE default'
       DO K=KSTART,KEND,KSKIP
       DO J=JSTART,JEND,JSKIP
       DO I=ISTART,IEND,ISKIP
        VORMAG= SQRT(VORX(I,J,K)**2+VORY(I,J,K)**2+VORZ(I,J,K)**2)
-       WRITE(103,105) XMP(I),YMP(J),ZMP(K),UC(I,J,K),VC(I,J,K),WC(I,J,K) &
-                     ,P(I,J,K),VORX(I,J,K),VORY(I,J,K),VORZ(I,J,K)       &
-                     ,VORMAG,VLAMBDA2(I,J,K)
+       WRITE(103,*) VORMAG
       ENDDO
       ENDDO
       ENDDO
-      CLOSE(103)
-  105 format(3F8.3,9ES13.5)
+      WRITE(103,'(A)') 'SCALARS lambda2 double 1'
+      WRITE(103,'(A)') 'LOOKUP_TABLE default'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) VLAMBDA2(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      IF (IHTRANS .EQ. 1) THEN
+       WRITE(103,'(A)') 'SCALARS temperature double 1'
+       WRITE(103,'(A)') 'LOOKUP_TABLE default'
+       DO K=KSTART,KEND,KSKIP
+       DO J=JSTART,JEND,JSKIP
+       DO I=ISTART,IEND,ISKIP
+        WRITE(103,*) T(I,J,K)
+       ENDDO
+       ENDDO
+       ENDDO
       ENDIF
-  110 FORMAT(A100)
+      CLOSE(103)
+      ENDIF
 
       RETURN
       END
 
-!=======================================================================
+   !=======================================================================
       SUBROUTINE PREFLD(fileprevel)
-!=======================================================================
+   !=======================================================================
        USE MOD_IBMPRE
        IMPLICIT NONE
        CHARACTER*100 :: fileprevel
        INTEGER*8    :: I,J,K
        INTEGER*8    :: NN1,NN2,NN3,IHIST,M,IPSS,IXPRDIC,IZPRDIC,IDUM
        REAL*8       :: RRE,TIME,DT,PRA,DUM
-       
+
 
        U= 0.
        V= 0.
        W= 0.
        P= 0.
+      T= 0.
 
       OPEN(12,FILE='../output/field/'//fileprevel,FORM='UNFORMATTED')
-!     dum for future use
+   !     dum for future use
       READ(12) N1,N2,N3,RE,PR,GR
       READ(12) IHIST,M,TIME,DT
       READ(12) XPRDIC, YPRDIC, ZPRDIC
@@ -780,14 +1102,14 @@ END MODULE
       WRITE(*,104) NN1,NN2,NN3
       WRITE(*,105) IHIST,M,TIME,DT
 
-  100 FORMAT('----------- INITIAL FIELD INFORMATION -----------')
-  101 FORMAT('INITIAL FIELD      : READING DONE')
-  102 FORMAT('INITIAL FIELD NAME : ',A30)
-  103 FORMAT('RE=',ES12.3)
-  104 FORMAT('N1=',I10,'  N2=',I10,'  N3=',I10)
-  105 FORMAT('IHIST=',I8,'  M=',I10,'  TIME= ',F12.5,'  DT=',F12.5)
+     100 FORMAT('----------- INITIAL FIELD INFORMATION -----------')
+     101 FORMAT('INITIAL FIELD      : READING DONE')
+     102 FORMAT('INITIAL FIELD NAME : ',A30)
+     103 FORMAT('RE=',ES12.3)
+     104 FORMAT('N1=',I10,'  N2=',I10,'  N3=',I10)
+     105 FORMAT('IHIST=',I8,'  M=',I10,'  TIME= ',F12.5,'  DT=',F12.5)
 
-!     Z PERIODICITY
+   !     Z PERIODICITY
       IF (ZPRDIC .EQ. 1) THEN
       DO J=0,N2
       DO I=1,N1
@@ -811,7 +1133,7 @@ END MODULE
       ENDDO
       ENDIF
 
-!     X PERIODICITY
+   !     X PERIODICITY
       IF (XPRDIC .EQ. 1) THEN
       DO K=0,N3
       DO J=0,N2
@@ -835,26 +1157,30 @@ END MODULE
       ENDDO
       ENDIF
 
-!     Z PERIODICITY
+   !     Z PERIODICITY
       IF (ZPRDIC .EQ. 1) THEN
       DO J=1,N2M
       DO I=1,N1M
          P(I,J,0) =P(I,J,N3M)
          P(I,J,N3)=P(I,J,1)
-         T(I,J,0) =T(I,J,N3M)
-         T(I,J,N3)=T(I,J,1)
+         IF (IHTRANS .EQ. 1) THEN
+          T(I,J,0) =T(I,J,N3M)
+          T(I,J,N3)=T(I,J,1)
+         ENDIF
       ENDDO
       ENDDO
       ENDIF
 
-!     X PERIODICITY
+   !     X PERIODICITY
       IF (XPRDIC .EQ. 1) THEN
       DO K=1,N3M
       DO J=1,N2M
          P(0 ,J,K)=P(N1M,J,K)
          P(N1,J,K)=P(1  ,J,K)
-         T(I,J,0) =T(I,J,N3M)
-         T(I,J,N3)=T(I,J,1)
+         IF (IHTRANS .EQ. 1) THEN
+          T(0 ,J,K)=T(N1M,J,K)
+          T(N1,J,K)=T(1  ,J,K)
+         ENDIF
       ENDDO
       ENDDO
       ENDIF
@@ -1368,24 +1694,4 @@ END MODULE
       pause 'too many iterations in jacobi'
       return
       END
-
-!=======================================================================
-        FUNCTION FUNCBODY(XX,YY,ZZ,IS)
-!=======================================================================
-        USE MOD_IBMPRE
-        IMPLICIT NONE
-        REAL*8     :: XX,YY,ZZ    
-        REAL*8     :: FUNCBODY
-        INTEGER*8  :: IS  ! IS : Section variable
-
-        IF (ABS(YY) .GE. 1.) THEN
-          FUNCBODY = -1.
-        ELSE
-          FUNCBODY = 1.
-        ENDIF
-
-!        FUNCBODY = XX**2.+YY**2.-0.5**2.
-
-        RETURN
-        END
 

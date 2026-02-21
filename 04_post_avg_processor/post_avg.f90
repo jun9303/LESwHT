@@ -129,7 +129,7 @@
           IJK='_k'
         ENDIF
 
-        ftailijk=IJK//NN3(1:1)//NN2(1:1)//NN1(1:1)//'.dat'
+      ftailijk=IJK//NN3(1:1)//NN2(1:1)//NN1(1:1)//'.vtk'
 
       RETURN
       END
@@ -369,43 +369,155 @@
       INTEGER*8    :: IPOINT
       INTEGER*8    :: I,J,K,L
       INTEGER*8    :: II,JJ,KK
-      REAL*8       :: FUNCBODY
-
-
       II=IPOINT
 
       OPEN(102,FILE='../output/post_avg/'//tname1//ftailijk)
-      IF (IHTRANS .NE. 1) THEN
-        WRITE(102,135)'variables= "z","y","u","v","w","p","p2","wx","wy"'//&
-                      ',"wz","uxux","uxuy","uxuz","uyuy","uyuz","uzuz"'  //&
-                      ',"wxwx","wxwy","wxwz","wywy","wywz","wzwz","ss"'
-        WRITE(102,*)'ZONE T="ZONE1" , I=',N3M,', J=',N2M,', F=POINT'
-        DO J=1,N2M
-        DO K=1,N3M
-         WRITE(102,101) ZMP(K),YMP(J),UAVG(II,J,K),VAVG(II,J,K),WAVG(II,J,K)   &
-                       ,PAVG(II,J,K),P2AVG(II,J,K),(VORAVG(II,J,K,L),L=1,3)    &
-                       ,(UIUJAVG(II,J,K,L),L=1,6),(VOR2AVG(II,J,K,L),L=1,6)       &
-                       ,SSAVG(II,J,K)
-        ENDDO
-        ENDDO
-      ELSE
-        WRITE(102,135)'variables= "z","y","u","v","w","p","p2","wx","wy"'//&
-                      ',"wz","uxux","uxuy","uxuz","uyuy","uyuz","uzuz"'  //&
-                      ',"wxwx","wxwy","wxwz","wywy","wywz","wzwz","ss","t","t2"'
-        WRITE(102,*)'ZONE T="ZONE1" , I=',N3M,', J=',N2M,', F=POINT'
-        DO J=1,N2M
-        DO K=1,N3M
-         WRITE(102,103) ZMP(K),YMP(J),UAVG(II,J,K),VAVG(II,J,K),WAVG(II,J,K)   &
-                       ,PAVG(II,J,K),P2AVG(II,J,K),(VORAVG(II,J,K,L),L=1,3)    &
-                       ,(UIUJAVG(II,J,K,L),L=1,6),(VOR2AVG(II,J,K,L),L=1,6)       &
-                       ,SSAVG(II,J,K),TAVG(II,J,K),T2AVG(II,J,K)
-        ENDDO
-        ENDDO
+      WRITE(102,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(102,'(A)') 'LESwHT averaged x-plane'
+      WRITE(102,'(A)') 'ASCII'
+      WRITE(102,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(102,*) 'DIMENSIONS ',N3M,N2M,1
+      WRITE(102,*) 'POINTS ',N3M*N2M,' double'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) XMP(II),YMP(J),ZMP(K)
+      ENDDO
+      ENDDO
+      WRITE(102,*) 'POINT_DATA ',N3M*N2M
+      WRITE(102,'(A)') 'VECTORS mean_velocity double'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) UAVG(II,J,K),VAVG(II,J,K),WAVG(II,J,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS pavg double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) PAVG(II,J,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS p2avg double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) P2AVG(II,J,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'VECTORS mean_vorticity double'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) (VORAVG(II,J,K,L),L=1,3)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS uxux double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) UIUJAVG(II,J,K,1)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS uxuy double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) UIUJAVG(II,J,K,2)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS uxuz double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) UIUJAVG(II,J,K,3)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS uyuy double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) UIUJAVG(II,J,K,4)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS uyuz double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) UIUJAVG(II,J,K,5)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS uzuz double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) UIUJAVG(II,J,K,6)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS wxwx double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) VOR2AVG(II,J,K,1)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS wxwy double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) VOR2AVG(II,J,K,2)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS wxwz double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) VOR2AVG(II,J,K,3)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS wywy double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) VOR2AVG(II,J,K,4)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS wywz double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) VOR2AVG(II,J,K,5)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS wzwz double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) VOR2AVG(II,J,K,6)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS ssavg double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO K=1,N3M
+       WRITE(102,*) SSAVG(II,J,K)
+      ENDDO
+      ENDDO
+      IF (IHTRANS .EQ. 1) THEN
+       WRITE(102,'(A)') 'SCALARS tavg double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO J=1,N2M
+       DO K=1,N3M
+        WRITE(102,*) TAVG(II,J,K)
+       ENDDO
+       ENDDO
+       WRITE(102,'(A)') 'SCALARS t2avg double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO J=1,N2M
+       DO K=1,N3M
+        WRITE(102,*) T2AVG(II,J,K)
+       ENDDO
+       ENDDO
       ENDIF
       CLOSE(102)
-  101 format(2F14.6,21ES13.5)
-  103 format(2F14.6,23ES13.5)
-  135 format(a200)
 
       RETURN
       END
@@ -421,41 +533,89 @@
       INTEGER*8    :: JPOINT
       INTEGER*8    :: I,J,K,L
       INTEGER*8    :: II,JJ,KK
-      REAL*8       :: FUNCBODY
 
       JJ=JPOINT
       OPEN(102,FILE='../output/post_avg/'//tname1//ftailijk)
-      IF (IHTRANS .NE. 1) THEN
-        WRITE(102,135)'variables= "x","z","u","v","w","p","p2","wx","wy"'//&
-                      ',"wz","uxux","uxuy","uxuz","uyuy","uyuz","uzuz"'  //&
-                      ',"wxwx","wxwy","wxwz","wywy","wywz","wzwz","ss"'
-        WRITE(102,*)'ZONE T="ZONE1", I=',N1M,', J=',N3M,', F=POINT'
-        DO K=1,N3M
-        DO I=1,N1M
-        WRITE(102,101) XMP(I),ZMP(K),UAVG(I,JJ,K),VAVG(I,JJ,K),WAVG(I,JJ,K)   &
-                      ,PAVG(I,JJ,K),P2AVG(I,JJ,K),(VORAVG(I,JJ,K,L),L=1,3)    &
-                      ,(UIUJAVG(I,JJ,K,L),L=1,6),(VOR2AVG(I,JJ,K,L),L=1,6)       &
-                      ,SSAVG(I,JJ,K)
-        ENDDO
-        ENDDO
-      ELSE
-        WRITE(102,135)'variables= "x","z","u","v","w","p","p2","wx","wy"'//&
-                      ',"wz","uxux","uxuy","uxuz","uyuy","uyuz","uzuz"'  //&
-                      ',"wxwx","wxwy","wxwz","wywy","wywz","wzwz","ss","t","t2"'
-        WRITE(102,*)'ZONE T="ZONE1", I=',N1M,', J=',N3M,', F=POINT'
-        DO K=1,N3M
-        DO I=1,N1M
-        WRITE(102,103) XMP(I),ZMP(K),UAVG(I,JJ,K),VAVG(I,JJ,K),WAVG(I,JJ,K)   &
-                      ,PAVG(I,JJ,K),P2AVG(I,JJ,K),(VORAVG(I,JJ,K,L),L=1,3)    &
-                      ,(UIUJAVG(I,JJ,K,L),L=1,6),(VOR2AVG(I,JJ,K,L),L=1,6)       &
-                      ,SSAVG(I,JJ,K),TAVG(I,JJ,K),T2AVG(I,JJ,K)
-        ENDDO
-        ENDDO
+      WRITE(102,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(102,'(A)') 'LESwHT averaged y-plane'
+      WRITE(102,'(A)') 'ASCII'
+      WRITE(102,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(102,*) 'DIMENSIONS ',N1M,N3M,1
+      WRITE(102,*) 'POINTS ',N1M*N3M,' double'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) XMP(I),YMP(JJ),ZMP(K)
+      ENDDO
+      ENDDO
+      WRITE(102,*) 'POINT_DATA ',N1M*N3M
+      WRITE(102,'(A)') 'VECTORS mean_velocity double'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) UAVG(I,JJ,K),VAVG(I,JJ,K),WAVG(I,JJ,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS pavg double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) PAVG(I,JJ,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS p2avg double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) P2AVG(I,JJ,K)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'VECTORS mean_vorticity double'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) (VORAVG(I,JJ,K,L),L=1,3)
+      ENDDO
+      ENDDO
+      DO L=1,6
+       WRITE(102,'(A,I1,A)') 'SCALARS uiuj_',L,' double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO K=1,N3M
+       DO I=1,N1M
+        WRITE(102,*) UIUJAVG(I,JJ,K,L)
+       ENDDO
+       ENDDO
+      ENDDO
+      DO L=1,6
+       WRITE(102,'(A,I1,A)') 'SCALARS vor2_',L,' double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO K=1,N3M
+       DO I=1,N1M
+        WRITE(102,*) VOR2AVG(I,JJ,K,L)
+       ENDDO
+       ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS ssavg double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO K=1,N3M
+      DO I=1,N1M
+       WRITE(102,*) SSAVG(I,JJ,K)
+      ENDDO
+      ENDDO
+      IF (IHTRANS .EQ. 1) THEN
+       WRITE(102,'(A)') 'SCALARS tavg double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO K=1,N3M
+       DO I=1,N1M
+        WRITE(102,*) TAVG(I,JJ,K)
+       ENDDO
+       ENDDO
+       WRITE(102,'(A)') 'SCALARS t2avg double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO K=1,N3M
+       DO I=1,N1M
+        WRITE(102,*) T2AVG(I,JJ,K)
+       ENDDO
+       ENDDO
       ENDIF
       CLOSE(102)
-  101 format(2F14.6,21ES13.5)
-  103 format(2F14.6,23ES13.5)
-  135 format(a200)
 
       RETURN
       END
@@ -472,42 +632,90 @@
       INTEGER*8    :: KPOINT
       INTEGER*8    :: I,J,K,L
       INTEGER*8    :: II,JJ,KK
-      REAL*8       :: FUNCBODY
 
       KK=KPOINT
 
       OPEN(102,FILE='../output/post_avg/'//tname1//ftailijk)
-      IF (IHTRANS .NE. 1) THEN
-        WRITE(102,135)'variables= "x","y","u","v","w","p","p2","wx","wy"'//&
-                      ',"wz","uxux","uxuy","uxuz","uyuy","uyuz","uzuz"'  //&
-                      ',"wxwx","wxwy","wxwz","wywy","wywz","wzwz","ss"'
-        WRITE(102,*)'ZONE T="ZONE1", I=',N1M,', J=',N2M,', F=POINT'
-        DO J=1,N2M
-        DO I=1,N1M
-        WRITE(102,101) XMP(I),YMP(J),UAVG(I,J,KK),VAVG(I,J,KK),WAVG(I,J,KK)   &
-                ,PAVG(I,J,KK),P2AVG(I,J,KK),(VORAVG(I,J,KK,L),L=1,3)    &
-                ,(UIUJAVG(I,J,KK,L),L=1,6),(VOR2AVG(I,J,KK,L),L=1,6)       &
-                ,SSAVG(I,J,KK)
-        ENDDO
-        ENDDO
-      ELSE
-        WRITE(102,135)'variables= "x","y","u","v","w","p","p2","wx","wy"'//&
-                      ',"wz","uxux","uxuy","uxuz","uyuy","uyuz","uzuz"'  //&
-                      ',"wxwx","wxwy","wxwz","wywy","wywz","wzwz","ss","t","t2"'
-        WRITE(102,*)'ZONE T="ZONE1", I=',N1M,', J=',N2M,', F=POINT'
-        DO J=1,N2M
-        DO I=1,N1M
-        WRITE(102,103) XMP(I),YMP(J),UAVG(I,J,KK),VAVG(I,J,KK),WAVG(I,J,KK)   &
-                ,PAVG(I,J,KK),P2AVG(I,J,KK),(VORAVG(I,J,KK,L),L=1,3)    &
-                ,(UIUJAVG(I,J,KK,L),L=1,6),(VOR2AVG(I,J,KK,L),L=1,6)       &
-                ,SSAVG(I,J,KK),TAVG(I,J,KK),T2AVG(I,J,KK)
-        ENDDO
-        ENDDO 
+      WRITE(102,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(102,'(A)') 'LESwHT averaged z-plane'
+      WRITE(102,'(A)') 'ASCII'
+      WRITE(102,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(102,*) 'DIMENSIONS ',N1M,N2M,1
+      WRITE(102,*) 'POINTS ',N1M*N2M,' double'
+      DO J=1,N2M
+      DO I=1,N1M
+       WRITE(102,*) XMP(I),YMP(J),ZMP(KK)
+      ENDDO
+      ENDDO
+      WRITE(102,*) 'POINT_DATA ',N1M*N2M
+      WRITE(102,'(A)') 'VECTORS mean_velocity double'
+      DO J=1,N2M
+      DO I=1,N1M
+       WRITE(102,*) UAVG(I,J,KK),VAVG(I,J,KK),WAVG(I,J,KK)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS pavg double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO I=1,N1M
+       WRITE(102,*) PAVG(I,J,KK)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS p2avg double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO I=1,N1M
+       WRITE(102,*) P2AVG(I,J,KK)
+      ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'VECTORS mean_vorticity double'
+      DO J=1,N2M
+      DO I=1,N1M
+       WRITE(102,*) (VORAVG(I,J,KK,L),L=1,3)
+      ENDDO
+      ENDDO
+      DO L=1,6
+       WRITE(102,'(A,I1,A)') 'SCALARS uiuj_',L,' double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO J=1,N2M
+       DO I=1,N1M
+        WRITE(102,*) UIUJAVG(I,J,KK,L)
+       ENDDO
+       ENDDO
+      ENDDO
+      DO L=1,6
+       WRITE(102,'(A,I1,A)') 'SCALARS vor2_',L,' double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO J=1,N2M
+       DO I=1,N1M
+        WRITE(102,*) VOR2AVG(I,J,KK,L)
+       ENDDO
+       ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS ssavg double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO J=1,N2M
+      DO I=1,N1M
+       WRITE(102,*) SSAVG(I,J,KK)
+      ENDDO
+      ENDDO
+      IF (IHTRANS .EQ. 1) THEN
+       WRITE(102,'(A)') 'SCALARS tavg double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO J=1,N2M
+       DO I=1,N1M
+        WRITE(102,*) TAVG(I,J,KK)
+       ENDDO
+       ENDDO
+       WRITE(102,'(A)') 'SCALARS t2avg double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO J=1,N2M
+       DO I=1,N1M
+        WRITE(102,*) T2AVG(I,J,KK)
+       ENDDO
+       ENDDO
       ENDIF
       CLOSE(102)
-  101 format(2F14.6,21ES13.5)
-  103 format(2F14.6,23ES13.5)
-  135 format(a200)
 
       RETURN
       END
@@ -523,7 +731,6 @@
       IMPLICIT NONE
       INTEGER*8    :: I,J,K,L
       INTEGER*8    :: INUM,JNUM,KNUM
-      REAL*8       :: FUNCBODY
 
        INUM = 0
        JNUM = 0
@@ -541,67 +748,216 @@
 
 !====== (When IUVWP = 1) Write UVWP values only
       IF (IUVWP.EQ.1) THEN
-      OPEN(101,FILE='../output/post_avg/'//tname2//'_uvwp.dat')
-      WRITE(101,110)'variables= "x","y","z","u","v","w","p","p2"'     //&
-                    ',"uxux","uxuy","uxuz","uyuy","uyuz","uzuz"'
-      WRITE(101,*)'ZONE T="ZONE1" , I=',INUM,' J=',JNUM,' K=',KNUM,' F=POINT'
+      OPEN(101,FILE='../output/post_avg/'//tname2//'_uvwp.vtk')
+      WRITE(101,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(101,'(A)') 'LESwHT averaged 3D uvwp'
+      WRITE(101,'(A)') 'ASCII'
+      WRITE(101,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(101,*) 'DIMENSIONS ',INUM,JNUM,KNUM
+      WRITE(101,*) 'POINTS ',INUM*JNUM*KNUM,' double'
       DO K=KSTART,KEND,KSKIP
       DO J=JSTART,JEND,JSKIP
       DO I=ISTART,IEND,ISKIP
-      WRITE(101,100) XMP(I),YMP(J),ZMP(K),UAVG(I,J,K)  &
-                    ,VAVG(I,J,K),WAVG(I,J,K),PAVG(I,J,K),P2AVG(I,J,K) &
-                    ,(UIUJAVG(I,J,K,L),L=1,6)
+       WRITE(101,*) XMP(I),YMP(J),ZMP(K)
       ENDDO
       ENDDO
+      ENDDO
+      WRITE(101,*) 'POINT_DATA ',INUM*JNUM*KNUM
+      WRITE(101,'(A)') 'VECTORS mean_velocity double'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(101,*) UAVG(I,J,K),VAVG(I,J,K),WAVG(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(101,'(A)') 'SCALARS pavg double 1'
+      WRITE(101,'(A)') 'LOOKUP_TABLE default'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(101,*) PAVG(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(101,'(A)') 'SCALARS p2avg double 1'
+      WRITE(101,'(A)') 'LOOKUP_TABLE default'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(101,*) P2AVG(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      DO L=1,6
+       WRITE(101,'(A,I1,A)') 'SCALARS uiuj_',L,' double 1'
+       WRITE(101,'(A)') 'LOOKUP_TABLE default'
+       DO K=KSTART,KEND,KSKIP
+       DO J=JSTART,JEND,JSKIP
+       DO I=ISTART,IEND,ISKIP
+        WRITE(101,*) UIUJAVG(I,J,K,L)
+       ENDDO
+       ENDDO
+       ENDDO
       ENDDO
       CLOSE(101)
-  100 format(3F8.3,11ES13.5)
       ENDIF
 !======
 
 !====== (When IWXYZ = 1) Write WXYZ values only
       IF (IWXYZ.EQ.1) THEN
-      OPEN(102,FILE='../output/post_avg/'//tname2//'_wxyz.dat')
-      WRITE(102,110)'variables= "x","y","z","wx","wy","wz","wxwx","wxwy"'//&
-                    ',"wxwz","wywy","wywz","wzwz","ss"'
-      WRITE(102,*)'ZONE T="ZONE1" , I=',INUM,' J=',JNUM,' K=',KNUM,' F=POINT'
+      OPEN(102,FILE='../output/post_avg/'//tname2//'_wxyz.vtk')
+      WRITE(102,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(102,'(A)') 'LESwHT averaged 3D wxyz'
+      WRITE(102,'(A)') 'ASCII'
+      WRITE(102,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(102,*) 'DIMENSIONS ',INUM,JNUM,KNUM
+      WRITE(102,*) 'POINTS ',INUM*JNUM*KNUM,' double'
       DO K=KSTART,KEND,KSKIP
       DO J=JSTART,JEND,JSKIP
       DO I=ISTART,IEND,ISKIP
-      WRITE(102,103) XMP(I),YMP(J),ZMP(K),(VORAVG(I,J,K,L),L=1,3) &
-                    ,(VOR2AVG(I,J,K,L),L=1,6),SSAVG(I,J,K)
+       WRITE(102,*) XMP(I),YMP(J),ZMP(K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(102,*) 'POINT_DATA ',INUM*JNUM*KNUM
+      WRITE(102,'(A)') 'VECTORS mean_vorticity double'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(102,*) (VORAVG(I,J,K,L),L=1,3)
+      ENDDO
+      ENDDO
+      ENDDO
+      DO L=1,6
+       WRITE(102,'(A,I1,A)') 'SCALARS vor2_',L,' double 1'
+       WRITE(102,'(A)') 'LOOKUP_TABLE default'
+       DO K=KSTART,KEND,KSKIP
+       DO J=JSTART,JEND,JSKIP
+       DO I=ISTART,IEND,ISKIP
+        WRITE(102,*) VOR2AVG(I,J,K,L)
+       ENDDO
+       ENDDO
+       ENDDO
+      ENDDO
+      WRITE(102,'(A)') 'SCALARS ssavg double 1'
+      WRITE(102,'(A)') 'LOOKUP_TABLE default'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(102,*) SSAVG(I,J,K)
       ENDDO
       ENDDO
       ENDDO
       CLOSE(102)
-  103 format(3F8.3,10ES13.5)
       ENDIF
 !======
 
 !====== (When IALL = 1) Write all
       IF (IALL.EQ.1) THEN
-      OPEN(103,FILE='../output/post_avg/'//tname2//'_all.dat')
-      WRITE(103,110)'variables= "x","y","z",u","v","w","p","p2","wx","wy"'//&
-                    ',"wz","uxux","uxuy","uxuz","uyuy","uyuz","uzuz"'  //&
-                    ',"wxwx","wxwy","wxwz","wywy","wywz","wzwz","ss"'
-      WRITE(103,*)'ZONE T="ZONE1" , I=',INUM,' J=',JNUM,' K=',KNUM,' F=POINT'
+      OPEN(103,FILE='../output/post_avg/'//tname2//'_all.vtk')
+      WRITE(103,'(A)') '# vtk DataFile Version 3.0'
+      WRITE(103,'(A)') 'LESwHT averaged 3D all'
+      WRITE(103,'(A)') 'ASCII'
+      WRITE(103,'(A)') 'DATASET STRUCTURED_GRID'
+      WRITE(103,*) 'DIMENSIONS ',INUM,JNUM,KNUM
+      WRITE(103,*) 'POINTS ',INUM*JNUM*KNUM,' double'
       DO K=KSTART,KEND,KSKIP
       DO J=JSTART,JEND,JSKIP
       DO I=ISTART,IEND,ISKIP
-      WRITE(103,105) XMP(I),YMP(J),ZMP(K)                           &
-              ,UAVG(I,J,K),VAVG(I,J,K),WAVG(I,J,K)                  &
-              ,PAVG(I,J,K),P2AVG(I,J,K),(VORAVG(I,J,K,L),L=1,3)     &
-              ,(UIUJAVG(I,J,K,L),L=1,6),(VOR2AVG(I,J,K,L),L=1,6)       &
-              ,SSAVG(I,J,K)
+       WRITE(103,*) XMP(I),YMP(J),ZMP(K)
       ENDDO
       ENDDO
       ENDDO
+      WRITE(103,*) 'POINT_DATA ',INUM*JNUM*KNUM
+      WRITE(103,'(A)') 'VECTORS mean_velocity double'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) UAVG(I,J,K),VAVG(I,J,K),WAVG(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(103,'(A)') 'SCALARS pavg double 1'
+      WRITE(103,'(A)') 'LOOKUP_TABLE default'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) PAVG(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(103,'(A)') 'SCALARS p2avg double 1'
+      WRITE(103,'(A)') 'LOOKUP_TABLE default'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) P2AVG(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      WRITE(103,'(A)') 'VECTORS mean_vorticity double'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) (VORAVG(I,J,K,L),L=1,3)
+      ENDDO
+      ENDDO
+      ENDDO
+      DO L=1,6
+       WRITE(103,'(A,I1,A)') 'SCALARS uiuj_',L,' double 1'
+       WRITE(103,'(A)') 'LOOKUP_TABLE default'
+       DO K=KSTART,KEND,KSKIP
+       DO J=JSTART,JEND,JSKIP
+       DO I=ISTART,IEND,ISKIP
+        WRITE(103,*) UIUJAVG(I,J,K,L)
+       ENDDO
+       ENDDO
+       ENDDO
+      ENDDO
+      DO L=1,6
+       WRITE(103,'(A,I1,A)') 'SCALARS vor2_',L,' double 1'
+       WRITE(103,'(A)') 'LOOKUP_TABLE default'
+       DO K=KSTART,KEND,KSKIP
+       DO J=JSTART,JEND,JSKIP
+       DO I=ISTART,IEND,ISKIP
+        WRITE(103,*) VOR2AVG(I,J,K,L)
+       ENDDO
+       ENDDO
+       ENDDO
+      ENDDO
+      WRITE(103,'(A)') 'SCALARS ssavg double 1'
+      WRITE(103,'(A)') 'LOOKUP_TABLE default'
+      DO K=KSTART,KEND,KSKIP
+      DO J=JSTART,JEND,JSKIP
+      DO I=ISTART,IEND,ISKIP
+       WRITE(103,*) SSAVG(I,J,K)
+      ENDDO
+      ENDDO
+      ENDDO
+      IF (IHTRANS .EQ. 1) THEN
+       WRITE(103,'(A)') 'SCALARS tavg double 1'
+       WRITE(103,'(A)') 'LOOKUP_TABLE default'
+       DO K=KSTART,KEND,KSKIP
+       DO J=JSTART,JEND,JSKIP
+       DO I=ISTART,IEND,ISKIP
+        WRITE(103,*) TAVG(I,J,K)
+       ENDDO
+       ENDDO
+       ENDDO
+       WRITE(103,'(A)') 'SCALARS t2avg double 1'
+       WRITE(103,'(A)') 'LOOKUP_TABLE default'
+       DO K=KSTART,KEND,KSKIP
+       DO J=JSTART,JEND,JSKIP
+       DO I=ISTART,IEND,ISKIP
+        WRITE(103,*) T2AVG(I,J,K)
+       ENDDO
+       ENDDO
+       ENDDO
+      ENDIF
       CLOSE(103)
-  105 format(3F8.3,21ES13.5)
       ENDIF
 !======
-
-  110 FORMAT(A200)
 
       RETURN
       END
@@ -1148,27 +1504,5 @@
       pause 'too many iterations in jacobi'
       return
       END
-
 !=======================================================================
-        FUNCTION FUNCBODY(XX,YY,ZZ,IS)
-!=======================================================================
-!
-!     FUNCBODY < 0 IF (XX,YY,ZZ) is inside a moving cylinder
-!     FUNCBODY > 0 IF (XX,YY,ZZ) is outside a moving cylinder
-!
-!=======================================================================
-      USE MOD_IBMPRE, ONLY : N3M, ZMP, N2M, YMP
-      IMPLICIT NONE
-      REAL*8     :: XX,YY,ZZ
-      REAL*8     :: FUNCBODY
-      INTEGER*8  :: IS
-      INTEGER*8  :: NZP
-      REAL*8     :: RIBS,RIBH
-      REAL*8     :: LOWDEL
-      REAL*8     :: ZBACUP,YBACUP
-
-      FUNCBODY = 1.
-      
-      RETURN
-      END
 

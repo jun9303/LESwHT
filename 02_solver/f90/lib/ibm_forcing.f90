@@ -1,100 +1,100 @@
 !=======================================================================
 !
-!     Codebase (LICA 2017 Version) by 
-!     H. Choi / Department of Mechanical & Aerospace Engineering
-!     Seoul National University
+!     CODEBASE (LICA 2017 VERSION) BY
+!     H. CHOI / DEPARTMENT OF MECHANICAL & AEROSPACE ENGINEERING
+!     SEOUL NATIONAL UNIVERSITY
 !
 !=======================================================================
 !
-!     LESwHT (c) 2026 S. Lee (ORCID: 0000-0002-2063-6298)
-!     2018.02.28. Modified for F2PY (Fortran-to-Python) usage
-!     2026.02.18. Code modernization
+!     LESWHT (C) 2026 S. LEE (ORCID: 0000-0002-2063-6298)
+!     2018.02.28. MODIFIED FOR F2PY (FORTRAN-TO-PYTHON) USAGE
+!     2026.02.18. CODE MODERNIZATION
 !
 !=======================================================================
-SUBROUTINE FINDFORCING()
-    USE MOD_COMMON
-    USE MOD_FLOWARRAY
-    IMPLICIT NONE
-    
-    ! Local Temporary Variables
-    INTEGER(8) :: NINNER_U, NINNER_V, NINNER_W, NINNER_T
-    INTEGER(8), ALLOCATABLE :: FCP_TEMP(:,:)
-    
-    ! Allocate temporary array for Forcing Points (FCP)
-    ! Size it safely to total grid points to handle any body size
-    ALLOCATE(FCP_TEMP(N1*N2*N3, 3))
+subroutine findforcing()
+  use mod_common
+  use mod_flowarray
+  implicit none
 
-    !-------------------------------------------------------------------
-    ! 1. U-Velocity Component (Face X)
-    !    Grid: X (Face), YMP (Center), ZMP (Center)
-    !-------------------------------------------------------------------
-    CALL FIND_INOUT(N1, N2, N3, X, YMP, ZMP, NBODY(1), INOUT(:,:,:,1), TIME)
-    
-    CALL FINDBDY_INTP(1_8, N1, N2, N3, NBODY(1), INOUT(:,:,:,1), &
-                      FIXIU, FIXJU, FIXKU, FIXIL, FIXJL, FIXKL, &
-                      NINTP(1), NINNER_U, FCP_TEMP, INTPTYPE(:,1), INTPINDX(:,1,:))
-    
-    ! Copy FCP data to Module Arrays
-    IFC(1:NBODY(1), 1) = FCP_TEMP(1:NBODY(1), 1)
-    JFC(1:NBODY(1), 1) = FCP_TEMP(1:NBODY(1), 2)
-    KFC(1:NBODY(1), 1) = FCP_TEMP(1:NBODY(1), 3)
+  ! LOCAL TEMPORARY VARIABLES
+  integer(8) :: ninner_u, ninner_v, ninner_w, ninner_t
+  integer(8), allocatable :: fcp_temp(:, :)
 
-    CALL GEOMFAC_INTP(N1, N2, N3, X, YMP, ZMP, NINTP(1), &
-                      NBODY(1), FCP_TEMP, INTPINDX(:,1,:), GEOMFAC(:,1,:,:,:), TIME)
+  ! ALLOCATE TEMPORARY ARRAY FOR FORCING POINTS (FCP)
+  ! SIZE IT SAFELY TO TOTAL GRID POINTS TO HANDLE ANY BODY SIZE
+  allocate (fcp_temp(n1 * n2 * n3, 3))
 
-    !-------------------------------------------------------------------
-    ! 2. V-Velocity Component (Face Y)
-    !    Grid: XMP (Center), Y (Face), ZMP (Center)
-    !-------------------------------------------------------------------
-    CALL FIND_INOUT(N1, N2, N3, XMP, Y, ZMP, NBODY(2), INOUT(:,:,:,2), TIME)
-    
-    CALL FINDBDY_INTP(2_8, N1, N2, N3, NBODY(2), INOUT(:,:,:,2), &
-                      FIXIU, FIXJU, FIXKU, FIXIL, FIXJL, FIXKL, &
-                      NINTP(2), NINNER_V, FCP_TEMP, INTPTYPE(:,2), INTPINDX(:,2,:))
-    
-    IFC(1:NBODY(2), 2) = FCP_TEMP(1:NBODY(2), 1)
-    JFC(1:NBODY(2), 2) = FCP_TEMP(1:NBODY(2), 2)
-    KFC(1:NBODY(2), 2) = FCP_TEMP(1:NBODY(2), 3)
+  !-------------------------------------------------------------------
+  ! 1. U-VELOCITY COMPONENT (FACE X)
+  !    GRID: X (FACE), YMP (CENTER), ZMP (CENTER)
+  !-------------------------------------------------------------------
+  call find_inout(n1, n2, n3, x, ymp, zmp, nbody(1), inout(:, :, :, 1), time)
 
-    CALL GEOMFAC_INTP(N1, N2, N3, XMP, Y, ZMP, NINTP(2), &
-                      NBODY(2), FCP_TEMP, INTPINDX(:,2,:), GEOMFAC(:,2,:,:,:), TIME)
+  call findbdy_intp(1_8, n1, n2, n3, nbody(1), inout(:, :, :, 1), &
+                    fixiu, fixju, fixku, fixil, fixjl, fixkl, &
+                    nintp(1), ninner_u, fcp_temp, intptype(:, 1), intpindx(:, 1, :))
 
-    !-------------------------------------------------------------------
-    ! 3. W-Velocity Component (Face Z)
-    !    Grid: XMP (Center), YMP (Center), Z (Face)
-    !-------------------------------------------------------------------
-    CALL FIND_INOUT(N1, N2, N3, XMP, YMP, Z, NBODY(3), INOUT(:,:,:,3), TIME)
-    
-    CALL FINDBDY_INTP(3_8, N1, N2, N3, NBODY(3), INOUT(:,:,:,3), &
-                      FIXIU, FIXJU, FIXKU, FIXIL, FIXJL, FIXKL, &
-                      NINTP(3), NINNER_W, FCP_TEMP, INTPTYPE(:,3), INTPINDX(:,3,:))
-    
-    IFC(1:NBODY(3), 3) = FCP_TEMP(1:NBODY(3), 1)
-    JFC(1:NBODY(3), 3) = FCP_TEMP(1:NBODY(3), 2)
-    KFC(1:NBODY(3), 3) = FCP_TEMP(1:NBODY(3), 3)
+  ! COPY FCP DATA TO MODULE ARRAYS
+  ifc(1:nbody(1), 1) = fcp_temp(1:nbody(1), 1)
+  jfc(1:nbody(1), 1) = fcp_temp(1:nbody(1), 2)
+  kfc(1:nbody(1), 1) = fcp_temp(1:nbody(1), 3)
 
-    CALL GEOMFAC_INTP(N1, N2, N3, XMP, YMP, Z, NINTP(3), &
-                      NBODY(3), FCP_TEMP, INTPINDX(:,3,:), GEOMFAC(:,3,:,:,:), TIME)
+  call geomfac_intp(n1, n2, n3, x, ymp, zmp, nintp(1), &
+                    nbody(1), fcp_temp, intpindx(:, 1, :), geomfac(:, 1, :, :, :), time)
 
-    !-------------------------------------------------------------------
-    ! 4. Temperature (Scalar) - Optional
-    !    Grid: XMP, YMP, ZMP (All Center)
-    !-------------------------------------------------------------------
-    IF (IHTRANS .EQ. 1) THEN
-        CALL FIND_INOUT(N1, N2, N3, XMP, YMP, ZMP, NBODY(4), INOUT(:,:,:,4), TIME)
-        
-        CALL FINDBDY_INTP(4_8, N1, N2, N3, NBODY(4), INOUT(:,:,:,4), &
-                          FIXIU, FIXJU, FIXKU, FIXIL, FIXJL, FIXKL, &
-                          NINTP(4), NINNER_T, FCP_TEMP, INTPTYPE(:,4), INTPINDX(:,4,:))
-                          
-        IFC(1:NBODY(4), 4) = FCP_TEMP(1:NBODY(4), 1)
-        JFC(1:NBODY(4), 4) = FCP_TEMP(1:NBODY(4), 2)
-        KFC(1:NBODY(4), 4) = FCP_TEMP(1:NBODY(4), 3)
+  !-------------------------------------------------------------------
+  ! 2. V-VELOCITY COMPONENT (FACE Y)
+  !    GRID: XMP (CENTER), Y (FACE), ZMP (CENTER)
+  !-------------------------------------------------------------------
+  call find_inout(n1, n2, n3, xmp, y, zmp, nbody(2), inout(:, :, :, 2), time)
 
-        CALL GEOMFAC_INTP(N1, N2, N3, XMP, YMP, ZMP, NINTP(4), &
-                          NBODY(4), FCP_TEMP, INTPINDX(:,4,:), GEOMFAC(:,4,:,:,:), TIME)
-    ENDIF
+  call findbdy_intp(2_8, n1, n2, n3, nbody(2), inout(:, :, :, 2), &
+                    fixiu, fixju, fixku, fixil, fixjl, fixkl, &
+                    nintp(2), ninner_v, fcp_temp, intptype(:, 2), intpindx(:, 2, :))
 
-    DEALLOCATE(FCP_TEMP)
+  ifc(1:nbody(2), 2) = fcp_temp(1:nbody(2), 1)
+  jfc(1:nbody(2), 2) = fcp_temp(1:nbody(2), 2)
+  kfc(1:nbody(2), 2) = fcp_temp(1:nbody(2), 3)
 
-END SUBROUTINE FINDFORCING
+  call geomfac_intp(n1, n2, n3, xmp, y, zmp, nintp(2), &
+                    nbody(2), fcp_temp, intpindx(:, 2, :), geomfac(:, 2, :, :, :), time)
+
+  !-------------------------------------------------------------------
+  ! 3. W-VELOCITY COMPONENT (FACE Z)
+  !    GRID: XMP (CENTER), YMP (CENTER), Z (FACE)
+  !-------------------------------------------------------------------
+  call find_inout(n1, n2, n3, xmp, ymp, z, nbody(3), inout(:, :, :, 3), time)
+
+  call findbdy_intp(3_8, n1, n2, n3, nbody(3), inout(:, :, :, 3), &
+                    fixiu, fixju, fixku, fixil, fixjl, fixkl, &
+                    nintp(3), ninner_w, fcp_temp, intptype(:, 3), intpindx(:, 3, :))
+
+  ifc(1:nbody(3), 3) = fcp_temp(1:nbody(3), 1)
+  jfc(1:nbody(3), 3) = fcp_temp(1:nbody(3), 2)
+  kfc(1:nbody(3), 3) = fcp_temp(1:nbody(3), 3)
+
+  call geomfac_intp(n1, n2, n3, xmp, ymp, z, nintp(3), &
+                    nbody(3), fcp_temp, intpindx(:, 3, :), geomfac(:, 3, :, :, :), time)
+
+  !-------------------------------------------------------------------
+  ! 4. TEMPERATURE (SCALAR) - OPTIONAL
+  !    GRID: XMP, YMP, ZMP (ALL CENTER)
+  !-------------------------------------------------------------------
+  if (ihtrans .eq. 1) then
+    call find_inout(n1, n2, n3, xmp, ymp, zmp, nbody(4), inout(:, :, :, 4), time)
+
+    call findbdy_intp(4_8, n1, n2, n3, nbody(4), inout(:, :, :, 4), &
+                      fixiu, fixju, fixku, fixil, fixjl, fixkl, &
+                      nintp(4), ninner_t, fcp_temp, intptype(:, 4), intpindx(:, 4, :))
+
+    ifc(1:nbody(4), 4) = fcp_temp(1:nbody(4), 1)
+    jfc(1:nbody(4), 4) = fcp_temp(1:nbody(4), 2)
+    kfc(1:nbody(4), 4) = fcp_temp(1:nbody(4), 3)
+
+    call geomfac_intp(n1, n2, n3, xmp, ymp, zmp, nintp(4), &
+                      nbody(4), fcp_temp, intpindx(:, 4, :), geomfac(:, 4, :, :, :), time)
+  end if
+
+  deallocate (fcp_temp)
+
+end subroutine findforcing

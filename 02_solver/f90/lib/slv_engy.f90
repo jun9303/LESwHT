@@ -1,713 +1,717 @@
 !=======================================================================
-        SUBROUTINE RHSNLHS_T
+        subroutine rhsnlhs_t
 !=======================================================================
-       USE MOD_COMMON
-       IMPLICIT NONE
-       
-       IF (ILES .EQ. 1) CALL RHSSGS_T    
-       CALL RHS_T
-       IF ((IBMON .NE. 0) .AND. ICONJG .EQ. 0) CALL RHS_IBM_T 
+          use mod_common
+          implicit none
 
-       ! BYPASS CONVECTIVE OUTLET FOR SCALING METHOD
-       IF (XPRDIC .EQ. 0) THEN
-          CALL CONVBC_T                     
-          IF (ICH .NE. 1) CALL RHSINCORPBC_T
-       ENDIF
+          if (iles .eq. 1) call rhssgs_t
+          call rhs_t
+          if ((ibmon .ne. 0) .and. iconjg .eq. 0) call rhs_ibm_t
 
-       CALL LHS_T
+          ! BYPASS CONVECTIVE OUTLET FOR SCALING METHOD
+          if (xprdic .eq. 0) then
+            call convbc_t
+            if (ich .ne. 1) call rhsincorpbc_t
+          end if
 
-       ! BYPASS CONVECTIVE RETRIEVAL FOR SCALING METHOD
-       IF (XPRDIC .EQ. 0) CALL RETRV_T
-       
-       CALL PRDIC_ADJ_T
-       CALL WALLBC_T
+          call lhs_t
 
-       RETURN
-       END
+          ! BYPASS CONVECTIVE RETRIEVAL FOR SCALING METHOD
+          if (xprdic .eq. 0) call retrv_t
+
+          call prdic_adj_t
+          call wallbc_t
+
+          return
+        end
 !=======================================================================
 !=======================================================================
-       SUBROUTINE RHS_T
+        subroutine rhs_t
 !=======================================================================
 !
-!     Computing intermediate velocity, u hat, step in delta form
+!     COMPUTING INTERMEDIATE VELOCITY, U HAT, STEP IN DELTA FORM
 !
-!     variables in common:
-!     x, y, z         : coordinate direction
-!     u, v, w         : velocity for x, y, z direction
-!     n, s, e, w, c, f: + & - for each x, y, z direction
-!     AN, AL, TAL     : Non-linear, linear, turbulent (SGS)
+!     VARIABLES IN COMMON:
+!     X, Y, Z         : COORDINATE DIRECTION
+!     U, V, W         : VELOCITY FOR X, Y, Z DIRECTION
+!     N, S, E, W, C, F: + & - FOR EACH X, Y, Z DIRECTION
+!     AN, AL, TAL     : NON-LINEAR, LINEAR, TURBULENT (SGS)
 !
-!     RHS1(x,y,z,L):
-!           RHS term consists of Non-linear/Linear/SGS terms
-!           Components for IB method will be added in RHS_IBM subroutine
+!     RHS1(X,Y,Z,L):
+!           RHS TERM CONSISTS OF NON-LINEAR/LINEAR/SGS TERMS
+!           COMPONENTS FOR IB METHOD WILL BE ADDED IN RHS_IBM SUBROUTINE
 !
 !-----------------------------------------------------------------------
-USE MOD_COMMON
-       USE MOD_FLOWARRAY, ONLY : U,V,W,P,T,ALSGS,ALSGS1,RHS1   &
-                                ,RK3TO,RK3TOO,NWALL_DVM,CSTAR,KSTAR
-       IMPLICIT NONE
-       INTEGER*8   :: I,J,K
-       INTEGER*8   :: IPLUS,IMINUS,JPLUS,JMINUS,KPLUS,KMINUS
-       REAL*8      :: OMEGA
+          use mod_common
+          use mod_flowarray, only: u, v, w, p, t, alsgs, alsgs1, rhs1 &
+                                   , rk3to, rk3too, nwall_dvm, cstar, kstar
+          implicit none
+          integer(8) :: i, j, k
+          integer(8) :: iplus, iminus, jplus, jminus, kplus, kminus
+          real(8) :: omega
 
-!------------ variables for T (temperature)
-       REAL*8      :: TE,TW,TN,TS,TC,TF
-       REAL*8      :: ANT1,ANT2,ANT3,RK3T
-       REAL*8      :: ALT1,ALT2,ALT3,ALT4,ALT5,ALT6,ALTX,ALTY,ALTZ,ALT
-       REAL*8      :: TALTX,TALTY,TALTZ
+!------------ VARIABLES FOR T (TEMPERATURE)
+          real(8) :: te, tw, tn, ts, tc, tf
+          real(8) :: ant1, ant2, ant3, rk3t
+          real(8) :: alt1, alt2, alt3, alt4, alt5, alt6, altx, alty, altz, alt
+          real(8) :: taltx, talty, taltz
 
-!-----RHS1 calculation for T -----------------
+!-----RHS1 CALCULATION FOR T -----------------
 !$OMP PARALLEL DO  &
-!$OMP private(TE,TW,TN,TS,TC,TF)   &
-!$OMP private(ANT1,ANT2,ANT3,RK3T) &
-!$OMP private(ALT1,ALT2,ALT3,ALT4,ALT5,ALT6,ALTX,ALTY,ALTZ,ALT) &
-!$OMP private(TALTX,TALTY,TALTZ,OMEGA)
-       DO K=1,N3M
-       DO J=1,N2M
-       DO I=1,N1M
+!$OMP PRIVATE(TE,TW,TN,TS,TC,TF)   &
+!$OMP PRIVATE(ANT1,ANT2,ANT3,RK3T) &
+!$OMP PRIVATE(ALT1,ALT2,ALT3,ALT4,ALT5,ALT6,ALTX,ALTY,ALTZ,ALT) &
+!$OMP PRIVATE(TALTX,TALTY,TALTZ,OMEGA)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
 
-       KPLUS=KPV(K)
-       KMINUS=KMV(K)
-       JPLUS=JPV(J)
-       JMINUS=JMV(J)
-       IPLUS=IPV(I)
-       IMINUS=IMV(I)
-      
-       ! DECOUPLE PERIODIC WRAP-AROUND FOR TEMPERATURE SCALING
-       IF (XPRDIC .EQ. 1) THEN
-         IF (I .EQ. N1M) IPLUS = N1
-         IF (I .EQ. 1)   IMINUS = 0
-       ENDIF
+                kplus = kpv(k)
+                kminus = kmv(k)
+                jplus = jpv(j)
+                jminus = jmv(j)
+                iplus = ipv(i)
+                iminus = imv(i)
 
-       TE=0.5*(F2FX(I)*T(IPLUS,J,K)+F2FX(IPLUS)*T(I,J,K))*C2CXI(IPLUS) &
-          *(1.-FIXIU(I))+T(IPLUS,J,K)*FIXIU(I)
-       TW=0.5*(F2FX(IMINUS)*T(I,J,K)+F2FX(I)*T(IMINUS,J,K))*C2CXI(I)   &
-          *(1.-FIXIL(I))+T(IMINUS,J,K)*FIXIL(I)
+                ! DECOUPLE PERIODIC WRAP-AROUND FOR TEMPERATURE SCALING
+                if (xprdic .eq. 1) then
+                  if (i .eq. n1m) iplus = n1
+                  if (i .eq. 1) iminus = 0
+                end if
 
-       TN=0.5*(F2FY(J)*T(I,JPLUS,K)+F2FY(JPLUS)*T(I,J,K))*C2CYI(JPLUS) &
-          *(1.-FIXJU(J))+T(I,JPLUS,K)*FIXJU(J)
-       TS=0.5*(F2FY(JMINUS)*T(I,J,K)+F2FY(J)*T(I,JMINUS,K))*C2CYI(J)   &
-          *(1.-FIXJL(J))+T(I,JMINUS,K)*FIXJL(J)
+                te = 0.5 * (f2fx(i) * t(iplus, j, k) + f2fx(iplus) * t(i, j, k)) * c2cxi(iplus) &
+                     * (1.-fixiu(i)) + t(iplus, j, k) * fixiu(i)
+                tw = 0.5 * (f2fx(iminus) * t(i, j, k) + f2fx(i) * t(iminus, j, k)) * c2cxi(i) &
+                     * (1.-fixil(i)) + t(iminus, j, k) * fixil(i)
 
-       TC=0.5*(F2FZ(K)*T(I,J,KPLUS)+F2FZ(KPLUS)*T(I,J,K))*C2CZI(KPLUS) &
-          *(1.-FIXKU(K))+T(I,J,KPLUS)*FIXKU(K)
-       TF=0.5*(F2FZ(KMINUS)*T(I,J,K)+F2FZ(K)*T(I,J,KMINUS))*C2CZI(K)   &
-          *(1.-FIXKL(K))+T(I,J,KMINUS)*FIXKL(K)
+                tn = 0.5 * (f2fy(j) * t(i, jplus, k) + f2fy(jplus) * t(i, j, k)) * c2cyi(jplus) &
+                     * (1.-fixju(j)) + t(i, jplus, k) * fixju(j)
+                ts = 0.5 * (f2fy(jminus) * t(i, j, k) + f2fy(j) * t(i, jminus, k)) * c2cyi(j) &
+                     * (1.-fixjl(j)) + t(i, jminus, k) * fixjl(j)
 
-       ANT1=(TE*U(IPLUS,J,K)-TW*U(I,J,K))*F2FXI(I)
-       ANT2=(TN*V(I,JPLUS,K)-TS*V(I,J,K))*F2FYI(J)
-       ANT3=(TC*W(I,J,KPLUS)-TF*W(I,J,K))*F2FZI(K)
+                tc = 0.5 * (f2fz(k) * t(i, j, kplus) + f2fz(kplus) * t(i, j, k)) * c2czi(kplus) &
+                     * (1.-fixku(k)) + t(i, j, kplus) * fixku(k)
+                tf = 0.5 * (f2fz(kminus) * t(i, j, k) + f2fz(k) * t(i, j, kminus)) * c2czi(k) &
+                     * (1.-fixkl(k)) + t(i, j, kminus) * fixkl(k)
 
-       ! OMEGA acts as a switch for the convective term.
-       ! For stationary Conjugate Heat Transfer (IMOVINGON = 0), velocity inside the solid is zero,
-       ! so we force OMEGA = 0. to guarantee pure conduction and suppress numerical noise.
-       ! For a MOVING solid (IMOVINGON = 1), the solid has a rigid-body velocity, 
-       ! and therefore advects its own temperature. We must leave OMEGA = 1.
-       IF ((ICONJG .EQ. 1) .AND. (NWALL_DVM(I,J,K) .EQ. 0) .AND. (IMOVINGON .EQ. 0)) THEN
-         OMEGA = 0.
-       ELSE
-         OMEGA = 1.
-       ENDIF
+                ant1 = (te * u(iplus, j, k) - tw * u(i, j, k)) * f2fxi(i)
+                ant2 = (tn * v(i, jplus, k) - ts * v(i, j, k)) * f2fyi(j)
+                ant3 = (tc * w(i, j, kplus) - tf * w(i, j, k)) * f2fzi(k)
 
-       RK3T=-OMEGA*(ANT1+ANT2+ANT3)              ! Non-linear term at k-substep
+                ! OMEGA ACTS AS A SWITCH FOR THE CONVECTIVE TERM.
+                ! FOR STATIONARY CONJUGATE HEAT TRANSFER (IMOVINGON = 0), VELOCITY INSIDE THE SOLID IS ZERO,
+                ! SO WE FORCE OMEGA = 0. TO GUARANTEE PURE CONDUCTION AND SUPPRESS NUMERICAL NOISE.
+                ! FOR A MOVING SOLID (IMOVINGON = 1), THE SOLID HAS A RIGID-BODY VELOCITY,
+                ! AND THEREFORE ADVECTS ITS OWN TEMPERATURE. WE MUST LEAVE OMEGA = 1.
+                if ((iconjg .eq. 1) .and. (nwall_dvm(i, j, k) .eq. 0) .and. (imovingon .eq. 0)) then
+                  omega = 0.
+                else
+                  omega = 1.
+                end if
 
-       ALT1=(T(IPLUS,J,K)-T(I,J,K))*C2CXI(IPLUS)
-       ALT2=(T(I,J,K)-T(IMINUS,J,K))*C2CXI(I)
-       ALT3=(T(I,JPLUS,K)-T(I,J,K))*C2CYI(JPLUS)
-       ALT4=(T(I,J,K)-T(I,JMINUS,K))*C2CYI(J)  
-       ALT5=(T(I,J,KPLUS)-T(I,J,K))*C2CZI(KPLUS)
-       ALT6=(T(I,J,K)-T(I,J,KMINUS))*C2CZI(K)   
+                rk3t = -omega * (ant1 + ant2 + ant3)              ! NON-LINEAR TERM AT K-SUBSTEP
 
-       ALTX=(ALT1-ALT2)*F2FXI(I)
-       ALTY=(ALT3-ALT4)*F2FYI(J)
-       ALTZ=(ALT5-ALT6)*F2FZI(K)
+                alt1 = (t(iplus, j, k) - t(i, j, k)) * c2cxi(iplus)
+                alt2 = (t(i, j, k) - t(iminus, j, k)) * c2cxi(i)
+                alt3 = (t(i, jplus, k) - t(i, j, k)) * c2cyi(jplus)
+                alt4 = (t(i, j, k) - t(i, jminus, k)) * c2cyi(j)
+                alt5 = (t(i, j, kplus) - t(i, j, k)) * c2czi(kplus)
+                alt6 = (t(i, j, k) - t(i, j, kminus)) * c2czi(k)
 
-       IF (ICONJG .EQ. 1) THEN
-         ALTX = CSTAR(I,J,K)*(KSTAR(I,J,K,1)*ALT1-KSTAR(I,J,K,2)*ALT2)*F2FXI(I)
-         ALTY = CSTAR(I,J,K)*(KSTAR(I,J,K,3)*ALT3-KSTAR(I,J,K,4)*ALT4)*F2FYI(J)
-         ALTZ = CSTAR(I,J,K)*(KSTAR(I,J,K,5)*ALT5-KSTAR(I,J,K,6)*ALT6)*F2FZI(K)
-       ENDIF
+                altx = (alt1 - alt2) * f2fxi(i)
+                alty = (alt3 - alt4) * f2fyi(j)
+                altz = (alt5 - alt6) * f2fzi(k)
 
-       ALT=1./(RE*PR)*(ALTX+ALTY+ALTZ)           ! Linear terms at k-substep
-       
+                if (iconjg .eq. 1) then
+                  altx = cstar(i, j, k) * (kstar(i, j, k, 1) * alt1 - kstar(i, j, k, 2) * alt2) * f2fxi(i)
+                  alty = cstar(i, j, k) * (kstar(i, j, k, 3) * alt3 - kstar(i, j, k, 4) * alt4) * f2fyi(j)
+                  altz = cstar(i, j, k) * (kstar(i, j, k, 5) * alt5 - kstar(i, j, k, 6) * alt6) * f2fzi(k)
+                end if
+
+                alt = 1./(re * pr) * (altx + alty + altz)           ! LINEAR TERMS AT K-SUBSTEP
+
 !-----LES
-      IF (ILES.EQ.1) THEN
-       TALTX=F2FXI(I)*                                           &
-             (ALSGS1(IPLUS,J,K,1)*C2CXI(IPLUS)*(T(IPLUS,J,K)-T(I,J,K)) &
-             -ALSGS1(I,J,K,1)*C2CXI(I)*(T(I,J,K)-T(IMINUS,J,K))) 
-       TALTY=F2FYI(J)*                                           &
-             (ALSGS1(I,JPLUS,K,2)*C2CYI(JPLUS)*(T(I,JPLUS,K)-T(I,J,K)) &
-             -ALSGS1(I,J,K,2)*C2CYI(J)*(T(I,J,K)-T(I,JMINUS,K)))
-       TALTZ=F2FZI(K)*                                           &
-             (ALSGS1(I,J,KPLUS,3)*C2CZI(KPLUS)*(T(I,J,KPLUS)-T(I,J,K)) &
-             -ALSGS1(I,J,K,3)*C2CZI(K)*(T(I,J,K)-T(I,J,KMINUS)))
-       ALT=ALT+FLOAT(ILES)*(TALTX+TALTY+TALTZ)
-       RK3T=RK3T+FLOAT(ILES)*RHS1(I,J,K,4)
-      ENDIF
+                if (iles .eq. 1) then
+                  taltx = f2fxi(i) * &
+                          (alsgs1(iplus, j, k, 1) * c2cxi(iplus) * (t(iplus, j, k) - t(i, j, k)) &
+                           - alsgs1(i, j, k, 1) * c2cxi(i) * (t(i, j, k) - t(iminus, j, k)))
+                  talty = f2fyi(j) * &
+                          (alsgs1(i, jplus, k, 2) * c2cyi(jplus) * (t(i, jplus, k) - t(i, j, k)) &
+                           - alsgs1(i, j, k, 2) * c2cyi(j) * (t(i, j, k) - t(i, jminus, k)))
+                  taltz = f2fzi(k) * &
+                          (alsgs1(i, j, kplus, 3) * c2czi(kplus) * (t(i, j, kplus) - t(i, j, k)) &
+                           - alsgs1(i, j, k, 3) * c2czi(k) * (t(i, j, k) - t(i, j, kminus)))
+                  alt = alt + float(iles) * (taltx + talty + taltz)
+                  rk3t = rk3t + float(iles) * rhs1(i, j, k, 4)
+                end if
 !-----LES
 
-       RHS1(I,J,K,4)=DT                                    &
-               *( GAMMA(MSUB)*RK3T+RO(MSUB)*RK3TO(I,J,K)   &
-               +2.*ALPHA*ALT )
-       RK3TOO(I,J,K)=RK3TO(I,J,K)
-       RK3TO(I,J,K)=RK3T
+                rhs1(i, j, k, 4) = dt &
+                                   * (gamma(msub) * rk3t + ro(msub) * rk3to(i, j, k) &
+                                      + 2.*alpha * alt)
+                rk3too(i, j, k) = rk3to(i, j, k)
+                rk3to(i, j, k) = rk3t
 
-       ENDDO
-       ENDDO
-       ENDDO
+              end do
+            end do
+          end do
 
-       RETURN
-       END
+          return
+        end
 !=======================================================================
 !=======================================================================
-       SUBROUTINE RHS_IBM_T
+        subroutine rhs_ibm_t
 !=======================================================================
 !
-!     Calculate momentum forcing
+!     CALCULATE MOMENTUM FORCING
 !
-!     Option
-!     IMOVINGON = 0, Stationary body => UBODY,VBODY,WBODY for translational vel.
-!     IMOVINGON = 1, Moving body     => UBD,VBD,WBD in lica_cylinder.f90
+!     OPTION
+!     IMOVINGON = 0, STATIONARY BODY => UBODY,VBODY,WBODY FOR TRANSLATIONAL VEL.
+!     IMOVINGON = 1, MOVING BODY     => UBD,VBD,WBD IN LICA_CYLINDER.F90
 !
-!     Variables
-!     UTARG,VTARG,WTARG: Target velocity to satisfy no-slip b.c.
-!       FCV   : Momentum forcing from the target velocity
-!     FCVAVG: Averaging forcing values    to calculate the force on a body
-!     DUDTR : Time derivative of velocity to calculate the force on a body
-!               Ref. Lee et al., 2011, Sources of spurious force
-!               oscillations from an immersed boundary method for moving
-!               -body problems, J. Comp. Phys., 230, 2677-2695.
+!     VARIABLES
+!     UTARG,VTARG,WTARG: TARGET VELOCITY TO SATISFY NO-SLIP B.C.
+!       FCV   : MOMENTUM FORCING FROM THE TARGET VELOCITY
+!     FCVAVG: AVERAGING FORCING VALUES    TO CALCULATE THE FORCE ON A BODY
+!     DUDTR : TIME DERIVATIVE OF VELOCITY TO CALCULATE THE FORCE ON A BODY
+!               REF. LEE ET AL., 2011, SOURCES OF SPURIOUS FORCE
+!               OSCILLATIONS FROM AN IMMERSED BOUNDARY METHOD FOR MOVING
+!               -BODY PROBLEMS, J. COMP. PHYS., 230, 2677-2695.
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : RHS1,U,V,W,T,IFC,JFC,KFC,INTPINDX,GEOMFAC,&
-                                FCV,FCVAVG,DUDTR
-      IMPLICIT NONE
-      INTEGER*8 :: I,J,K,N,II,JJ,KK,IP,JP,KP,IPP,JPP,KPP
-      REAL*8    :: TBODY,DTI
-      REAL*8    :: TTARG
-      REAL*8    :: RHSTMP(N1M,N2M,N3M)
+          use mod_common
+          use mod_flowarray, only: rhs1, u, v, w, t, ifc, jfc, kfc, intpindx, geomfac, &
+                                   fcv, fcvavg, dudtr
+          implicit none
+          integer(8) :: i, j, k, n, ii, jj, kk, ip, jp, kp, ipp, jpp, kpp
+          real(8) :: tbody, dti
+          real(8) :: ttarg
+          real(8) :: rhstmp(n1m, n2m, n3m)
 
-!---- Compute target velocities & forcing values at forcing points
-      TBODY = 0.
-      DTI   = 1./DT
+!---- COMPUTE TARGET VELOCITIES & FORCING VALUES AT FORCING POINTS
+          tbody = 0.
+          dti = 1./dt
 
 !$OMP PARALLEL DO
-      DO K= 1,N3M
-      DO J= 1,N2M
-      DO I= 1,N1M
-        RHSTMP(I,J,K)=RHS1(I,J,K,4)
-      ENDDO
-      ENDDO
-      ENDDO
-
-
-!$OMP PARALLEL DO &
-!$OMP private(II,JJ,KK,IP,JP,KP,IPP,JPP,KPP,TTARG,TBODY)
-      DO N=1,NINTP(4)
-         II =IFC(N,4)
-         JJ =JFC(N,4)
-         KK =KFC(N,4)
-         IP =IFC(N,4)+INTPINDX(N,4,1)
-         JP =JFC(N,4)+INTPINDX(N,4,2)
-         KP =KFC(N,4)+INTPINDX(N,4,3)
-         IPP=IFC(N,4)+INTPINDX(N,4,1)*2
-         JPP=JFC(N,4)+INTPINDX(N,4,2)*2
-         KPP=KFC(N,4)+INTPINDX(N,4,3)*2
-
-         IF ((IPP.GE.N1).OR.(IPP.LE.0)) CALL REINDEX_I(IP,IPP) ! AT SLV_MMTM LIB
-         IF ((KPP.GE.N3).OR.(KPP.LE.0)) CALL REINDEX_K(KP,KPP) ! AT SLV_MMTM LIB
-         TTARG=GEOMFAC(N,4,0,0,0)* TBODY                                &
-              +GEOMFAC(N,4,0,0,1)*(T(II ,JJ ,KP )+RHSTMP(II ,JJ ,KP ))  &
-              +GEOMFAC(N,4,0,0,2)*(T(II ,JJ ,KPP)+RHSTMP(II ,JJ ,KPP))  &
-              +GEOMFAC(N,4,0,1,0)*(T(II ,JP ,KK )+RHSTMP(II ,JP ,KK ))  &
-              +GEOMFAC(N,4,0,1,1)*(T(II ,JP ,KP )+RHSTMP(II ,JP ,KP ))  &
-              +GEOMFAC(N,4,0,1,2)*(T(II ,JP ,KPP)+RHSTMP(II ,JP ,KPP))  &
-              +GEOMFAC(N,4,0,2,0)*(T(II ,JPP,KK )+RHSTMP(II ,JPP,KK ))  &
-              +GEOMFAC(N,4,0,2,1)*(T(II ,JPP,KP )+RHSTMP(II ,JPP,KP ))  &
-              +GEOMFAC(N,4,0,2,2)*(T(II ,JPP,KPP)+RHSTMP(II ,JPP,KPP))  &
-              +GEOMFAC(N,4,1,0,0)*(T(IP ,JJ ,KK )+RHSTMP(IP ,JJ ,KK ))  &
-              +GEOMFAC(N,4,1,0,1)*(T(IP ,JJ ,KP )+RHSTMP(IP ,JJ ,KP ))  &
-              +GEOMFAC(N,4,1,0,2)*(T(IP ,JJ ,KPP)+RHSTMP(IP ,JJ ,KPP))  &
-              +GEOMFAC(N,4,1,1,0)*(T(IP ,JP ,KK )+RHSTMP(IP ,JP ,KK ))  &
-              +GEOMFAC(N,4,1,1,1)*(T(IP ,JP ,KP )+RHSTMP(IP ,JP ,KP ))  &
-              +GEOMFAC(N,4,1,1,2)*(T(IP ,JP ,KPP)+RHSTMP(IP ,JP ,KPP))  &
-              +GEOMFAC(N,4,1,2,0)*(T(IP ,JPP,KK )+RHSTMP(IP ,JPP,KK ))  &
-              +GEOMFAC(N,4,1,2,1)*(T(IP ,JPP,KP )+RHSTMP(IP ,JPP,KP ))  &
-              +GEOMFAC(N,4,1,2,2)*(T(IP ,JPP,KPP)+RHSTMP(IP ,JPP,KPP))  &
-              +GEOMFAC(N,4,2,0,0)*(T(IPP,JJ ,KK )+RHSTMP(IPP,JJ ,KK ))  &
-              +GEOMFAC(N,4,2,0,1)*(T(IPP,JJ ,KP )+RHSTMP(IPP,JJ ,KP ))  &
-              +GEOMFAC(N,4,2,0,2)*(T(IPP,JJ ,KPP)+RHSTMP(IPP,JJ ,KPP))  &
-              +GEOMFAC(N,4,2,1,0)*(T(IPP,JP ,KK )+RHSTMP(IPP,JP ,KK ))  &
-              +GEOMFAC(N,4,2,1,1)*(T(IPP,JP ,KP )+RHSTMP(IPP,JP ,KP ))  &
-              +GEOMFAC(N,4,2,1,2)*(T(IPP,JP ,KPP)+RHSTMP(IPP,JP ,KPP))  &
-              +GEOMFAC(N,4,2,2,0)*(T(IPP,JPP,KK )+RHSTMP(IPP,JPP,KK ))  &
-              +GEOMFAC(N,4,2,2,1)*(T(IPP,JPP,KP )+RHSTMP(IPP,JPP,KP ))  &
-              +GEOMFAC(N,4,2,2,2)*(T(IPP,JPP,KPP)+RHSTMP(IPP,JPP,KPP))
-         FCV(N,4)=(TTARG-T(II,JJ,KK)-RHSTMP(II,JJ,KK))*DTI
-         RHS1(II,JJ,KK,4)=TTARG-T(II,JJ,KK)
-      ENDDO
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                rhstmp(i, j, k) = rhs1(i, j, k, 4)
+              end do
+            end do
+          end do
 
 !$OMP PARALLEL DO &
-!$OMP private(II,JJ,KK,TTARG,TBODY)
-      DO N=NINTP(4)+1,NBODY(4)
-         II=IFC(N,4)
-         JJ=JFC(N,4)
-         KK=KFC(N,4)
-         TTARG=TBODY
-         FCV(N,4)=(TTARG-T(II,JJ,KK)-RHS1(II,JJ,KK,4))*DTI
-         RHS1(II,JJ,KK,4)=TTARG-T(II,JJ,KK)
-      ENDDO
+!$OMP PRIVATE(II,JJ,KK,IP,JP,KP,IPP,JPP,KPP,TTARG,TBODY)
+          do n = 1, nintp(4)
+            ii = ifc(n, 4)
+            jj = jfc(n, 4)
+            kk = kfc(n, 4)
+            ip = ifc(n, 4) + intpindx(n, 4, 1)
+            jp = jfc(n, 4) + intpindx(n, 4, 2)
+            kp = kfc(n, 4) + intpindx(n, 4, 3)
+            ipp = ifc(n, 4) + intpindx(n, 4, 1) * 2
+            jpp = jfc(n, 4) + intpindx(n, 4, 2) * 2
+            kpp = kfc(n, 4) + intpindx(n, 4, 3) * 2
 
-!-----compute average forcing values during RK3 steps
+            if ((ipp .ge. n1) .or. (ipp .le. 0)) call reindex_i(ip, ipp) ! AT SLV_MMTM LIB
+            if ((kpp .ge. n3) .or. (kpp .le. 0)) call reindex_k(kp, kpp) ! AT SLV_MMTM LIB
+            ttarg = geomfac(n, 4, 0, 0, 0) * tbody &
+                    + geomfac(n, 4, 0, 0, 1) * (t(ii, jj, kp) + rhstmp(ii, jj, kp)) &
+                    + geomfac(n, 4, 0, 0, 2) * (t(ii, jj, kpp) + rhstmp(ii, jj, kpp)) &
+                    + geomfac(n, 4, 0, 1, 0) * (t(ii, jp, kk) + rhstmp(ii, jp, kk)) &
+                    + geomfac(n, 4, 0, 1, 1) * (t(ii, jp, kp) + rhstmp(ii, jp, kp)) &
+                    + geomfac(n, 4, 0, 1, 2) * (t(ii, jp, kpp) + rhstmp(ii, jp, kpp)) &
+                    + geomfac(n, 4, 0, 2, 0) * (t(ii, jpp, kk) + rhstmp(ii, jpp, kk)) &
+                    + geomfac(n, 4, 0, 2, 1) * (t(ii, jpp, kp) + rhstmp(ii, jpp, kp)) &
+                    + geomfac(n, 4, 0, 2, 2) * (t(ii, jpp, kpp) + rhstmp(ii, jpp, kpp)) &
+                    + geomfac(n, 4, 1, 0, 0) * (t(ip, jj, kk) + rhstmp(ip, jj, kk)) &
+                    + geomfac(n, 4, 1, 0, 1) * (t(ip, jj, kp) + rhstmp(ip, jj, kp)) &
+                    + geomfac(n, 4, 1, 0, 2) * (t(ip, jj, kpp) + rhstmp(ip, jj, kpp)) &
+                    + geomfac(n, 4, 1, 1, 0) * (t(ip, jp, kk) + rhstmp(ip, jp, kk)) &
+                    + geomfac(n, 4, 1, 1, 1) * (t(ip, jp, kp) + rhstmp(ip, jp, kp)) &
+                    + geomfac(n, 4, 1, 1, 2) * (t(ip, jp, kpp) + rhstmp(ip, jp, kpp)) &
+                    + geomfac(n, 4, 1, 2, 0) * (t(ip, jpp, kk) + rhstmp(ip, jpp, kk)) &
+                    + geomfac(n, 4, 1, 2, 1) * (t(ip, jpp, kp) + rhstmp(ip, jpp, kp)) &
+                    + geomfac(n, 4, 1, 2, 2) * (t(ip, jpp, kpp) + rhstmp(ip, jpp, kpp)) &
+                    + geomfac(n, 4, 2, 0, 0) * (t(ipp, jj, kk) + rhstmp(ipp, jj, kk)) &
+                    + geomfac(n, 4, 2, 0, 1) * (t(ipp, jj, kp) + rhstmp(ipp, jj, kp)) &
+                    + geomfac(n, 4, 2, 0, 2) * (t(ipp, jj, kpp) + rhstmp(ipp, jj, kpp)) &
+                    + geomfac(n, 4, 2, 1, 0) * (t(ipp, jp, kk) + rhstmp(ipp, jp, kk)) &
+                    + geomfac(n, 4, 2, 1, 1) * (t(ipp, jp, kp) + rhstmp(ipp, jp, kp)) &
+                    + geomfac(n, 4, 2, 1, 2) * (t(ipp, jp, kpp) + rhstmp(ipp, jp, kpp)) &
+                    + geomfac(n, 4, 2, 2, 0) * (t(ipp, jpp, kk) + rhstmp(ipp, jpp, kk)) &
+                    + geomfac(n, 4, 2, 2, 1) * (t(ipp, jpp, kp) + rhstmp(ipp, jpp, kp)) &
+                    + geomfac(n, 4, 2, 2, 2) * (t(ipp, jpp, kpp) + rhstmp(ipp, jpp, kpp))
+            fcv(n, 4) = (ttarg - t(ii, jj, kk) - rhstmp(ii, jj, kk)) * dti
+            rhs1(ii, jj, kk, 4) = ttarg - t(ii, jj, kk)
+          end do
+
+!$OMP PARALLEL DO &
+!$OMP PRIVATE(II,JJ,KK,TTARG,TBODY)
+          do n = nintp(4) + 1, nbody(4)
+            ii = ifc(n, 4)
+            jj = jfc(n, 4)
+            kk = kfc(n, 4)
+            ttarg = tbody
+            fcv(n, 4) = (ttarg - t(ii, jj, kk) - rhs1(ii, jj, kk, 4)) * dti
+            rhs1(ii, jj, kk, 4) = ttarg - t(ii, jj, kk)
+          end do
+
+!-----COMPUTE AVERAGE FORCING VALUES DURING RK3 STEPS
 !$OMP PARALLEL DO
-      DO N=1,NBODY(4)
-         FCVAVG(N,4)=FCVAVG(N,4)+FCV(N,4)
-      ENDDO
+          do n = 1, nbody(4)
+            fcvavg(n, 4) = fcvavg(n, 4) + fcv(n, 4)
+          end do
 
-      RETURN
-      END
+          return
+        end
 !=======================================================================
 !=======================================================================
-        SUBROUTINE CONVBC_T
+        subroutine convbc_t
 !=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,T
-      IMPLICIT NONE
-      INTEGER*8   :: I,J,K
-      REAL*8      :: QIN,QOUT,QRATIO
-      REAL*8      :: UBAR,UCOEF,VWCOEF
-      REAL*8      :: FUNCBODY
+          use mod_common
+          use mod_flowarray, only: u, v, w, t
+          implicit none
+          integer(8) :: i, j, k
+          real(8) :: qin, qout, qratio
+          real(8) :: ubar, ucoef, vwcoef
+          real(8) :: funcbody
 
-      IF (ICH .NE. 1) THEN
+          if (ich .ne. 1) then
 
 !-----CALCULATE INFLUX
-      QIN=0.
+            qin = 0.
 !$OMP PARALLEL DO REDUCTION(+:QIN)
-      DO K=1,N3M
-        DO J=1,N2M
-          QIN=U(1,J,K)*F2FY(J)*F2FZ(K)+QIN
-        ENDDO
-      ENDDO
+            do k = 1, n3m
+              do j = 1, n2m
+                qin = u(1, j, k) * f2fy(j) * f2fz(k) + qin
+              end do
+            end do
 !$OMP PARALLEL DO REDUCTION(+:QIN)
-      DO K=1,N3M
-        DO I=1,N1M
-          QIN=(V(I,1,K)-V(I,N2,K))*F2FX(I)*F2FZ(K)+QIN
-        ENDDO
-      ENDDO
+            do k = 1, n3m
+              do i = 1, n1m
+                qin = (v(i, 1, k) - v(i, n2, k)) * f2fx(i) * f2fz(k) + qin
+              end do
+            end do
 !$OMP PARALLEL DO REDUCTION(+:QIN)
-      DO J=1,N2M
-        DO I=1,N1M
-         QIN=(W(I,J,1)-W(I,J,N3))*F2FX(I)*F2FY(J)+QIN
-        ENDDO
-      ENDDO
+            do j = 1, n2m
+              do i = 1, n1m
+                qin = (w(i, j, 1) - w(i, j, n3)) * f2fx(i) * f2fy(j) + qin
+              end do
+            end do
 
-!-----CALCULATE CONVECTIVE VELOCITY Uc
-      UBAR = 0.
+!-----CALCULATE CONVECTIVE VELOCITY UC
+            ubar = 0.
 !$OMP PARALLEL DO REDUCTION(+:UBAR)
-      DO K=1,N3M
-        DO J=1,N2M
-          UBAR=U(N1,J,K)*F2FY(J)*F2FZ(K)+UBAR
-        ENDDO
-      ENDDO
-      UBAR  = UBAR/(YL*ZL)
-      UCOEF = UBAR*DTCONST*F2FXI(N1M)
-      VWCOEF= UBAR*DTCONST*C2CXI(N1)
+            do k = 1, n3m
+              do j = 1, n2m
+                ubar = u(n1, j, k) * f2fy(j) * f2fz(k) + ubar
+              end do
+            end do
+            ubar = ubar / (yl * zl)
+            ucoef = ubar * dtconst * f2fxi(n1m)
+            vwcoef = ubar * dtconst * c2cxi(n1)
 
-      QOUT = 0.
+            qout = 0.
 !$OMP PARALLEL DO REDUCTION(+:QOUT)
-      DO K=1,N3M
-        DO J=1,N2M
-          UOUT(J,K)=U(N1,J,K)-UCOEF*(U(N1,J,K)-U(N1M,J,K))
-          
-          IF (FUNCBODY(XMP(N1M),YMP(J),ZMP(K),TIME) .LE. 1.E-10 .AND. IMOVINGON .EQ. 0) THEN
-            ! Solid Phase: Zero-gradient conduction boundary
-            TOUT(J,K) = T(N1M,J,K)
-          ELSE
-            ! Fluid Phase: Convective advection
-            TOUT(J,K) = T(N1,J,K)-VWCOEF*(T(N1,J,K)-T(N1M,J,K))
-          ENDIF
-          
-          QOUT=UOUT(J,K)*F2FY(J)*F2FZ(K)+QOUT
-        ENDDO
-      ENDDO
-      QRATIO=QIN/QOUT
+            do k = 1, n3m
+              do j = 1, n2m
+                uout(j, k) = u(n1, j, k) - ucoef * (u(n1, j, k) - u(n1m, j, k))
+
+                if (funcbody(xmp(n1m), ymp(j), zmp(k), time) .le. 1.e-10 .and. imovingon .eq. 0) then
+                  ! SOLID PHASE: ZERO-GRADIENT CONDUCTION BOUNDARY
+                  tout(j, k) = t(n1m, j, k)
+                else
+                  ! FLUID PHASE: CONVECTIVE ADVECTION
+                  tout(j, k) = t(n1, j, k) - vwcoef * (t(n1, j, k) - t(n1m, j, k))
+                end if
+
+                qout = uout(j, k) * f2fy(j) * f2fz(k) + qout
+              end do
+            end do
+            qratio = qin / qout
 
 !-----ADJUST BOUNDARY VELOCITY TO SATISFY GLOBAL MASS CONSERVATION
 !$OMP PARALLEL DO
-      DO K=1,N3M
-        DO J=1,N2M
-          ! Only scale the fluid phase by the mass flux error
-          IF (FUNCBODY(XMP(N1M),YMP(J),ZMP(K),TIME) .GT. 1.E-10) THEN
-             TOUT(J,K)=TOUT(J,K)*QRATIO
-          ENDIF
-          DTOUT(J,K)=TOUT(J,K)-T(N1,J,K)
-        ENDDO
-      ENDDO
-   
-      IF (YPRDIC .EQ. 1) THEN
+            do k = 1, n3m
+              do j = 1, n2m
+                ! ONLY SCALE THE FLUID PHASE BY THE MASS FLUX ERROR
+                if (funcbody(xmp(n1m), ymp(j), zmp(k), time) .gt. 1.e-10) then
+                  tout(j, k) = tout(j, k) * qratio
+                end if
+                dtout(j, k) = tout(j, k) - t(n1, j, k)
+              end do
+            end do
+
+            if (yprdic .eq. 1) then
 !$OMP PARALLEL DO
-        DO K=0,N3
-          DTOUT(N2,K)=DTOUT(1,  K)
-          DTOUT(0, K)=DTOUT(N2M,K)
-        ENDDO
-      ENDIF
-     
-      IF (ZPRDIC .EQ. 1) THEN
+              do k = 0, n3
+                dtout(n2, k) = dtout(1, k)
+                dtout(0, k) = dtout(n2m, k)
+              end do
+            end if
+
+            if (zprdic .eq. 1) then
 !$OMP PARALLEL DO
-        DO J=0,N2
-          DTOUT(J,N3)=DTOUT(J,  1)
-          DTOUT(J, 0)=DTOUT(J,N3M)
-        ENDDO
-      ENDIF
+              do j = 0, n2
+                dtout(j, n3) = dtout(j, 1)
+                dtout(j, 0) = dtout(j, n3m)
+              end do
+            end if
 
-      ELSE
+          else
 
-      TOUT = 0.
+            tout = 0.
 
-      ENDIF
+          end if
 
-      RETURN
-      END SUBROUTINE CONVBC_T
+          return
+        end subroutine convbc_t
 !=======================================================================
 !=======================================================================
-       SUBROUTINE RHSINCORPBC_T
+        subroutine rhsincorpbc_t
 !=======================================================================
-       USE MOD_COMMON
-       USE MOD_FLOWARRAY, ONLY : U,V,W,T,RHS1,ALSGS,CSTAR,KSTAR
-       IMPLICIT NONE
-       INTEGER*8     :: I,J,K
-       REAL*8        :: CRE,CRE2,CS,KS
+          use mod_common
+          use mod_flowarray, only: u, v, w, t, rhs1, alsgs, cstar, kstar
+          implicit none
+          integer(8) :: i, j, k
+          real(8) :: cre, cre2, cs, ks
 
-       IF (ILES .EQ. 1) THEN
-         CRE=RE*PR
-         CRE2=2.*RE*PR
-       ELSE
-         CRE=0.
-         CRE2=0.
-       ENDIF
+          if (iles .eq. 1) then
+            cre = re * pr
+            cre2 = 2.*re * pr
+          else
+            cre = 0.
+            cre2 = 0.
+          end if
 
 !$OMP PARALLEL DO
-       DO K=1,N3M
-       DO J=1,N2M
-       IF (ICONJG .EQ. 1) THEN
-        CS = CSTAR(N1M,J,K)
-        KS = (KSTAR(N1M,J,K,1)+KSTAR(N1M,J,K,2)+KSTAR(N1M,J,K,3)        &
-             +KSTAR(N1M,J,K,4)+KSTAR(N1M,J,K,5)+KSTAR(N1M,J,K,6))/6.
-       ELSE
-        CS = 1.
-        KS = 1.
-       ENDIF
+          do k = 1, n3m
+            do j = 1, n2m
+              if (iconjg .eq. 1) then
+                cs = cstar(n1m, j, k)
+                ks = (kstar(n1m, j, k, 1) + kstar(n1m, j, k, 2) + kstar(n1m, j, k, 3) &
+                      + kstar(n1m, j, k, 4) + kstar(n1m, j, k, 5) + kstar(n1m, j, k, 6)) / 6.
+              else
+                cs = 1.
+                ks = 1.
+              end if
 
-       RHS1(N1M,J,K,4)=RHS1(N1M,J,K,4)                                  &
-                      -ACOEF*CS*KS                                      &
-                      *CIU(N1M)*(1.+CRE2*ALSGS(N1M,J,K))*DTOUT(J,K)
-       ENDDO
-       ENDDO
+              rhs1(n1m, j, k, 4) = rhs1(n1m, j, k, 4) &
+                                   - acoef * cs * ks &
+                                   * ciu(n1m) * (1.+cre2 * alsgs(n1m, j, k)) * dtout(j, k)
+            end do
+          end do
 
-       RETURN
-       END SUBROUTINE RHSINCORPBC_T
+          return
+        end subroutine rhsincorpbc_t
 !=======================================================================
 !=======================================================================
-      SUBROUTINE LHS_T
+        subroutine lhs_t
 !=======================================================================
 !
-!     Calculate intermediate velocity, u_i hat through TDMA
-!           In this routine, compute streamwise velocity (u hat)
+!     CALCULATE INTERMEDIATE VELOCITY, U_I HAT THROUGH TDMA
+!           IN THIS ROUTINE, COMPUTE STREAMWISE VELOCITY (U HAT)
 !
 !-----------------------------------------------------------------------
-       USE MOD_COMMON
-       USE MOD_FLOWARRAY, ONLY : U,V,W,T,RHS1,ALSGS,ALSGS1,CSTAR,KSTAR
-       IMPLICIT NONE
-       INTEGER*8     :: I,J,K
-       REAL*8        :: CRE,CRE2,CS,KS1,KS2
-       REAL*8, DIMENSION (:,:), ALLOCATABLE :: AI,BI,CI,GI
-       REAL*8, DIMENSION (:,:), ALLOCATABLE :: AJ,BJ,CJ,GJ
-       REAL*8, DIMENSION (:,:), ALLOCATABLE :: AK,BK,CK,GK
+          use mod_common
+          use mod_flowarray, only: u, v, w, t, rhs1, alsgs, alsgs1, cstar, kstar
+          implicit none
+          integer(8) :: i, j, k
+          real(8) :: cre, cre2, cs, ks1, ks2
+          real(8), dimension(:, :), allocatable :: ai, bi, ci, gi
+          real(8), dimension(:, :), allocatable :: aj, bj, cj, gj
+          real(8), dimension(:, :), allocatable :: ak, bk, ck, gk
 
-       CRE=FLOAT(ILES)*RE*PR
-       CRE2=2.*FLOAT(ILES)*RE*PR
+          cre = float(iles) * re * pr
+          cre2 = 2.*float(iles) * re * pr
 
 !=====ADI STARTS
 
-      IF (N3M.EQ.1) GOTO 100
+          if (n3m .eq. 1) goto 100
 !-----Z-DIRECTION
 !$OMP PARALLEL &
-!$OMP private(AK,CK,BK,GK,CS,KS1,KS2)
-      allocate(AK(N1,N3),BK(N1,N3),CK(N1,N3),GK(N1,N3))
+!$OMP PRIVATE(AK,CK,BK,GK,CS,KS1,KS2)
+          allocate (ak(n1, n3), bk(n1, n3), ck(n1, n3), gk(n1, n3))
 !$OMP DO
-      DO 131 J=1,N2M
-      DO 141 K=1,N3M
-      DO 141 I=1,N1M
-       IF (ICONJG .EQ. 1) THEN
-        CS = CSTAR(I,J,K)
-        KS1 = KSTAR(I,J,K,6)
-        KS2 = KSTAR(I,J,K,5)
-       ELSE
-        CS = 1.
-        KS1 = 1.
-        KS2 = 1.
-       ENDIF
-       AK(I,K)=AKUV(K)*(CS*KS1+CRE*ALSGS1(I,J,K,2)) 
-       CK(I,K)=CKUV(K)*(CS*KS2+CRE*ALSGS1(I,J,K+1,2))
-       BK(I,K)=ACOEFI*PR-AK(I,K)-CK(I,K)
-       GK(I,K)=ACOEFI*PR*RHS1(I,J,K,4)
-  141 CONTINUE
+          do j = 1, n2m
+            do k = 1, n3m
+              do i = 1, n1m
+                if (iconjg .eq. 1) then
+                  cs = cstar(i, j, k)
+                  ks1 = kstar(i, j, k, 6)
+                  ks2 = kstar(i, j, k, 5)
+                else
+                  cs = 1.
+                  ks1 = 1.
+                  ks2 = 1.
+                end if
+                ak(i, k) = akuv(k) * (cs * ks1 + cre * alsgs1(i, j, k, 2))
+                ck(i, k) = ckuv(k) * (cs * ks2 + cre * alsgs1(i, j, k + 1, 2))
+                bk(i, k) = acoefi * pr - ak(i, k) - ck(i, k)
+                gk(i, k) = acoefi * pr * rhs1(i, j, k, 4)
+              end do
+            end do
 
-      IF (ZPRDIC .EQ. 0) THEN
-         CALL TRDIAG3(AK,BK,CK,GK,GK,1,N3M,1,N1M)
-      ELSE IF (ZPRDIC .EQ. 1) THEN
-         CALL TRDIAG3P(AK,BK,CK,GK,1,N3M,1,N1M)  !z periodicity
-      ENDIF
+            if (zprdic .eq. 0) then
+              call trdiag3(ak, bk, ck, gk, gk, 1, n3m, 1, n1m)
+            else if (zprdic .eq. 1) then
+              call trdiag3p(ak, bk, ck, gk, 1, n3m, 1, n1m)  !Z PERIODICITY
+            end if
 
-      DO 151 K=1,N3M
-      DO 151 I=1,N1M
-      RHS1(I,J,K,4)=GK(I,K)
-  151 CONTINUE
-  131 CONTINUE
+            do k = 1, n3m
+              do i = 1, n1m
+                rhs1(i, j, k, 4) = gk(i, k)
+              end do
+            end do
+          end do
 !$OMP END DO
-      deallocate(AK,BK,CK,GK)
+          deallocate (ak, bk, ck, gk)
 !$OMP END PARALLEL
 
-  100 CONTINUE
+100       continue
 
 !$OMP PARALLEL  &
-!$OMP private(AJ,CJ,BJ,GJ)  &
-!$OMP private(AI,CI,BI,GI,CS,KS1,KS2)
-      allocate(AI(N2,N1),BI(N2,N1),CI(N2,N1),GI(N2,N1))
-      allocate(AJ(N1,N2),BJ(N1,N2),CJ(N1,N2),GJ(N1,N2))
+!$OMP PRIVATE(AJ,CJ,BJ,GJ)  &
+!$OMP PRIVATE(AI,CI,BI,GI,CS,KS1,KS2)
+          allocate (ai(n2, n1), bi(n2, n1), ci(n2, n1), gi(n2, n1))
+          allocate (aj(n1, n2), bj(n1, n2), cj(n1, n2), gj(n1, n2))
 !$OMP DO
-      DO 40 K=1,N3M
+          do k = 1, n3m
 
 !-----Y-DIRECTION
-      DO 91 J=1,N2M
-      DO 91 I=1,N1M
-       IF (ICONJG .EQ. 1) THEN
-        CS = CSTAR(I,J,K)
-        KS1 = KSTAR(I,J,K,4)
-        KS2 = KSTAR(I,J,K,3)
-       ELSE
-        CS = 1.
-        KS1 = 1.
-        KS2 = 1.
-       ENDIF
-      AJ(I,J)=AJUW(J)*(CS*KS1+CRE*ALSGS1(I,J,K,3))  
-      CJ(I,J)=CJUW(J)*(CS*KS2+CRE*ALSGS1(I,J+1,K,3))
-      BJ(I,J)=ACOEFI*PR-AJ(I,J)-CJ(I,J)
-      GJ(I,J)=ACOEFI*PR*RHS1(I,J,K,4)
-   91 CONTINUE
+            do j = 1, n2m
+              do i = 1, n1m
+                if (iconjg .eq. 1) then
+                  cs = cstar(i, j, k)
+                  ks1 = kstar(i, j, k, 4)
+                  ks2 = kstar(i, j, k, 3)
+                else
+                  cs = 1.
+                  ks1 = 1.
+                  ks2 = 1.
+                end if
+                aj(i, j) = ajuw(j) * (cs * ks1 + cre * alsgs1(i, j, k, 3))
+                cj(i, j) = cjuw(j) * (cs * ks2 + cre * alsgs1(i, j + 1, k, 3))
+                bj(i, j) = acoefi * pr - aj(i, j) - cj(i, j)
+                gj(i, j) = acoefi * pr * rhs1(i, j, k, 4)
+              end do
+            end do
 
-      CALL TRDIAG2(AJ,BJ,CJ,GJ,GJ,1,N2M,1,N1M)
+            call trdiag2(aj, bj, cj, gj, gj, 1, n2m, 1, n1m)
 
 !-----X-DIRECTION
-      DO 51 I=1,N1M
-      DO 51 J=1,N2M
-       IF (ICONJG .EQ. 1) THEN
-        CS = CSTAR(I,J,K)
-        KS1 = KSTAR(I,J,K,2)
-        KS2 = KSTAR(I,J,K,1)
-       ELSE
-        CS = 1.
-        KS1 = 1.
-        KS2 = 1.
-       ENDIF
-      AI(J,I)=AIVW(I)*(CS*KS1+CRE*ALSGS1(I,J,K,1))
-      CI(J,I)=CIVW(I)*(CS*KS2+CRE*ALSGS1(I+1,J,K,1))
-      BI(J,I)=ACOEFI*PR-AI(J,I)-CI(J,I)
-      GI(J,I)=ACOEFI*PR*GJ(I,J)
-   51 CONTINUE
+            do i = 1, n1m
+              do j = 1, n2m
+                if (iconjg .eq. 1) then
+                  cs = cstar(i, j, k)
+                  ks1 = kstar(i, j, k, 2)
+                  ks2 = kstar(i, j, k, 1)
+                else
+                  cs = 1.
+                  ks1 = 1.
+                  ks2 = 1.
+                end if
+                ai(j, i) = aivw(i) * (cs * ks1 + cre * alsgs1(i, j, k, 1))
+                ci(j, i) = civw(i) * (cs * ks2 + cre * alsgs1(i + 1, j, k, 1))
+                bi(j, i) = acoefi * pr - ai(j, i) - ci(j, i)
+                gi(j, i) = acoefi * pr * gj(i, j)
+              end do
+            end do
 
-      CALL TRDIAG1(AI,BI,CI,GI,GI,1,N1M,1,N2M)
-     
-      DO 61 J=1,N2M
-      DO 61 I=1,N1M
-        T(I,J,K)=GI(J,I)+T(I,J,K)
-   61 CONTINUE
+            call trdiag1(ai, bi, ci, gi, gi, 1, n1m, 1, n2m)
 
-   40 CONTINUE
+            do j = 1, n2m
+              do i = 1, n1m
+                t(i, j, k) = gi(j, i) + t(i, j, k)
+              end do
+            end do
+
+          end do
 !$OMP END DO
-      deallocate(AI,BI,CI,GI)
-      deallocate(AJ,BJ,CJ,GJ)
+          deallocate (ai, bi, ci, gi)
+          deallocate (aj, bj, cj, gj)
 !$OMP END PARALLEL
 
-      RETURN
-      END
+          return
+        end
 !=======================================================================
 !=======================================================================
-      SUBROUTINE RETRV_T
+        subroutine retrv_t
 !=======================================================================
 !
-!     Adjust boundary velocity to satisfy global mass conservation
-!           [retrieve uvw (at the exit boundary)]
-!     See 'CONVBC' subroutine in lica_[bodyname, e.g. cylinder].f90 file
+!     ADJUST BOUNDARY VELOCITY TO SATISFY GLOBAL MASS CONSERVATION
+!           [RETRIEVE UVW (AT THE EXIT BOUNDARY)]
+!     SEE 'CONVBC' SUBROUTINE IN LICA_[BODYNAME, E.G. CYLINDER].F90 FILE
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,T
-      IMPLICIT NONE
-      INTEGER*8    :: I,J,K
+          use mod_common
+          use mod_flowarray, only: u, v, w, t
+          implicit none
+          integer(8) :: i, j, k
 
 !$OMP PARALLEL DO
-      DO K=1,N3M
-      DO J=1,N2M
-      T(N1,J,K)=TOUT(J,K)
-      ENDDO
-      ENDDO
+          do k = 1, n3m
+            do j = 1, n2m
+              t(n1, j, k) = tout(j, k)
+            end do
+          end do
 
-      RETURN
-      END SUBROUTINE RETRV_T
+          return
+        end subroutine retrv_t
 !=======================================================================
 !=======================================================================
-      SUBROUTINE PRDIC_ADJ_T
+        subroutine prdic_adj_t
 !=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U, T
-      IMPLICIT NONE
-      INTEGER*8    :: I,J,K
-      REAL*8       :: T_B_OUT, M_DOT
-      REAL*8       :: T_WALL, T_B_IN, RATIO
-      REAL*8       :: FUNCBODY
+          use mod_common
+          use mod_flowarray, only: u, t
+          implicit none
+          integer(8) :: i, j, k
+          real(8) :: t_b_out, m_dot
+          real(8) :: t_wall, t_b_in, ratio
+          real(8) :: funcbody
 
 ! X PERIODICITY WITH DIRICHLET SCALING (RECYCLING METHOD)
-      IF (XPRDIC .EQ. 1) THEN
-        
-        IF (T_INF .EQ. 0) THEN
-           T_WALL = -1.0D0
-        ELSE
-           T_WALL = 1.0D0
-        ENDIF
-        T_B_IN = 0.0D0   
+          if (xprdic .eq. 1) then
 
-        T_B_OUT = 0.0D0
-        M_DOT   = 0.0D0
+            if (t_inf .eq. 0) then
+              t_wall = -1.0d0
+            else
+              t_wall = 1.0d0
+            end if
+            t_b_in = 0.0d0
 
-!$OMP PARALLEL DO reduction(+:T_B_OUT, M_DOT)
-        DO K=1,N3M
-        DO J=1,N2M
-           ! Check geometry at Outlet (N1M)
-           IF (FUNCBODY(XMP(N1M),YMP(J),ZMP(K),TIME) .GE. 1.E-10) THEN
-              M_DOT   = M_DOT   + U(N1M,J,K) * F2FY(J) * F2FZ(K)
-              T_B_OUT = T_B_OUT + T(N1M,J,K) * U(N1M,J,K) * F2FY(J) * F2FZ(K)
-           ENDIF
-        ENDDO
-        ENDDO
+            t_b_out = 0.0d0
+            m_dot = 0.0d0
+
+!$OMP PARALLEL DO REDUCTION(+:T_B_OUT, M_DOT)
+            do k = 1, n3m
+              do j = 1, n2m
+                ! CHECK GEOMETRY AT OUTLET (N1M)
+                if (funcbody(xmp(n1m), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                  m_dot = m_dot + u(n1m, j, k) * f2fy(j) * f2fz(k)
+                  t_b_out = t_b_out + t(n1m, j, k) * u(n1m, j, k) * f2fy(j) * f2fz(k)
+                end if
+              end do
+            end do
 !$OMP END PARALLEL DO
 
-        T_B_OUT = T_B_OUT / M_DOT
-        RATIO = (T_WALL - T_B_IN) / (T_WALL - T_B_OUT)
+            t_b_out = t_b_out / m_dot
+            ratio = (t_wall - t_b_in) / (t_wall - t_b_out)
 
 !$OMP PARALLEL DO
-        DO K=0,N3
-        DO J=0,N2
-           ! 1. Inlet gets the scaled outlet profile (Source of the developed shape)
-           T(0 ,J,K) = T_WALL - (T_WALL - T(N1M,J,K)) * RATIO
-           
-           ! 2. Outlet ghost cell uses inversely scaled inlet profile to preserve derivatives
-           T(N1,J,K) = T_WALL - (T_WALL - T(1,J,K)) / RATIO
-        ENDDO
-        ENDDO
+            do k = 0, n3
+              do j = 0, n2
+                ! 1. INLET GETS THE SCALED OUTLET PROFILE (SOURCE OF THE DEVELOPED SHAPE)
+                t(0, j, k) = t_wall - (t_wall - t(n1m, j, k)) * ratio
+
+                ! 2. OUTLET GHOST CELL USES INVERSELY SCALED INLET PROFILE TO PRESERVE DERIVATIVES
+                t(n1, j, k) = t_wall - (t_wall - t(1, j, k)) / ratio
+              end do
+            end do
 !$OMP END PARALLEL DO
 
-      ENDIF
+          end if
 
 ! Y PERIODICITY
-      IF (YPRDIC .EQ. 1) THEN
+          if (yprdic .eq. 1) then
 !$OMP PARALLEL DO
-      DO K=1,N3
-      DO I=0,N1
-         T(I ,0,K)=T(I,N2M,K)
-         T(I,N2,K)=T(I,  1,K)
-      ENDDO
-      ENDDO
-      ENDIF
+            do k = 1, n3
+              do i = 0, n1
+                t(i, 0, k) = t(i, n2m, k)
+                t(i, n2, k) = t(i, 1, k)
+              end do
+            end do
+          end if
 
 ! Z PERIODICITY
-      IF (ZPRDIC .EQ. 1) THEN
+          if (zprdic .eq. 1) then
 !$OMP PARALLEL DO
-      DO J=0,N2
-      DO I=1,N1
-         T(I,J,0) =T(I,J,N3M)
-         T(I,J,N3)=T(I,J,1)
-      ENDDO
-      ENDDO
-      ENDIF
+            do j = 0, n2
+              do i = 1, n1
+                t(i, j, 0) = t(i, j, n3m)
+                t(i, j, n3) = t(i, j, 1)
+              end do
+            end do
+          end if
 
-      RETURN
-      END SUBROUTINE PRDIC_ADJ_T
+          return
+        end subroutine prdic_adj_t
 !=======================================================================
 !=======================================================================
-      SUBROUTINE WALLBC_T
+        subroutine wallbc_t
 !=======================================================================
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : T
-      IMPLICIT NONE
-      INTEGER*8    :: I,J,K
-      REAL*8       :: T_SOLID
-      REAL*8       :: FUNCBODY
+          use mod_common
+          use mod_flowarray, only: t
+          implicit none
+          integer(8) :: i, j, k
+          real(8) :: t_solid
+          real(8) :: funcbody
 
-      IF (T_INF .EQ. 0) THEN
-        T_SOLID = -1.0D0
-      ELSE
-        T_SOLID = 1.0D0
-      ENDIF
+          if (t_inf .eq. 0) then
+            t_solid = -1.0d0
+          else
+            t_solid = 1.0d0
+          end if
 
-      IF (XPRDIC .EQ. 0) THEN
+          if (xprdic .eq. 0) then
 !$OMP PARALLEL DO
-        DO K=0,N3
-        DO J=0,N2
-          ! Bottom X (I=0): Separate Solid vs Fluid Dirichlets unconditionally
-          IF (FUNCBODY(XMP(0), YMP(J), ZMP(K), TIME) .LE. 1.E-10) THEN
-             T(0,J,K) = T_SOLID   ! Solid Body
-          ELSE
-             T(0,J,K) = 0.0D0     ! Fluid
-          ENDIF
-          
-          ! Top X (I=N1): Convective Outlet is actively mapped by RETRV_T.
-        ENDDO
-        ENDDO
-!$OMP END PARALLEL DO
-      ENDIF
+            do k = 0, n3
+              do j = 0, n2
+                ! BOTTOM X (I=0): SEPARATE SOLID VS FLUID DIRICHLETS UNCONDITIONALLY
+                if (funcbody(xmp(0), ymp(j), zmp(k), time) .le. 1.e-10) then
+                  t(0, j, k) = t_solid   ! SOLID BODY
+                else
+                  t(0, j, k) = 0.0d0     ! FLUID
+                end if
 
-      IF (YPRDIC .EQ. 0) THEN
+                ! TOP X (I=N1): CONVECTIVE OUTLET IS ACTIVELY MAPPED BY RETRV_T.
+              end do
+            end do
+!$OMP END PARALLEL DO
+          end if
+
+          if (yprdic .eq. 0) then
 !$OMP PARALLEL DO
-        DO K=0,N3
-        DO I=0,N1
-          IF (BC_T_YBTM .EQ. 0) THEN
-            T(I,0,K) = VAL_T_YBTM
-          ELSE IF (BC_T_YBTM .EQ. 1) THEN
-            T(I,0,K) = T(I,1,K) - VAL_T_YBTM / C2CYI(1)
-          ENDIF
+            do k = 0, n3
+              do i = 0, n1
+                if (bc_t_ybtm .eq. 0) then
+                  t(i, 0, k) = val_t_ybtm
+                else if (bc_t_ybtm .eq. 1) then
+                  t(i, 0, k) = t(i, 1, k) - val_t_ybtm / c2cyi(1)
+                end if
 
-          IF (BC_T_YTOP .EQ. 0) THEN
-            T(I,N2,K) = VAL_T_YTOP
-          ELSE IF (BC_T_YTOP .EQ. 1) THEN
-            T(I,N2,K) = T(I,N2M,K) + VAL_T_YTOP / C2CYI(N2)
-          ENDIF
-        ENDDO
-        ENDDO
+                if (bc_t_ytop .eq. 0) then
+                  t(i, n2, k) = val_t_ytop
+                else if (bc_t_ytop .eq. 1) then
+                  t(i, n2, k) = t(i, n2m, k) + val_t_ytop / c2cyi(n2)
+                end if
+              end do
+            end do
 !$OMP END PARALLEL DO
-      ENDIF
+          end if
 
-      IF (ZPRDIC .EQ. 0) THEN
+          if (zprdic .eq. 0) then
 !$OMP PARALLEL DO
-        DO J=0,N2
-        DO I=0,N1
-          IF (BC_T_ZBTM .EQ. 0) THEN
-            T(I,J,0) = VAL_T_ZBTM
-          ELSE IF (BC_T_ZBTM .EQ. 1) THEN
-            T(I,J,0) = T(I,J,1) - VAL_T_ZBTM / C2CZI(1)
-          ENDIF
+            do j = 0, n2
+              do i = 0, n1
+                if (bc_t_zbtm .eq. 0) then
+                  t(i, j, 0) = val_t_zbtm
+                else if (bc_t_zbtm .eq. 1) then
+                  t(i, j, 0) = t(i, j, 1) - val_t_zbtm / c2czi(1)
+                end if
 
-          IF (BC_T_ZTOP .EQ. 0) THEN
-            T(I,J,N3) = VAL_T_ZTOP
-          ELSE IF (BC_T_ZTOP .EQ. 1) THEN
-            T(I,J,N3) = T(I,J,N3M) + VAL_T_ZTOP / C2CZI(N3)
-          ENDIF
-        ENDDO
-        ENDDO
+                if (bc_t_ztop .eq. 0) then
+                  t(i, j, n3) = val_t_ztop
+                else if (bc_t_ztop .eq. 1) then
+                  t(i, j, n3) = t(i, j, n3m) + val_t_ztop / c2czi(n3)
+                end if
+              end do
+            end do
 !$OMP END PARALLEL DO
-      ENDIF
+          end if
 
-      RETURN
-      END SUBROUTINE WALLBC_T
+          return
+        end subroutine wallbc_t
 !=======================================================================

@@ -1,19 +1,19 @@
-MODULE MOD_POISS
+module mod_poiss
 !======================= PARAMETERS ==================================
-      INTEGER*8, PARAMETER :: MLEV = 20
+  integer(8), parameter :: mlev = 20
 
-      REAL*8, DIMENSION(:), ALLOCATABLE :: AW,AE,AS,AN,AB,AF
-      REAL*8, DIMENSION(:), ALLOCATABLE :: FIDW,FKDW,FIUP,FKUP
-      INTEGER*8 :: IIMG(0:MLEV,3),KKMG(0:MLEV,3)
-      INTEGER*8, DIMENSION(:), ALLOCATABLE :: IH1,IH2,KH1,KH2,IL1,IL2,KL1,KL2
-      REAL*8, DIMENSION(:), ALLOCATABLE :: COI1,COI2,COR1,COR2
-      REAL*8, DIMENSION(:), ALLOCATABLE :: AI3,AK3,AI1,AK1
-      INTEGER*8 :: LEVHALF
-      INTEGER*8, DIMENSION(:), ALLOCATABLE :: IPM,IMM,KPM,KMM
-      REAL*8, DIMENSION (:,:,:), ALLOCATABLE :: AC,GAM,BET
+  real(8), dimension(:), allocatable :: aw, ae, as, an, ab, af
+  real(8), dimension(:), allocatable :: fidw, fkdw, fiup, fkup
+  integer(8) :: iimg(0:mlev, 3), kkmg(0:mlev, 3)
+  integer(8), dimension(:), allocatable :: ih1, ih2, kh1, kh2, il1, il2, kl1, kl2
+  real(8), dimension(:), allocatable :: coi1, coi2, cor1, cor2
+  real(8), dimension(:), allocatable :: ai3, ak3, ai1, ak1
+  integer(8) :: levhalf
+  integer(8), dimension(:), allocatable :: ipm, imm, kpm, kmm
+  real(8), dimension(:, :, :), allocatable :: ac, gam, bet
 
-! MLEV: MAXIMUM LEVEL OF MULTIGRID 
-! AW,AE,AS,AN,AB,AF: COEEFICIENT FOR THE ITERATIVE METHOD (AX=b)
+! MLEV: MAXIMUM LEVEL OF MULTIGRID
+! AW,AE,AS,AN,AB,AF: COEEFICIENT FOR THE ITERATIVE METHOD (AX=B)
 ! FIDW,FKDW, FIUP, FKUP: COEEFICIENT FOR THE MULTIGRID RESTRICTION AND PROLONGATION
 ! IIMG,KKMG: START AND END INDEX FOR EACH LEVEL OF THE GRID SYSTEM
 ! IH1,IH2,KH1,KH2: INDEX OF RESIDUE TO BE RESTRICTION
@@ -23,132 +23,132 @@ MODULE MOD_POISS
 ! IPM,IMM,KPM,KMM: PLUS-MINUS INDEX OF X & Z DIECTION FOR CONSIDERING PERIODICITY
 ! AC,GAM,BET: COEFICIENT FOR THE SOLVER OF TRIDIGONAL MATRIX
 
-CONTAINS
+contains
 !=======================================================================
-      SUBROUTINE X_FT_ALLO
+  subroutine x_ft_allo
 !=======================================================================
-      USE MOD_COMMON
-      IMPLICIT NONE
+    use mod_common
+    implicit none
 
-      ALLOCATE(AB(N3MD))
-      ALLOCATE(AF(N3MD))
-      ALLOCATE(AS(N2M))
-      ALLOCATE(AN(N2M))
-      ALLOCATE(COI1(N3MD))
-      ALLOCATE(COI2(N3MD))
-      ALLOCATE(COR1(N3MD))
-      ALLOCATE(COR2(N3MD))
-      ALLOCATE(AI3(N1MH))
-      ALLOCATE(KPM(N3MD),KMM(N3MD))
+    allocate (ab(n3md))
+    allocate (af(n3md))
+    allocate (as(n2m))
+    allocate (an(n2m))
+    allocate (coi1(n3md))
+    allocate (coi2(n3md))
+    allocate (cor1(n3md))
+    allocate (cor2(n3md))
+    allocate (ai3(n1mh))
+    allocate (kpm(n3md), kmm(n3md))
 
-      AB = 0.
-      AF = 0.
-      AS = 0.
-      AN = 0.
-      COI1 = 0.
-      COI2 = 0.
-      COR1 = 0.
-      COR2 = 0.
-      AI3 = 0.
-      
-      RETURN
-      END SUBROUTINE X_FT_ALLO
-!=======================================================================
-!=======================================================================
-      SUBROUTINE Z_FT_ALLO
-!=======================================================================
-      USE MOD_COMMON
-      IMPLICIT NONE
+    ab = 0.
+    af = 0.
+    as = 0.
+    an = 0.
+    coi1 = 0.
+    coi2 = 0.
+    cor1 = 0.
+    cor2 = 0.
+    ai3 = 0.
 
-      ALLOCATE(AW(N1MD))
-      ALLOCATE(AE(N1MD))
-      ALLOCATE(AS(N2M))
-      ALLOCATE(AN(N2M))
-      ALLOCATE(COI1(N1MD))
-      ALLOCATE(COI2(N1MD))
-      ALLOCATE(COR1(N1MD))
-      ALLOCATE(COR2(N1MD))
-      ALLOCATE(AK3(N3MH))
-      ALLOCATE(IPM(N1MD),IMM(N1MD))
-
-      AW = 0.
-      AE = 0.
-      AS = 0.
-      AN = 0.
-      COI1 = 0.
-      COI2 = 0.
-      COR1 = 0.
-      COR2 = 0.
-      AK3 = 0.
-
-      RETURN
-      END SUBROUTINE Z_FT_ALLO
+    return
+  end subroutine x_ft_allo
 !=======================================================================
 !=======================================================================
-      SUBROUTINE MGRD_ALLO
+  subroutine z_ft_allo
 !=======================================================================
-      USE MOD_COMMON
-      IMPLICIT NONE
+    use mod_common
+    implicit none
 
-      ALLOCATE(AW(N1MD))
-      ALLOCATE(AE(N1MD))
-      ALLOCATE(AS(N2M))
-      ALLOCATE(AN(N2M))
-      ALLOCATE(AB(N3MD))
-      ALLOCATE(AF(N3MD))
-      ALLOCATE(FIDW(N1MD))
-      ALLOCATE(FKDW(N3MD))
-      ALLOCATE(FIUP(N1MD))
-      ALLOCATE(FKUP(N3MD))
-      ALLOCATE(IH1(N1MD))
-      ALLOCATE(IH2(N1MD))
-      ALLOCATE(KH1(N3MD))
-      ALLOCATE(KH2(N3MD))
-      ALLOCATE(IL1(N1MD))
-      ALLOCATE(IL2(N1MD))
-      ALLOCATE(KL1(N3MD))
-      ALLOCATE(KL2(N3MD))
-      ALLOCATE(IPM(N1MD),IMM(N1MD))
-      ALLOCATE(KPM(N3MD),KMM(N3MD))
+    allocate (aw(n1md))
+    allocate (ae(n1md))
+    allocate (as(n2m))
+    allocate (an(n2m))
+    allocate (coi1(n1md))
+    allocate (coi2(n1md))
+    allocate (cor1(n1md))
+    allocate (cor2(n1md))
+    allocate (ak3(n3mh))
+    allocate (ipm(n1md), imm(n1md))
 
-      AW = 0.
-      AE = 0.
-      AS = 0.
-      AN = 0.
-      AB = 0.
-      AF = 0.
-      FIDW = 0.
-      FKDW = 0.
-      FIUP = 0.
-      FKUP = 0.
-      IH1 = 0.
-      IH2 = 0.
-      KH1 = 0.
-      KH2 = 0.
-      IL1 = 0.
-      IL2 = 0.
-      KL1 = 0.
-      KL2 = 0.
+    aw = 0.
+    ae = 0.
+    as = 0.
+    an = 0.
+    coi1 = 0.
+    coi2 = 0.
+    cor1 = 0.
+    cor2 = 0.
+    ak3 = 0.
 
-      RETURN
-      END SUBROUTINE MGRD_ALLO
+    return
+  end subroutine z_ft_allo
 !=======================================================================
-      SUBROUTINE FTFT_ALLO
 !=======================================================================
-      USE MOD_COMMON
-      IMPLICIT NONE
-
-      ALLOCATE(AI3(N3MH))
-      ALLOCATE(AI1(N1))
-      ALLOCATE(AK3(N3MH))
-      ALLOCATE(AK1(N1))
-
-      AI3 = 0.
-      AI1 = 0.
-      AK3 = 0.
-      AK1 = 0.
-
-      RETURN
-      END SUBROUTINE FTFT_ALLO
+  subroutine mgrd_allo
 !=======================================================================
-END MODULE MOD_POISS
+    use mod_common
+    implicit none
+
+    allocate (aw(n1md))
+    allocate (ae(n1md))
+    allocate (as(n2m))
+    allocate (an(n2m))
+    allocate (ab(n3md))
+    allocate (af(n3md))
+    allocate (fidw(n1md))
+    allocate (fkdw(n3md))
+    allocate (fiup(n1md))
+    allocate (fkup(n3md))
+    allocate (ih1(n1md))
+    allocate (ih2(n1md))
+    allocate (kh1(n3md))
+    allocate (kh2(n3md))
+    allocate (il1(n1md))
+    allocate (il2(n1md))
+    allocate (kl1(n3md))
+    allocate (kl2(n3md))
+    allocate (ipm(n1md), imm(n1md))
+    allocate (kpm(n3md), kmm(n3md))
+
+    aw = 0.
+    ae = 0.
+    as = 0.
+    an = 0.
+    ab = 0.
+    af = 0.
+    fidw = 0.
+    fkdw = 0.
+    fiup = 0.
+    fkup = 0.
+    ih1 = 0.
+    ih2 = 0.
+    kh1 = 0.
+    kh2 = 0.
+    il1 = 0.
+    il2 = 0.
+    kl1 = 0.
+    kl2 = 0.
+
+    return
+  end subroutine mgrd_allo
+!=======================================================================
+  subroutine ftft_allo
+!=======================================================================
+    use mod_common
+    implicit none
+
+    allocate (ai3(n3mh))
+    allocate (ai1(n1))
+    allocate (ak3(n3mh))
+    allocate (ak1(n1))
+
+    ai3 = 0.
+    ai1 = 0.
+    ak3 = 0.
+    ak1 = 0.
+
+    return
+  end subroutine ftft_allo
+!=======================================================================
+end module mod_poiss

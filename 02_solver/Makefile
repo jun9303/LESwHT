@@ -26,7 +26,7 @@ OBJS =  mod_common.o \
         slv_engy.o \
         slv_cont.o \
         slv_auxi.o \
-        poiss_z_ft.o \
+        poiss_ftft.o \
         funcbody.o \
         ibm_body.o \
         ibm_forcing.o

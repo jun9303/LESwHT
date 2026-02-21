@@ -1,471 +1,471 @@
 !=======================================================================
-       SUBROUTINE FTRFILES(IO)
+       subroutine ftrfiles(io)
 !=======================================================================
-!$    use omp_lib
-      USE MOD_COMMON
-      IMPLICIT NONE
-      INTEGER*8    :: IO
+!$       USE OMP_LIB
+         use mod_common
+         implicit none
+         integer(8) :: io
 
-      IF (IO.NE.0) THEN
-        IF (IREAD.NE.1) THEN
-          OPEN(2000,FILE='../output/ftr/fhist.dat')
-          OPEN(2001,FILE='../output/ftr/fcdcl.dat')
-          OPEN(2002,FILE='../output/ftr/fnusselt.dat')          
-          IF (ILES.EQ.1) THEN
-            OPEN(2003,FILE='../output/ftr/fles.dat')
-            IF(IHTRANS.EQ.1) THEN
-              OPEN(2004,FILE='../output/ftr/flest.dat')
-            ENDIF
-          ENDIF
-          IF (NTRACE.NE.0) THEN
-            OPEN(2005,FILE='../output/ftr/futrace.dat')
-            OPEN(2006,FILE='../output/ftr/fvtrace.dat')
-            OPEN(2007,FILE='../output/ftr/fwtrace.dat')
-            OPEN(2008,FILE='../output/ftr/fptrace.dat')
-            IF (IHTRANS.EQ.1) THEN
-              OPEN(2009,FILE='../output/ftr/fttrace.dat')
-            ENDIF
-          ENDIF
-          IF (ICH.EQ.1) THEN
-            OPEN(2010,FILE='../output/ftr/fcmfr.dat')
-          ENDIF
-          OPEN(2011,FILE='../output/ftr/ftime.dat')
-        ELSE
-          OPEN(2000,FILE='../output/ftr/fhist.dat',&
-            POSITION='APPEND')
-          OPEN(2001,FILE='../output/ftr/fcdcl.dat',&
-            POSITION='APPEND')
-          OPEN(2002,FILE='../output/ftr/fnusselt.dat',&
-            POSITION='APPEND')          
-          IF (ILES.EQ.1) THEN
-            OPEN(2003,FILE='../output/ftr/fles.dat',&
-                POSITION='APPEND')
-            IF (IHTRANS.EQ.1) THEN
-              OPEN(2004,FILE='../output/ftr/flest.dat',&
-                POSITION='APPEND')
-            ENDIF
-          ENDIF
-          IF (NTRACE.NE.0) THEN
-            OPEN(2005,FILE='../output/ftr/futrace.dat',&
-                POSITION='APPEND')
-            OPEN(2006,FILE='../output/ftr/fvtrace.dat',&
-                POSITION='APPEND')
-            OPEN(2007,FILE='../output/ftr/fwtrace.dat',&
-                POSITION='APPEND')
-            OPEN(2008,FILE='../output/ftr/fptrace.dat',&
-                POSITION='APPEND')
-            IF (IHTRANS.EQ.1) THEN
-              OPEN(2009,FILE='../output/ftr/fttrace.dat',&
-                   POSITION='APPEND')
-            ENDIF
-          ENDIF
-          IF (ICH.EQ.1) THEN
-            OPEN(2010,FILE='../output/ftr/fcmfr.dat',&
-                POSITION='APPEND')
-          ENDIF
-          OPEN(2011,FILE='../output/ftr/ftime.dat',&
-            POSITION='APPEND')
-        ENDIF
-      ELSE
-        CLOSE(2000)
-        CLOSE(2001)
-        CLOSE(2002)
-        IF (ILES.EQ.1) THEN
-          CLOSE(2003)
-          IF (IHTRANS.EQ.1) THEN
-            CLOSE(2004)
-          ENDIF
-        ENDIF
-        IF (NTRACE.NE.0) THEN
-          CLOSE(2005)
-          CLOSE(2006)
-          CLOSE(2007)
-          CLOSE(2008)
-          IF (IHTRANS.EQ.1) THEN
-            CLOSE(2009)
-          ENDIF
-        ENDIF
-        IF (ICH.EQ.1) THEN
-          CLOSE(2010)
-        ENDIF
-        CLOSE(2011)
+         if (io .ne. 0) then
+           if (iread .ne. 1) then
+             open (2000, file='../output/ftr/fhist.dat')
+             open (2001, file='../output/ftr/fcdcl.dat')
+             open (2002, file='../output/ftr/fnusselt.dat')
+             if (iles .eq. 1) then
+               open (2003, file='../output/ftr/fles.dat')
+               if (ihtrans .eq. 1) then
+                 open (2004, file='../output/ftr/flest.dat')
+               end if
+             end if
+             if (ntrace .ne. 0) then
+               open (2005, file='../output/ftr/futrace.dat')
+               open (2006, file='../output/ftr/fvtrace.dat')
+               open (2007, file='../output/ftr/fwtrace.dat')
+               open (2008, file='../output/ftr/fptrace.dat')
+               if (ihtrans .eq. 1) then
+                 open (2009, file='../output/ftr/fttrace.dat')
+               end if
+             end if
+             if (ich .eq. 1) then
+               open (2010, file='../output/ftr/fcmfr.dat')
+             end if
+             open (2011, file='../output/ftr/ftime.dat')
+           else
+             open (2000, file='../output/ftr/fhist.dat', &
+                   position='append')
+             open (2001, file='../output/ftr/fcdcl.dat', &
+                   position='append')
+             open (2002, file='../output/ftr/fnusselt.dat', &
+                   position='append')
+             if (iles .eq. 1) then
+               open (2003, file='../output/ftr/fles.dat', &
+                     position='append')
+               if (ihtrans .eq. 1) then
+                 open (2004, file='../output/ftr/flest.dat', &
+                       position='append')
+               end if
+             end if
+             if (ntrace .ne. 0) then
+               open (2005, file='../output/ftr/futrace.dat', &
+                     position='append')
+               open (2006, file='../output/ftr/fvtrace.dat', &
+                     position='append')
+               open (2007, file='../output/ftr/fwtrace.dat', &
+                     position='append')
+               open (2008, file='../output/ftr/fptrace.dat', &
+                     position='append')
+               if (ihtrans .eq. 1) then
+                 open (2009, file='../output/ftr/fttrace.dat', &
+                       position='append')
+               end if
+             end if
+             if (ich .eq. 1) then
+               open (2010, file='../output/ftr/fcmfr.dat', &
+                     position='append')
+             end if
+             open (2011, file='../output/ftr/ftime.dat', &
+                   position='append')
+           end if
+         else
+           close (2000)
+           close (2001)
+           close (2002)
+           if (iles .eq. 1) then
+             close (2003)
+             if (ihtrans .eq. 1) then
+               close (2004)
+             end if
+           end if
+           if (ntrace .ne. 0) then
+             close (2005)
+             close (2006)
+             close (2007)
+             close (2008)
+             if (ihtrans .eq. 1) then
+               close (2009)
+             end if
+           end if
+           if (ich .eq. 1) then
+             close (2010)
+           end if
+           close (2011)
 
-      ENDIF
+         end if
 
-      RETURN
-      END SUBROUTINE FTRFILES
+         return
+       end subroutine ftrfiles
 !=======================================================================
 !=======================================================================
-      SUBROUTINE WRITEHISTORY
+       subroutine writehistory
 !=======================================================================
 !
-!     Trace the maximum CFL#, divergenceU, and QMASS(IBM).
-!     The tracing interval is set in lica.in (NPIN)
+!     TRACE THE MAXIMUM CFL#, DIVERGENCEU, AND QMASS(IBM).
+!     THE TRACING INTERVAL IS SET IN LICA.IN (NPIN)
 !
-!     *In case of channel flow,
-!     - the flow rate and the mean pressure gradient is traced
-!     - QFLUX should be constant, while PMI, PMIL, PMIU fluctuate
+!     *IN CASE OF CHANNEL FLOW,
+!     - THE FLOW RATE AND THE MEAN PRESSURE GRADIENT IS TRACED
+!     - QFLUX SHOULD BE CONSTANT, WHILE PMI, PMIL, PMIU FLUCTUATE
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K
+         use mod_common
+         use mod_flowarray
+         implicit none
+         integer(8) :: i, j, k
 
-      QFLUX = 0.
+         qflux = 0.
 
 !$OMP PARALLEL DO &
-!$OMP reduction(+:QFLUX)
-      DO K=1,N3M
-      DO J=1,N2M
-      QFLUX = QFLUX+U(1,J,K)*F2FY(J)*F2FZ(K)
-      ENDDO
-      ENDDO
+!$OMP REDUCTION(+:QFLUX)
+         do k = 1, n3m
+           do j = 1, n2m
+             qflux = qflux + u(1, j, k) * f2fy(j) * f2fz(k)
+           end do
+         end do
 
-      WRITE(2000,130) TIME,DT,CFLMAX,DVMAX,QMMAX
- 130  FORMAT(F13.5,4ES15.7)
+         write (2000, 130) time, dt, cflmax, dvmax, qmmax
+130      format(f13.5, 4es15.7)
 
-      IF (ICH.EQ.1) THEN
-      WRITE(2010,140) TIME,QFLUX,-PMIAVG
- 140  FORMAT(F13.5,6ES20.12)
-      ENDIF
+         if (ich .eq. 1) then
+           write (2010, 140) time, qflux, -pmiavg
+140        format(f13.5, 6es20.12)
+         end if
 
-      RETURN
-      END SUBROUTINE WRITEHISTORY
+         return
+       end subroutine writehistory
 !=======================================================================
 !=======================================================================
-      SUBROUTINE TRACER
+       subroutine tracer
 !=======================================================================
 !
-!     This subroutine is called when MOD(M,NTPRINT)=0.
-!     Velocity components and the pressure at the cell center of the
-!     tracing cells are saved.
+!     THIS SUBROUTINE IS CALLED WHEN MOD(M,NTPRINT)=0.
+!     VELOCITY COMPONENTS AND THE PRESSURE AT THE CELL CENTER OF THE
+!     TRACING CELLS ARE SAVED.
 !
-!     NTPRINT : determining the time-tracing interval
-!
-!-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,P
-      IMPLICIT NONE
-      INTEGER*8 :: N
-
-      WRITE(2005,101)TIME,(0.5*(U(TRPTS(N,1),TRPTS(N,2),TRPTS(N,3))              &
-                            +U(TRPTS(N,1)+1,TRPTS(N,2),TRPTS(N,3))),N=1,NTRACE)
-      WRITE(2006,101)TIME,(0.5*(V(TRPTS(N,1),TRPTS(N,2),TRPTS(N,3))              &
-                            +V(TRPTS(N,1),TRPTS(N,2)+1,TRPTS(N,3))),N=1,NTRACE)
-      WRITE(2007,101)TIME,(0.5*(W(TRPTS(N,1),TRPTS(N,2),TRPTS(N,3))              &
-                            +W(TRPTS(N,1),TRPTS(N,2),TRPTS(N,3)+1)),N=1,NTRACE)
-      WRITE(2008,101)TIME,(P(TRPTS(N,1),TRPTS(N,2),TRPTS(N,3)),N=1,NTRACE)
-  101 FORMAT(F15.7,10000ES15.7)
-
-      RETURN
-      END SUBROUTINE TRACER
-!=======================================================================
-!=======================================================================
-      SUBROUTINE WRITEFIELD
-!=======================================================================
-!
-!     Make an output file of instantaneous field, when MOD(NTIME,NPRINT)=0,
-!     NPRINT : instantaneous field file printing interval
-!     tfn1='fld': prefix for instantaneous flow field
-!     tname     : instantaneous field file name ex) fld006100
+!     NTPRINT : DETERMINING THE TIME-TRACING INTERVAL
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,T,P
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K
-      INTEGER*8     :: IDUM,IDG1,IDG2,IDG3,IDG4,IDG5,IDG6
-      REAL*8        :: DUM
-      CHARACTER*25  :: TNAME
-      CHARACTER*19  :: TFN1
+         use mod_common
+         use mod_flowarray, only: u, v, w, p
+         implicit none
+         integer(8) :: n
 
-      IDUM = 0
-      DUM  = 0.
+         write (2005, 101) time, (0.5 * (u(trpts(n, 1), trpts(n, 2), trpts(n, 3)) &
+                                         + u(trpts(n, 1) + 1, trpts(n, 2), trpts(n, 3))), n=1, ntrace)
+         write (2006, 101) time, (0.5 * (v(trpts(n, 1), trpts(n, 2), trpts(n, 3)) &
+                                         + v(trpts(n, 1), trpts(n, 2) + 1, trpts(n, 3))), n=1, ntrace)
+         write (2007, 101) time, (0.5 * (w(trpts(n, 1), trpts(n, 2), trpts(n, 3)) &
+                                         + w(trpts(n, 1), trpts(n, 2), trpts(n, 3) + 1)), n=1, ntrace)
+         write (2008, 101) time, (p(trpts(n, 1), trpts(n, 2), trpts(n, 3)), n=1, ntrace)
+101      format(f15.7, 10000es15.7)
 
-      TFN1='../output/field/fld'
-      IDG1=IHIST/100000
-      IDG2=(IHIST-IDG1*100000)/10000
-      IDG3=(IHIST-IDG1*100000-IDG2*10000)/1000
-      IDG4=(IHIST-IDG1*100000-IDG2*10000-IDG3*1000)/100
-      IDG5=(IHIST-IDG1*100000-IDG2*10000-IDG3*1000-IDG4*100)/10
-      IDG6=IHIST-IDG1*100000-IDG2*10000-IDG3*1000-IDG4*100-IDG5*10
-      TNAME=TFN1//CHAR(IDG1+48)//CHAR(IDG2+48)//                       &
-           CHAR(IDG3+48)//CHAR(IDG4+48)//CHAR(IDG5+48)//CHAR(IDG6+48)
-
-      OPEN(NV,FILE=TNAME,FORM='UNFORMATTED')
-      WRITE(NV) N1,N2,N3,RE,PR,GR
-      WRITE(NV) IHIST,M,TIME,DT
-      WRITE(NV) XPRDIC, YPRDIC, ZPRDIC
-      WRITE(NV) BC_XBTM, BC_XTOP, BC_YBTM, BC_YTOP, BC_ZBTM, BC_ZTOP
-      WRITE(NV) ICH, ICONJG
-      WRITE(NV) ((( U(I,J,K) ,I=1,N1),J=0,N2),K=0,N3)
-      WRITE(NV) ((( V(I,J,K) ,I=0,N1),J=1,N2),K=0,N3)
-      WRITE(NV) ((( W(I,J,K) ,I=0,N1),J=0,N2),K=1,N3)
-      WRITE(NV) ((( P(I,J,K) ,I=1,N1M),J=1,N2M),K=1,N3M)
-      IF (IHTRANS .EQ. 1) WRITE(NV) ((( T(I,J,K), I=1,N1M),J=1,N2M),K=1,N3M)
-      CLOSE(NV)
-
-      NV=NV+1
-
-      RETURN
-      END SUBROUTINE WRITEFIELD
+         return
+       end subroutine tracer
 !=======================================================================
 !=======================================================================
-      SUBROUTINE WRITEFTRTIME
+       subroutine writefield
 !=======================================================================
 !
-!     Real time measurements for individual processes
-!     Printed at every computational step
+!     MAKE AN OUTPUT FILE OF INSTANTANEOUS FIELD, WHEN MOD(NTIME,NPRINT)=0,
+!     NPRINT : INSTANTANEOUS FIELD FILE PRINTING INTERVAL
+!     TFN1='FLD': PREFIX FOR INSTANTANEOUS FLOW FIELD
+!     TNAME     : INSTANTANEOUS FIELD FILE NAME EX) FLD006100
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      IMPLICIT NONE
-      REAL*8     ::   FTRTIME1,FTRTIME2,FTRTIME3,FTRTIME4
+         use mod_common
+         use mod_flowarray, only: u, v, w, t, p
+         implicit none
+         integer(8) :: i, j, k
+         integer(8) :: idum, idg1, idg2, idg3, idg4, idg5, idg6
+         real(8) :: dum
+         character*25 :: tname
+         character*19 :: tfn1
 
-      FTRTIME1=(SGSTIME_E(3)-SGSTIME_B(3)+SGSTIME_E(2)-SGSTIME_B(2)+SGSTIME_E(1)-SGSTIME_B(1))
-      FTRTIME2=(RHSNLHSTIME_E(3)-RHSNLHSTIME_B(3)+RHSNLHSTIME_E(2)-RHSNLHSTIME_B(2)+RHSNLHSTIME_E(1)-RHSNLHSTIME_B(1))
-      FTRTIME3=(POISSTIME_E(3)-POISSTIME_B(3)+POISSTIME_E(2)-POISSTIME_B(2)+POISSTIME_E(1)-POISSTIME_B(1))
-      FTRTIME4=TIME_END-TIME_BEGIN
+         idum = 0
+         dum = 0.
 
-      WRITE(*,201) FTRTIME1
-      WRITE(*,202) FTRTIME2
-      WRITE(*,203) FTRTIME3
-      WRITE(*,204) FTRTIME4
+         tfn1 = '../output/field/fld'
+         idg1 = ihist / 100000
+         idg2 = (ihist - idg1 * 100000) / 10000
+         idg3 = (ihist - idg1 * 100000 - idg2 * 10000) / 1000
+         idg4 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
+         idg5 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
+         idg6 = ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
+         tname = tfn1//char(idg1 + 48)//char(idg2 + 48)// &
+                 char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
 
- 201  FORMAT('TIME FOR SGS    : ',F12.3,' SECONDS')
- 202  FORMAT('TIME FOR RHSnLHS: ',F12.3,' SECONDS')
- 203  FORMAT('TIME FOR POISSON: ',F12.3,' SECONDS')
- 204  FORMAT('TIME OF OPERTION: ',F12.3,' SECONDS')
-      WRITE(2011,206)TIME,FTRTIME1,FTRTIME2,FTRTIME3,FTRTIME4
- 206  FORMAT(F13.5,5F12.4)
+         open (nv, file=tname, form='unformatted')
+         write (nv) n1, n2, n3, re, pr, gr
+         write (nv) ihist, m, time, dt
+         write (nv) xprdic, yprdic, zprdic
+         write (nv) bc_xbtm, bc_xtop, bc_ybtm, bc_ytop, bc_zbtm, bc_ztop
+         write (nv) ich, iconjg
+         write (nv) (((u(i, j, k), i=1, n1), j=0, n2), k=0, n3)
+         write (nv) (((v(i, j, k), i=0, n1), j=1, n2), k=0, n3)
+         write (nv) (((w(i, j, k), i=0, n1), j=0, n2), k=1, n3)
+         write (nv) (((p(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+         if (ihtrans .eq. 1) write (nv) (((t(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+         close (nv)
 
-      RETURN
-      END
+         nv = nv + 1
+
+         return
+       end subroutine writefield
 !=======================================================================
 !=======================================================================
-      SUBROUTINE FIELD_AVG
+       subroutine writeftrtime
+!=======================================================================
+!
+!     REAL TIME MEASUREMENTS FOR INDIVIDUAL PROCESSES
+!     PRINTED AT EVERY COMPUTATIONAL STEP
+!
+!-----------------------------------------------------------------------
+         use mod_common
+         implicit none
+         real(8) :: ftrtime1, ftrtime2, ftrtime3, ftrtime4
+
+         ftrtime1 = (sgstime_e(3) - sgstime_b(3) + sgstime_e(2) - sgstime_b(2) + sgstime_e(1) - sgstime_b(1))
+         ftrtime2 = (rhsnlhstime_e(3) - rhsnlhstime_b(3) + rhsnlhstime_e(2) - rhsnlhstime_b(2) + rhsnlhstime_e(1) - rhsnlhstime_b(1))
+         ftrtime3 = (poisstime_e(3) - poisstime_b(3) + poisstime_e(2) - poisstime_b(2) + poisstime_e(1) - poisstime_b(1))
+         ftrtime4 = time_end - time_begin
+
+         write (*, 201) ftrtime1
+         write (*, 202) ftrtime2
+         write (*, 203) ftrtime3
+         write (*, 204) ftrtime4
+
+201      format('TIME FOR SGS    : ', f12.3, ' SECONDS')
+202      format('TIME FOR RHSNLHS: ', f12.3, ' SECONDS')
+203      format('TIME FOR POISSON: ', f12.3, ' SECONDS')
+204      format('TIME OF OPERTION: ', f12.3, ' SECONDS')
+         write (2011, 206) time, ftrtime1, ftrtime2, ftrtime3, ftrtime4
+206      format(f13.5, 5f12.4)
+
+         return
+       end
+!=======================================================================
+!=======================================================================
+       subroutine field_avg
 !=======================================================================
 !     SUBROUTINE FOR FIELD AVERAGING
 !     AVERAGED VARIABLES ARE DEFINED AT CELL CENTER
 !     VARIABLES ARE LINEARLY INTERPOLATED
 !     FROM STAGGERED GRID STRUCTURE TO DETERMINE CELL CENTER VALUES
 !
-!     No spatial averaging.
+!     NO SPATIAL AVERAGING.
 !
-!     Print an averaged flow-field file, when MOD(NTIME,NPRIAVG)=0,
-!     satisfying the averaged flow-field file printing interval (NPRIAVG set in lica.in).
-!     tfn1='fav': prefix for average flow field
-!     tname     : average field file name  ex) fav100000-110000
+!     PRINT AN AVERAGED FLOW-FIELD FILE, WHEN MOD(NTIME,NPRIAVG)=0,
+!     SATISFYING THE AVERAGED FLOW-FIELD FILE PRINTING INTERVAL (NPRIAVG SET IN LICA.IN).
+!     TFN1='FAV': PREFIX FOR AVERAGE FLOW FIELD
+!     TNAME     : AVERAGE FIELD FILE NAME  EX) FAV100000-110000
 !
 !-----------------------------------------------------------------------
-      USE MOD_COMMON
-      USE MOD_FLOWARRAY, ONLY : U,V,W,P,T,UAVG,VAVG,WAVG,UIUJAVG,PAVG,&
-                                P2AVG,TAVG,T2AVG,VORAVG,VOR2AVG,SSAVG
-      IMPLICIT NONE
-      INTEGER*8     :: I,J,K,L
-      REAL*8        :: UCC,VCC,WCC
-      REAL*8        :: VG11,VG12,VG13,VG21,VG22,VG23,VG31,VG32,VG33
-      REAL*8        :: UP,UM,VP,VM,WP,WM,SR(6),SRSR
-      REAL*8        :: WX,WY,WZ
-      REAL*8        :: TIMEEND
-      INTEGER*8     :: IHISTEND
-      INTEGER*8     :: idg1,idg2,idg3,idg4,idg5,idg6
-      CHARACTER*16  :: tname
-      CHARACTER*3   :: tfn1
-      CHARACTER*6   :: tfn2,tfn3
-      CHARACTER*1   :: tfnh
+         use mod_common
+         use mod_flowarray, only: u, v, w, p, t, uavg, vavg, wavg, uiujavg, pavg, &
+                                  p2avg, tavg, t2avg, voravg, vor2avg, ssavg
+         implicit none
+         integer(8) :: i, j, k, l
+         real(8) :: ucc, vcc, wcc
+         real(8) :: vg11, vg12, vg13, vg21, vg22, vg23, vg31, vg32, vg33
+         real(8) :: up, um, vp, vm, wp, wm, sr(6), srsr
+         real(8) :: wx, wy, wz
+         real(8) :: timeend
+         integer(8) :: ihistend
+         integer(8) :: idg1, idg2, idg3, idg4, idg5, idg6
+         character*16 :: tname
+         character*3 :: tfn1
+         character*6 :: tfn2, tfn3
+         character*1 :: tfnh
 
-      tfnh='-'
-
-!$OMP PARALLEL DO &
-!$OMP private(UCC,VCC,WCC)
-      DO K=1,N3M
-      DO J=1,N2M
-      DO I=1,N1M
-       UCC=0.5*(U(I,J,K)+U(I+1,J,K))
-       VCC=0.5*(V(I,J,K)+V(I,J+1,K))
-       WCC=0.5*(W(I,J,K)+W(I,J,K+1))
-         UAVG(I,J,K)     =UAVG(I,J,K)     +UCC         *DT
-         VAVG(I,J,K)     =VAVG(I,J,K)     +VCC         *DT
-         WAVG(I,J,K)     =WAVG(I,J,K)     +WCC         *DT
-         UIUJAVG(I,J,K,1)=UIUJAVG(I,J,K,1)+UCC**2.     *DT
-         UIUJAVG(I,J,K,2)=UIUJAVG(I,J,K,2)+UCC*VCC     *DT
-         UIUJAVG(I,J,K,3)=UIUJAVG(I,J,K,3)+UCC*WCC     *DT
-         UIUJAVG(I,J,K,4)=UIUJAVG(I,J,K,4)+VCC**2.     *DT
-         UIUJAVG(I,J,K,5)=UIUJAVG(I,J,K,5)+VCC*WCC     *DT
-         UIUJAVG(I,J,K,6)=UIUJAVG(I,J,K,6)+WCC**2.     *DT
-         IF(IHTRANS.EQ.1) THEN
-         TAVG(I,J,K)     =TAVG(I,J,K)     +T(I,J,K)    *DT
-         T2AVG(I,J,K)    =T2AVG(I,J,K)    +T(I,J,K)**2.*DT
-         ENDIF
-         PAVG(I,J,K)     =PAVG(I,J,K)     +P(I,J,K)    *DT
-         P2AVG(I,J,K)    =P2AVG(I,J,K)    +P(I,J,K)**2.*DT
-      ENDDO
-      ENDDO
-      ENDDO
+         tfnh = '-'
 
 !$OMP PARALLEL DO &
-!$OMP private(VG11,VG12,VG13,VG21,VG22,VG23,VG31,VG32,VG33) &
-!$OMP private(UP,UM,VP,VM,WP,WM,SR,SRSR) &
-!$OMP private(WX,WY,WZ)
-      DO K=1,N3M
-      DO J=1,N2M
-      DO I=1,N1M
+!$OMP PRIVATE(UCC,VCC,WCC)
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
+               ucc = 0.5 * (u(i, j, k) + u(i + 1, j, k))
+               vcc = 0.5 * (v(i, j, k) + v(i, j + 1, k))
+               wcc = 0.5 * (w(i, j, k) + w(i, j, k + 1))
+               uavg(i, j, k) = uavg(i, j, k) + ucc * dt
+               vavg(i, j, k) = vavg(i, j, k) + vcc * dt
+               wavg(i, j, k) = wavg(i, j, k) + wcc * dt
+               uiujavg(i, j, k, 1) = uiujavg(i, j, k, 1) + ucc**2.*dt
+               uiujavg(i, j, k, 2) = uiujavg(i, j, k, 2) + ucc * vcc * dt
+               uiujavg(i, j, k, 3) = uiujavg(i, j, k, 3) + ucc * wcc * dt
+               uiujavg(i, j, k, 4) = uiujavg(i, j, k, 4) + vcc**2.*dt
+               uiujavg(i, j, k, 5) = uiujavg(i, j, k, 5) + vcc * wcc * dt
+               uiujavg(i, j, k, 6) = uiujavg(i, j, k, 6) + wcc**2.*dt
+               if (ihtrans .eq. 1) then
+                 tavg(i, j, k) = tavg(i, j, k) + t(i, j, k) * dt
+                 t2avg(i, j, k) = t2avg(i, j, k) + t(i, j, k)**2.*dt
+               end if
+               pavg(i, j, k) = pavg(i, j, k) + p(i, j, k) * dt
+               p2avg(i, j, k) = p2avg(i, j, k) + p(i, j, k)**2.*dt
+             end do
+           end do
+         end do
 
-       VG11=F2FXI(I)*(U(I+1,J,K)-U(I,J,K))
-       UP=C2CYI(J+1)*0.25                                      &
-          *(F2FY(J+1)*(U(I,J,K)+U(I+1,J,K))                    &
-           +F2FY(J)*(U(I,J+1,K)+U(I+1,J+1,K)))*(1.-FIXJU(J))   &
-          +0.5*(U(I,N2,K)+U(I+1,N2,K))*FIXJU(J)
-       UM=C2CYI(J)*0.25                                        &
-          *(F2FY(J)*(U(I,J-1,K)+U(I+1,J-1,K))                  &
-           +F2FY(J-1)*(U(I,J,K)+U(I+1,J,K)))*(1.-FIXJL(J))     &
-          +0.5*(U(I,0,K)+U(I+1,0,K))*FIXJL(J)
-       VG12=F2FYI(J)*(UP-UM)
+!$OMP PARALLEL DO &
+!$OMP PRIVATE(VG11,VG12,VG13,VG21,VG22,VG23,VG31,VG32,VG33) &
+!$OMP PRIVATE(UP,UM,VP,VM,WP,WM,SR,SRSR) &
+!$OMP PRIVATE(WX,WY,WZ)
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
 
-       UP=C2CZI(K+1)*0.25                                      &
-          *(F2FZ(K+1)*(U(I,J,K)+U(I+1,J,K))                    &
-           +F2FZ(K)*(U(I,J,K+1)+U(I+1,J,K+1)))*(1.-FIXKU(K))   &
-          +0.5*(U(I,J,N3)+U(I+1,J,N3))*FIXKU(K)
-       UM=C2CZI(K)*0.25                                        &
-          *(F2FZ(K)*(U(I,J,K-1)+U(I+1,J,K-1))                  &
-           +F2FZ(K-1)*(U(I,J,K)+U(I+1,J,K)))*(1.-FIXKL(K))     &
-          +0.5*(U(I,J,0)+U(I+1,J,0))*FIXKL(K)
-       VG13=F2FZI(K)*(UP-UM)
+               vg11 = f2fxi(i) * (u(i + 1, j, k) - u(i, j, k))
+               up = c2cyi(j + 1) * 0.25 &
+                    * (f2fy(j + 1) * (u(i, j, k) + u(i + 1, j, k)) &
+                       + f2fy(j) * (u(i, j + 1, k) + u(i + 1, j + 1, k))) * (1.-fixju(j)) &
+                    + 0.5 * (u(i, n2, k) + u(i + 1, n2, k)) * fixju(j)
+               um = c2cyi(j) * 0.25 &
+                    * (f2fy(j) * (u(i, j - 1, k) + u(i + 1, j - 1, k)) &
+                       + f2fy(j - 1) * (u(i, j, k) + u(i + 1, j, k))) * (1.-fixjl(j)) &
+                    + 0.5 * (u(i, 0, k) + u(i + 1, 0, k)) * fixjl(j)
+               vg12 = f2fyi(j) * (up - um)
 
-       VP=C2CXI(I+1)*0.25                                      &
-          *(F2FX(I+1)*(V(I,J,K)+V(I,J+1,K))                    &
-           +F2FX(I)*(V(I+1,J,K)+V(I+1,J+1,K)))*(1.-FIXIU(I))   &
-          +0.5*(V(N1,J,K)+V(N1,J+1,K))*FIXIU(I)
-       VM=C2CXI(I)*0.25                                        &
-          *(F2FX(I)*(V(I-1,J,K)+V(I-1,J+1,K))                  &
-           +F2FX(I-1)*(V(I,J,K)+V(I,J+1,K)))*(1.-FIXIL(I))     &
-          +0.5*(V(0,J,K)+V(0,J+1,K))*FIXIL(I)
-       VG21=F2FXI(I)*(VP-VM)
+               up = c2czi(k + 1) * 0.25 &
+                    * (f2fz(k + 1) * (u(i, j, k) + u(i + 1, j, k)) &
+                       + f2fz(k) * (u(i, j, k + 1) + u(i + 1, j, k + 1))) * (1.-fixku(k)) &
+                    + 0.5 * (u(i, j, n3) + u(i + 1, j, n3)) * fixku(k)
+               um = c2czi(k) * 0.25 &
+                    * (f2fz(k) * (u(i, j, k - 1) + u(i + 1, j, k - 1)) &
+                       + f2fz(k - 1) * (u(i, j, k) + u(i + 1, j, k))) * (1.-fixkl(k)) &
+                    + 0.5 * (u(i, j, 0) + u(i + 1, j, 0)) * fixkl(k)
+               vg13 = f2fzi(k) * (up - um)
 
-       VG22=F2FYI(J)*(V(I,J+1,K)-V(I,J,K))
+               vp = c2cxi(i + 1) * 0.25 &
+                    * (f2fx(i + 1) * (v(i, j, k) + v(i, j + 1, k)) &
+                       + f2fx(i) * (v(i + 1, j, k) + v(i + 1, j + 1, k))) * (1.-fixiu(i)) &
+                    + 0.5 * (v(n1, j, k) + v(n1, j + 1, k)) * fixiu(i)
+               vm = c2cxi(i) * 0.25 &
+                    * (f2fx(i) * (v(i - 1, j, k) + v(i - 1, j + 1, k)) &
+                       + f2fx(i - 1) * (v(i, j, k) + v(i, j + 1, k))) * (1.-fixil(i)) &
+                    + 0.5 * (v(0, j, k) + v(0, j + 1, k)) * fixil(i)
+               vg21 = f2fxi(i) * (vp - vm)
 
-       VP=C2CZI(K+1)*0.25                                      &
-          *(F2FZ(K+1)*(V(I,J,K)+V(I,J+1,K))                    &
-           +F2FZ(K)*(V(I,J,K+1)+V(I,J+1,K+1)))*(1.-FIXKU(K))   &
-          +0.5*(V(I,J,N3)+V(I,J+1,N3))*FIXKU(K)
-       VM=C2CZI(K)*0.25                                        &
-          *(F2FZ(K)*(V(I,J,K-1)+V(I,J+1,K-1))                  &
-           +F2FZ(K-1)*(V(I,J,K)+V(I,J+1,K)))*(1.-FIXKL(K))     &
-          +0.5*(V(I,J,0)+V(I,J+1,0))*FIXKL(K)
-       VG23=F2FZI(K)*(VP-VM)
+               vg22 = f2fyi(j) * (v(i, j + 1, k) - v(i, j, k))
 
-       WP=C2CXI(I+1)*0.25                                      &
-          *(F2FX(I+1)*(W(I,J,K)+W(I,J,K+1))                    &
-           +F2FX(I)*(W(I+1,J,K)+W(I+1,J,K+1)))*(1.-FIXIU(I))   &
-          +0.5*(W(N1,J,K)+W(N1,J,K+1))*FIXIU(I)
-       WM=C2CXI(I)*0.25                                        &
-          *(F2FX(I)*(W(I-1,J,K)+W(I-1,J,K+1))                  &
-           +F2FX(I-1)*(W(I,J,K)+W(I,J,K+1)))*(1.-FIXIL(I))     &
-          +0.5*(W(0,J,K)+W(0,J,K+1))*FIXIL(I)
-       VG31=F2FXI(I)*(WP-WM)
+               vp = c2czi(k + 1) * 0.25 &
+                    * (f2fz(k + 1) * (v(i, j, k) + v(i, j + 1, k)) &
+                       + f2fz(k) * (v(i, j, k + 1) + v(i, j + 1, k + 1))) * (1.-fixku(k)) &
+                    + 0.5 * (v(i, j, n3) + v(i, j + 1, n3)) * fixku(k)
+               vm = c2czi(k) * 0.25 &
+                    * (f2fz(k) * (v(i, j, k - 1) + v(i, j + 1, k - 1)) &
+                       + f2fz(k - 1) * (v(i, j, k) + v(i, j + 1, k))) * (1.-fixkl(k)) &
+                    + 0.5 * (v(i, j, 0) + v(i, j + 1, 0)) * fixkl(k)
+               vg23 = f2fzi(k) * (vp - vm)
 
-       WP=C2CYI(J+1)*0.25                                      &
-          *(F2FY(J+1)*(W(I,J,K)+W(I,J,K+1))                    &
-           +F2FY(J)*(W(I,J+1,K)+W(I,J+1,K+1)))*(1.-FIXJU(J))   &
-          +0.5*(W(I,N2,K)+W(I,N2,K+1))*FIXJU(J)
-       WM=C2CYI(J)*0.25                                        &
-          *(F2FY(J)*(W(I,J-1,K)+W(I,J-1,K+1))                  &
-           +F2FY(J-1)*(W(I,J,K)+W(I,J,K+1)))*(1.-FIXJL(J))     &
-          +0.5*(W(I,0,K)+W(I,0,K+1))*FIXJL(J)
-       VG32=F2FYI(J)*(WP-WM)
+               wp = c2cxi(i + 1) * 0.25 &
+                    * (f2fx(i + 1) * (w(i, j, k) + w(i, j, k + 1)) &
+                       + f2fx(i) * (w(i + 1, j, k) + w(i + 1, j, k + 1))) * (1.-fixiu(i)) &
+                    + 0.5 * (w(n1, j, k) + w(n1, j, k + 1)) * fixiu(i)
+               wm = c2cxi(i) * 0.25 &
+                    * (f2fx(i) * (w(i - 1, j, k) + w(i - 1, j, k + 1)) &
+                       + f2fx(i - 1) * (w(i, j, k) + w(i, j, k + 1))) * (1.-fixil(i)) &
+                    + 0.5 * (w(0, j, k) + w(0, j, k + 1)) * fixil(i)
+               vg31 = f2fxi(i) * (wp - wm)
 
-       VG33=F2FZI(K)*(W(I,J,K+1)-W(I,J,K))
+               wp = c2cyi(j + 1) * 0.25 &
+                    * (f2fy(j + 1) * (w(i, j, k) + w(i, j, k + 1)) &
+                       + f2fy(j) * (w(i, j + 1, k) + w(i, j + 1, k + 1))) * (1.-fixju(j)) &
+                    + 0.5 * (w(i, n2, k) + w(i, n2, k + 1)) * fixju(j)
+               wm = c2cyi(j) * 0.25 &
+                    * (f2fy(j) * (w(i, j - 1, k) + w(i, j - 1, k + 1)) &
+                       + f2fy(j - 1) * (w(i, j, k) + w(i, j, k + 1))) * (1.-fixjl(j)) &
+                    + 0.5 * (w(i, 0, k) + w(i, 0, k + 1)) * fixjl(j)
+               vg32 = f2fyi(j) * (wp - wm)
 
-       SR(1)= VG11
-       SR(2)= 0.5*(VG12+VG21)
-       SR(3)= 0.5*(VG13+VG31)
-       SR(4)= VG22
-       SR(5)= 0.5*(VG23+VG32)
-       SR(6)= VG33
+               vg33 = f2fzi(k) * (w(i, j, k + 1) - w(i, j, k))
 
-       WX=VG32-VG23
-       WY=VG13-VG31
-       WZ=VG21-VG12
+               sr(1) = vg11
+               sr(2) = 0.5 * (vg12 + vg21)
+               sr(3) = 0.5 * (vg13 + vg31)
+               sr(4) = vg22
+               sr(5) = 0.5 * (vg23 + vg32)
+               sr(6) = vg33
 
-       VORAVG(I,J,K,1)=VORAVG(I,J,K,1)+WX*DT
-       VORAVG(I,J,K,2)=VORAVG(I,J,K,2)+WY*DT
-       VORAVG(I,J,K,3)=VORAVG(I,J,K,3)+WZ*DT
+               wx = vg32 - vg23
+               wy = vg13 - vg31
+               wz = vg21 - vg12
 
-       VOR2AVG(I,J,K,1)=VOR2AVG(I,J,K,1)+WX*WX*DT
-       VOR2AVG(I,J,K,2)=VOR2AVG(I,J,K,2)+WX*WY*DT
-       VOR2AVG(I,J,K,3)=VOR2AVG(I,J,K,3)+WX*WZ*DT
-       VOR2AVG(I,J,K,4)=VOR2AVG(I,J,K,4)+WY*WY*DT
-       VOR2AVG(I,J,K,5)=VOR2AVG(I,J,K,5)+WY*WZ*DT
-       VOR2AVG(I,J,K,6)=VOR2AVG(I,J,K,6)+WZ*WZ*DT
+               voravg(i, j, k, 1) = voravg(i, j, k, 1) + wx * dt
+               voravg(i, j, k, 2) = voravg(i, j, k, 2) + wy * dt
+               voravg(i, j, k, 3) = voravg(i, j, k, 3) + wz * dt
 
-       SRSR= 2.*SR(2)**2.+SR(1)**2.+2.*SR(3)**2.+SR(4)**2.+2.*SR(5)**2.+SR(6)**2.
-       SSAVG(I,J,K)= SSAVG(I,J,K)+SRSR*DT
+               vor2avg(i, j, k, 1) = vor2avg(i, j, k, 1) + wx * wx * dt
+               vor2avg(i, j, k, 2) = vor2avg(i, j, k, 2) + wx * wy * dt
+               vor2avg(i, j, k, 3) = vor2avg(i, j, k, 3) + wx * wz * dt
+               vor2avg(i, j, k, 4) = vor2avg(i, j, k, 4) + wy * wy * dt
+               vor2avg(i, j, k, 5) = vor2avg(i, j, k, 5) + wy * wz * dt
+               vor2avg(i, j, k, 6) = vor2avg(i, j, k, 6) + wz * wz * dt
 
-      ENDDO
-      ENDDO
-      ENDDO
+               srsr = 2.*sr(2)**2.+sr(1)**2.+2.*sr(3)**2.+sr(4)**2.+2.*sr(5)**2.+sr(6)**2.
+               ssavg(i, j, k) = ssavg(i, j, k) + srsr * dt
 
-      IF (MOD(NTIME,NPRIAVG).EQ.0) THEN
+             end do
+           end do
+         end do
 
-       TIMEEND =TIME
-       IHISTEND=IHIST
+         if (mod(ntime, npriavg) .eq. 0) then
 
-       tfn1='fav'
-       idg1=ihistinit/100000
-       idg2=(ihistinit-idg1*100000)/10000
-       idg3=(ihistinit-idg1*100000-idg2*10000)/1000
-       idg4=(ihistinit-idg1*100000-idg2*10000-idg3*1000)/100
-       idg5=(ihistinit-idg1*100000-idg2*10000-idg3*1000-idg4*100)/10
-       idg6=ihistinit-idg1*100000-idg2*10000-idg3*1000-idg4*100-idg5*10
-       tfn2=char(idg1+48)//char(idg2+48)//char(idg3+48)//char(idg4+48)//char(idg5+48)//char(idg6+48)
-       idg1=ihist/100000
-       idg2=(ihist-idg1*100000)/10000
-       idg3=(ihist-idg1*100000-idg2*10000)/1000
-       idg4=(ihist-idg1*100000-idg2*10000-idg3*1000)/100
-       idg5=(ihist-idg1*100000-idg2*10000-idg3*1000-idg4*100)/10
-       idg6=ihist-idg1*100000-idg2*10000-idg3*1000-idg4*100-idg5*10
-       tfn3=char(idg1+48)//char(idg2+48)//char(idg3+48)//char(idg4+48)//char(idg5+48)//char(idg6+48)
-       tname=tfn1//tfn2//tfnh//tfn3
+           timeend = time
+           ihistend = ihist
 
-       OPEN(NAV,FILE='../output/field_avg/'//tname,FORM='UNFORMATTED')
-       WRITE(NAV)N1M,N2M,N3M,RE
-       WRITE(NAV)TIMEINIT,TIMEEND,IHISTINIT,IHISTEND
-       WRITE(NAV)((( UAVG(I,J,K)     ,I=1,N1M),J=1,N2M),K=1,N3M)
-       WRITE(NAV)((( VAVG(I,J,K)     ,I=1,N1M),J=1,N2M),K=1,N3M)
-       WRITE(NAV)((( WAVG(I,J,K)     ,I=1,N1M),J=1,N2M),K=1,N3M)
-       WRITE(NAV)((((UIUJAVG(I,J,K,L),I=1,N1M),J=1,N2M),K=1,N3M),L=1,6)
-       WRITE(NAV)((( PAVG(I,J,K)     ,I=1,N1M),J=1,N2M),K=1,N3M)
-       WRITE(NAV)((( P2AVG(I,J,K)    ,I=1,N1M),J=1,N2M),K=1,N3M)
-       WRITE(NAV)((((VORAVG(I,J,K,L) ,I=1,N1M),J=1,N2M),K=1,N3M),L=1,3)
-       WRITE(NAV)((((VOR2AVG(I,J,K,L)   ,I=1,N1M),J=1,N2M),K=1,N3M),L=1,6)
-       WRITE(NAV)((( SSAVG(I,J,K)    ,I=1,N1M),J=1,N2M),K=1,N3M)
-       IF (IHTRANS .EQ. 1) THEN
-         WRITE(NAV)((( TAVG(I,J,K)     ,I=1,N1M),J=1,N2M),K=1,N3M)
-         WRITE(NAV)((( T2AVG(I,J,K)    ,I=1,N1M),J=1,N2M),K=1,N3M)
-       ENDIF
-       CLOSE(NAV)
+           tfn1 = 'fav'
+           idg1 = ihistinit / 100000
+           idg2 = (ihistinit - idg1 * 100000) / 10000
+           idg3 = (ihistinit - idg1 * 100000 - idg2 * 10000) / 1000
+           idg4 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
+           idg5 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
+           idg6 = ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
+           tfn2 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
+           idg1 = ihist / 100000
+           idg2 = (ihist - idg1 * 100000) / 10000
+           idg3 = (ihist - idg1 * 100000 - idg2 * 10000) / 1000
+           idg4 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
+           idg5 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
+           idg6 = ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
+           tfn3 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
+           tname = tfn1//tfn2//tfnh//tfn3
 
-       NAV      = NAV+1
-       UAVG     = 0.
-       VAVG     = 0.
-       WAVG     = 0.
-       UIUJAVG  = 0.
-       PAVG     = 0.
-       P2AVG    = 0.
-       IF (IHTRANS.EQ.1) THEN
-       TAVG     = 0.
-       T2AVG    = 0.
-       ENDIF
-       VORAVG   = 0.
-       VOR2AVG     = 0.
-       SSAVG    = 0.
-       TIMEINIT = TIME
-       IHISTINIT= IHIST
+           open (nav, file='../output/field_avg/'//tname, form='unformatted')
+           write (nav) n1m, n2m, n3m, re
+           write (nav) timeinit, timeend, ihistinit, ihistend
+           write (nav) (((uavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+           write (nav) (((vavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+           write (nav) (((wavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+           write (nav) ((((uiujavg(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 6)
+           write (nav) (((pavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+           write (nav) (((p2avg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+           write (nav) ((((voravg(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 3)
+           write (nav) ((((vor2avg(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 6)
+           write (nav) (((ssavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+           if (ihtrans .eq. 1) then
+             write (nav) (((tavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+             write (nav) (((t2avg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+           end if
+           close (nav)
 
-      ENDIF
+           nav = nav + 1
+           uavg = 0.
+           vavg = 0.
+           wavg = 0.
+           uiujavg = 0.
+           pavg = 0.
+           p2avg = 0.
+           if (ihtrans .eq. 1) then
+             tavg = 0.
+             t2avg = 0.
+           end if
+           voravg = 0.
+           vor2avg = 0.
+           ssavg = 0.
+           timeinit = time
+           ihistinit = ihist
 
-      RETURN
-      END
+         end if
+
+         return
+       end
 !=======================================================================

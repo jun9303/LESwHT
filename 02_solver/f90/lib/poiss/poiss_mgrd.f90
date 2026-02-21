@@ -2,993 +2,992 @@
 !
 !     MAIN SOLVER OF POISSON EQUATION
 !
-!     AX=b
-!     A: coefficient of discretized poisson equation
-!     X: PHI: Pseudo pressure, Output of subroutine POISSON
-!     b: DIVGSUM: OUTPUT of subroutine DIVGS.
+!     AX=B
+!     A: COEFFICIENT OF DISCRETIZED POISSON EQUATION
+!     X: PHI: PSEUDO PRESSURE, OUTPUT OF SUBROUTINE POISSON
+!     B: DIVGSUM: OUTPUT OF SUBROUTINE DIVGS.
 !
-!     Main algorithm: Preconditioned BICGSTAB 
-!     [Biconjugate gradient stabilized method]
-!     algorithm: https://en.wikipedia.org/wiki/Biconjugate_gradient_stabilized_method
+!     MAIN ALGORITHM: PRECONDITIONED BICGSTAB
+!     [BICONJUGATE GRADIENT STABILIZED METHOD]
+!     ALGORITHM: HTTPS://EN.WIKIPEDIA.ORG/WIKI/BICONJUGATE_GRADIENT_STABILIZED_METHOD
 !
-!     Precondition: Gauss-Seidal with Multigrid acceleration
-!                   x & z direction: Gauss-Seidal + Multigrid
-!                   y direction: TDMA
-!                   only one V-cycle for the precondition
+!     PRECONDITION: GAUSS-SEIDAL WITH MULTIGRID ACCELERATION
+!                   X & Z DIRECTION: GAUSS-SEIDAL + MULTIGRID
+!                   Y DIRECTION: TDMA
+!                   ONLY ONE V-CYCLE FOR THE PRECONDITION
 !
 !
-!     Sept. 1998, S. Kang: MG3D
-!     Jun. 2017,  J. Park: BICG and f90
-!     Feb. 2026, S. Lee: Periodic Domain Support and Several Bug Fixes
+!     SEPT. 1998, S. KANG: MG3D
+!     JUN. 2017,  J. PARK: BICG AND F90
+!     FEB. 2026, S. LEE: PERIODIC DOMAIN SUPPORT AND SEVERAL BUG FIXES
 !
 !======================================================================
-      SUBROUTINE POISSON(PHI, DIVGSUM)
+      subroutine poisson(phi, divgsum)
 !======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8) :: I, J, K
-       INTEGER(8) :: I_CG, IMAX, JMAX, KMAX
-       REAL(8)    :: RHO_CG, RHO_OL, ALP_CG, W_CG, BET_CG, RV_TMP, ACC
-       REAL(8)    :: PHIREF, RESM_CG, BTTT, UPPP
-       
-       REAL(8), DIMENSION(0:N1, 0:N2, 0:N3) :: PHI
-       REAL(8), DIMENSION(0:N1, 0:N2, 0:N3) :: DIVGSUM
-       REAL(8), DIMENSION(0:N1, 0:N2, 0:N3) :: P_CG
-       REAL(8), DIMENSION(0:N1, 0:N2, 0:N3) :: S_CG
-       REAL(8), DIMENSION(0:N1, 0:N2, 0:N3) :: Y_CG
-       REAL(8), DIMENSION(0:N1, 0:N2, 0:N3) :: Z_CG
-       REAL(8), DIMENSION(0:N1, 0:N2, 0:N3) :: V_CG
-       REAL(8), DIMENSION(N1, N2, N3)       :: T_CG
-       REAL(8), DIMENSION(N1, N2, N3)       :: RES_CG
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: i_cg, imax, jmax, kmax
+        real(8) :: rho_cg, rho_ol, alp_cg, w_cg, bet_cg, rv_tmp, acc
+        real(8) :: phiref, resm_cg, bttt, uppp
 
-       P_CG = 0.0_8
-       S_CG = 0.0_8
-       Y_CG = 0.0_8
-       Z_CG = 0.0_8
-       V_CG = 0.0_8
-       T_CG = 0.0_8
+        real(8), dimension(0:n1, 0:n2, 0:n3) :: phi
+        real(8), dimension(0:n1, 0:n2, 0:n3) :: divgsum
+        real(8), dimension(0:n1, 0:n2, 0:n3) :: p_cg
+        real(8), dimension(0:n1, 0:n2, 0:n3) :: s_cg
+        real(8), dimension(0:n1, 0:n2, 0:n3) :: y_cg
+        real(8), dimension(0:n1, 0:n2, 0:n3) :: z_cg
+        real(8), dimension(0:n1, 0:n2, 0:n3) :: v_cg
+        real(8), dimension(n1, n2, n3) :: t_cg
+        real(8), dimension(n1, n2, n3) :: res_cg
 
-      IF (IOLDV == 0) THEN
-          PHI = 0.0_8
-!$OMP PARALLEL DO private(I, J)
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      RES_CG(I, J, K) = DIVGSUM(I, J, K)
-                  END DO
-              END DO
-          END DO
-      ELSE
-!$OMP PARALLEL DO private(I, J, ACC)
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      ACC = -1.0_8 * (AW(I) + AE(I) + AS(J) + AN(J) + AB(K) + AF(K))
-                      RES_CG(I, J, K) = DIVGSUM(I, J, K) + (-ACC * PHI(I, J, K) &
-                                    - AW(I) * PHI(IMM(I), J, K) - AE(I) * PHI(IPM(I), J, K) &
-                                    - AS(J) * PHI(I, J - 1, K) - AN(J) * PHI(I, J + 1, K) &
-                                    - AB(K) * PHI(I, J, KMM(K)) - AF(K) * PHI(I, J, KPM(K)))
-                  END DO
-              END DO
-          END DO
-      END IF
+        p_cg = 0.0_8
+        s_cg = 0.0_8
+        y_cg = 0.0_8
+        z_cg = 0.0_8
+        v_cg = 0.0_8
+        t_cg = 0.0_8
 
-       RHO_OL = 1.0_8
-       ALP_CG = 1.0_8
-       W_CG   = 1.0_8
+        if (ioldv == 0) then
+          phi = 0.0_8
+!$OMP PARALLEL DO PRIVATE(I, J)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                res_cg(i, j, k) = divgsum(i, j, k)
+              end do
+            end do
+          end do
+        else
+!$OMP PARALLEL DO PRIVATE(I, J, ACC)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                acc = -1.0_8 * (aw(i) + ae(i) + as(j) + an(j) + ab(k) + af(k))
+                res_cg(i, j, k) = divgsum(i, j, k) + (-acc * phi(i, j, k) &
+                                                      - aw(i) * phi(imm(i), j, k) - ae(i) * phi(ipm(i), j, k) &
+                                                      - as(j) * phi(i, j - 1, k) - an(j) * phi(i, j + 1, k) &
+                                                      - ab(k) * phi(i, j, kmm(k)) - af(k) * phi(i, j, kpm(k)))
+              end do
+            end do
+          end do
+        end if
 
-      DO I_CG = 1, MGITR
+        rho_ol = 1.0_8
+        alp_cg = 1.0_8
+        w_cg = 1.0_8
 
-          RHO_CG = 0.0_8
-!$OMP PARALLEL DO private(I, J) reduction(+:RHO_CG)
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      RHO_CG = RHO_CG + DIVGSUM(I, J, K) * RES_CG(I, J, K)
-                  END DO
-              END DO
-          END DO
+        do i_cg = 1, mgitr
 
-          BET_CG = RHO_CG / RHO_OL * ALP_CG / W_CG
+          rho_cg = 0.0_8
+!$OMP PARALLEL DO PRIVATE(I, J) REDUCTION(+:RHO_CG)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                rho_cg = rho_cg + divgsum(i, j, k) * res_cg(i, j, k)
+              end do
+            end do
+          end do
 
-!$OMP PARALLEL DO private(I, J)
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      P_CG(I, J, K) = RES_CG(I, J, K) + BET_CG * (P_CG(I, J, K) - W_CG * V_CG(I, J, K))
-                  END DO
-              END DO
-          END DO
+          bet_cg = rho_cg / rho_ol * alp_cg / w_cg
 
-          CALL MG3D(Y_CG, P_CG, TEST1, IOLDV)
+!$OMP PARALLEL DO PRIVATE(I, J)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                p_cg(i, j, k) = res_cg(i, j, k) + bet_cg * (p_cg(i, j, k) - w_cg * v_cg(i, j, k))
+              end do
+            end do
+          end do
 
-!$OMP PARALLEL DO private(I, J, ACC)
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      ACC = -1.0_8 * (AW(I) + AE(I) + AS(J) + AN(J) + AB(K) + AF(K))
-                      V_CG(I, J, K) = AW(I) * Y_CG(IMM(I), J, K) + AE(I) * Y_CG(IPM(I), J, K) &
-                                    + AS(J) * Y_CG(I, J - 1, K) + AN(J) * Y_CG(I, J + 1, K) &
-                                    + AB(K) * Y_CG(I, J, KMM(K)) + AF(K) * Y_CG(I, J, KPM(K)) &
-                                    + ACC * Y_CG(I, J, K)
-                  END DO
-              END DO
-          END DO
+          call mg3d(y_cg, p_cg, test1, ioldv)
 
-          RV_TMP = 0.0_8
-!$OMP PARALLEL DO private(I, J) reduction(+:RV_TMP)
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      RV_TMP = RV_TMP + DIVGSUM(I, J, K) * V_CG(I, J, K)
-                  END DO
-              END DO
-          END DO
+!$OMP PARALLEL DO PRIVATE(I, J, ACC)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                acc = -1.0_8 * (aw(i) + ae(i) + as(j) + an(j) + ab(k) + af(k))
+                v_cg(i, j, k) = aw(i) * y_cg(imm(i), j, k) + ae(i) * y_cg(ipm(i), j, k) &
+                                + as(j) * y_cg(i, j - 1, k) + an(j) * y_cg(i, j + 1, k) &
+                                + ab(k) * y_cg(i, j, kmm(k)) + af(k) * y_cg(i, j, kpm(k)) &
+                                + acc * y_cg(i, j, k)
+              end do
+            end do
+          end do
 
-          ALP_CG = RHO_CG / RV_TMP
+          rv_tmp = 0.0_8
+!$OMP PARALLEL DO PRIVATE(I, J) REDUCTION(+:RV_TMP)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                rv_tmp = rv_tmp + divgsum(i, j, k) * v_cg(i, j, k)
+              end do
+            end do
+          end do
 
-!$OMP PARALLEL DO private(I, J)
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      S_CG(I, J, K) = RES_CG(I, J, K) - ALP_CG * V_CG(I, J, K)
-                  END DO
-              END DO
-          END DO
+          alp_cg = rho_cg / rv_tmp
 
-          CALL MG3D(Z_CG, S_CG, TEST1, IOLDV)
+!$OMP PARALLEL DO PRIVATE(I, J)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                s_cg(i, j, k) = res_cg(i, j, k) - alp_cg * v_cg(i, j, k)
+              end do
+            end do
+          end do
 
-!$OMP PARALLEL DO private(I, J, ACC)
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      ACC = -1.0_8 * (AW(I) + AE(I) + AS(J) + AN(J) + AB(K) + AF(K))
-                      T_CG(I, J, K) = AW(I) * Z_CG(IMM(I), J, K) + AE(I) * Z_CG(IPM(I), J, K) &
-                                    + AS(J) * Z_CG(I, J - 1, K) + AN(J) * Z_CG(I, J + 1, K) &
-                                    + AB(K) * Z_CG(I, J, KMM(K)) + AF(K) * Z_CG(I, J, KPM(K)) &
-                                    + ACC * Z_CG(I, J, K)
-                  END DO
-              END DO
-          END DO
+          call mg3d(z_cg, s_cg, test1, ioldv)
 
-          BTTT = 0.0_8
-          UPPP = 0.0_8
-!$OMP PARALLEL DO private(I, J) reduction(+:UPPP) reduction(+:BTTT)
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      UPPP = UPPP + T_CG(I, J, K) * S_CG(I, J, K)
-                      BTTT = BTTT + T_CG(I, J, K)**2.0_8
-                  END DO
-              END DO
-          END DO
-          W_CG = UPPP / BTTT
+!$OMP PARALLEL DO PRIVATE(I, J, ACC)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                acc = -1.0_8 * (aw(i) + ae(i) + as(j) + an(j) + ab(k) + af(k))
+                t_cg(i, j, k) = aw(i) * z_cg(imm(i), j, k) + ae(i) * z_cg(ipm(i), j, k) &
+                                + as(j) * z_cg(i, j - 1, k) + an(j) * z_cg(i, j + 1, k) &
+                                + ab(k) * z_cg(i, j, kmm(k)) + af(k) * z_cg(i, j, kpm(k)) &
+                                + acc * z_cg(i, j, k)
+              end do
+            end do
+          end do
 
-!$OMP PARALLEL DO private(I, J)
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      PHI(I, J, K) = PHI(I, J, K) + ALP_CG * Y_CG(I, J, K) + W_CG * Z_CG(I, J, K)
-                  END DO
-              END DO
-          END DO
+          bttt = 0.0_8
+          uppp = 0.0_8
+!$OMP PARALLEL DO PRIVATE(I, J) REDUCTION(+:UPPP) REDUCTION(+:BTTT)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                uppp = uppp + t_cg(i, j, k) * s_cg(i, j, k)
+                bttt = bttt + t_cg(i, j, k)**2.0_8
+              end do
+            end do
+          end do
+          w_cg = uppp / bttt
 
-          RESM_CG = 0.0_8
-!$OMP PARALLEL DO private(I, J) reduction(MAX:RESM_CG)
-          DO K = 1, N3M
-              DO J = 1, N2M
-                  DO I = 1, N1M
-                      RES_CG(I, J, K) = S_CG(I, J, K) - W_CG * T_CG(I, J, K)
-                      RESM_CG = MAX(RESM_CG, ABS(RES_CG(I, J, K)))
-                      IF(RESM_CG == ABS(RES_CG(I, J, K))) THEN
-                          IMAX = I
-                          JMAX = J
-                          KMAX = K
-                      END IF
-                  END DO
-              END DO
-          END DO
-          RHO_OL = RHO_CG
+!$OMP PARALLEL DO PRIVATE(I, J)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                phi(i, j, k) = phi(i, j, k) + alp_cg * y_cg(i, j, k) + w_cg * z_cg(i, j, k)
+              end do
+            end do
+          end do
 
-          WRITE(77, 102) I_CG, RESM_CG * DTCONST, IMAX, JMAX, KMAX
- 102      FORMAT(I4, ES15.7, 3I4)
+          resm_cg = 0.0_8
+!$OMP PARALLEL DO PRIVATE(I, J) REDUCTION(MAX:RESM_CG)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                res_cg(i, j, k) = s_cg(i, j, k) - w_cg * t_cg(i, j, k)
+                resm_cg = max(resm_cg, abs(res_cg(i, j, k)))
+                if (resm_cg == abs(res_cg(i, j, k))) then
+                  imax = i
+                  jmax = j
+                  kmax = k
+                end if
+              end do
+            end do
+          end do
+          rho_ol = rho_cg
 
-          IF (RESM_CG < TEST1) THEN
-              WRITE(*, 300) I_CG, RESM_CG * DTCONST
-              GOTO 1000
-          END IF
+          write (77, 102) i_cg, resm_cg * dtconst, imax, jmax, kmax
+102       format(i4, es15.7, 3i4)
 
-      END DO
+          if (resm_cg < test1) then
+            write (*, 300) i_cg, resm_cg * dtconst
+            goto 1000
+          end if
 
-      PRINT*, '=== MUTLGRID : NOT CONVERGED ==='
-      WRITE(*, 300) I_CG, RESM_CG * DTCONST
- 300  FORMAT('ICYC=', I10, '  RESMAX=', ES25.12)
+        end do
 
- 1000 CONTINUE
+        print *, '=== MUTLGRID : NOT CONVERGED ==='
+        write (*, 300) i_cg, resm_cg * dtconst
+300     format('ICYC=', i10, '  RESMAX=', es25.12)
 
-      PHIREF = PHI(1, N2M, 1)
-!$OMP PARALLEL DO private(I, J)
-      DO K = 1, N3M
-          DO J = 1, N2M
-              DO I = 1, N1M
-                  PHI(I, J, K) = PHI(I, J, K) - PHIREF
-              END DO
-          END DO
-      END DO
+1000    continue
 
-      WRITE(78, 103) TIME, DT, I_CG, RESM_CG * DTCONST
- 103  FORMAT(2F13.5, I5, ES15.7)
+        phiref = phi(1, n2m, 1)
+!$OMP PARALLEL DO PRIVATE(I, J)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              phi(i, j, k) = phi(i, j, k) - phiref
+            end do
+          end do
+        end do
 
-      RETURN
-      END SUBROUTINE POISSON
+        write (78, 103) time, dt, i_cg, resm_cg * dtconst
+103     format(2f13.5, i5, es15.7)
 
-!======================================================================
-        SUBROUTINE MG3D(SOL, RHS, EPSIL, IOLD)
-!======================================================================
-!       contain overall multigrid procedures
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I, J, K
-       REAL(8)     :: SOL(0:N1, 0:N2, 0:N3), RHS(0:N1, 0:N2, 0:N3), EPSIL
-       REAL(8)     :: RESID(N1MD, N2M, N3MD), GI(0:N1MD, 0:N2, 0:N3MD)
-       INTEGER(8)  :: IOLD, ICYC, ILEV
-       REAL(8)     :: RESM
-
-        CALL TOPLEVEL(GI, RESID, RHS, RESM, IOLD)
-
-        IF (NLEV == 0) GOTO 777
-        DO ILEV = NLEV - 1, 1, -1
-           CALL RELAX(GI, RESID, ILEV, 1_8, 0_8)
-           CALL RESCAL(GI, RESID, ILEV)
-           CALL GODOWN(RESID, ILEV - 1)
-        END DO
-
-        CALL RELAX(GI, RESID, 0_8, NBLI, 0_8)
-
-        DO ILEV = 1, NLEV - 1
-           CALL GOUP(GI, ILEV)
-           CALL RELAX(GI, RESID, ILEV, 1_8, 1_8)
-        END DO
-
-        CALL GOUP(GI, NLEV)
- 777    CALL TOPLEVEL(GI, RESID, RHS, RESM, 1_8)
-
-!$OMP PARALLEL DO private(I, J)
-        DO K = 1, N3M
-            DO J = 1, N2M
-                DO I = 1, N1M
-                    SOL(I, J, K) = GI(I, J, K)
-                END DO
-            END DO
-        END DO
-
-        RETURN
-        END SUBROUTINE MG3D
+        return
+      end subroutine poisson
 
 !======================================================================
-        SUBROUTINE TOPLEVEL(GI, RESID, RHS, RESM, IOLD)   ! Zebra Version
+      subroutine mg3d(sol, rhs, epsil, iold)
 !======================================================================
-!       solve the Poisson equation with Zebra GS at the top level
-!       with only 1 iteration
+!       CONTAIN OVERALL MULTIGRID PROCEDURES
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: sol(0:n1, 0:n2, 0:n3), rhs(0:n1, 0:n2, 0:n3), epsil
+        real(8) :: resid(n1md, n2m, n3md), gi(0:n1md, 0:n2, 0:n3md)
+        integer(8) :: iold, icyc, ilev
+        real(8) :: resm
+
+        call toplevel(gi, resid, rhs, resm, iold)
+
+        if (nlev == 0) goto 777
+        do ilev = nlev - 1, 1, -1
+          call relax(gi, resid, ilev, 1_8, 0_8)
+          call rescal(gi, resid, ilev)
+          call godown(resid, ilev - 1)
+        end do
+
+        call relax(gi, resid, 0_8, nbli, 0_8)
+
+        do ilev = 1, nlev - 1
+          call goup(gi, ilev)
+          call relax(gi, resid, ilev, 1_8, 1_8)
+        end do
+
+        call goup(gi, nlev)
+777     call toplevel(gi, resid, rhs, resm, 1_8)
+
+!$OMP PARALLEL DO PRIVATE(I, J)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              sol(i, j, k) = gi(i, j, k)
+            end do
+          end do
+        end do
+
+        return
+      end subroutine mg3d
+
+!======================================================================
+      subroutine toplevel(gi, resid, rhs, resm, iold)   ! ZEBRA VERSION
+!======================================================================
+!       SOLVE THE POISSON EQUATION WITH ZEBRA GS AT THE TOP LEVEL
+!       WITH ONLY 1 ITERATION
 !       IOLD = 0 (GODOWN), 1 (GOUP)
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8) :: I, J, K
-       INTEGER(8) :: ISTART, IOLD
-       REAL(8)    :: RHS(0:N1, 0:N2, 0:N3)
-       REAL(8)    :: RESID(N1MD, N2M, N3MD), GI(0:N1MD, 0:N2, 0:N3MD)
-       REAL(8)    :: ACC, RESM
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: istart, iold
+        real(8) :: rhs(0:n1, 0:n2, 0:n3)
+        real(8) :: resid(n1md, n2m, n3md), gi(0:n1md, 0:n2, 0:n3md)
+        real(8) :: acc, resm
 
-!------ make RHS of Zebra GS (odd line)
-!$OMP PARALLEL DO private(ISTART, I, J)
-        DO K = 1, N3M
-            ISTART = 1 + MOD(KPM(K), 2_8)
-            DO J = 1, N2M
-                DO I = ISTART, N1M, 2
-                    GI(I, J, K) = RHS(I, J, K) - IOLD * &
-                                  (AW(I) * GI(IMM(I), J, K) + AE(I) * GI(IPM(I), J, K) &
-                                 + AB(K) * GI(I, J, KMM(K)) + AF(K) * GI(I, J, KPM(K)))
-                END DO
-            END DO
-        END DO
+!------ MAKE RHS OF ZEBRA GS (ODD LINE)
+!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
+        do k = 1, n3m
+          istart = 1 + mod(kpm(k), 2_8)
+          do j = 1, n2m
+            do i = istart, n1m, 2
+              gi(i, j, k) = rhs(i, j, k) - iold * &
+                            (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
+                             + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
+            end do
+          end do
+        end do
 
-!------ solve TDMA
-!$OMP PARALLEL DO private(ISTART)
-        DO K = 1, N3M
-            ISTART = 1 + MOD(KPM(K), 2_8)
-            DO I = ISTART, N1M, 2
-                GI(I, 1, K) = GI(I, 1, K) * BET(I, 1, K)
-            END DO
-        END DO
+!------ SOLVE TDMA
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = 1, n3m
+          istart = 1 + mod(kpm(k), 2_8)
+          do i = istart, n1m, 2
+            gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
+          end do
+        end do
 
-!$OMP PARALLEL DO private(ISTART)
-        DO K = 1, N3M
-            ISTART = 1 + MOD(KPM(K), 2_8)
-            DO J = 2, N2M
-                DO I = ISTART, N1M, 2
-                    GI(I, J, K) = (GI(I, J, K) - AS(J) * GI(I, J - 1, K)) * BET(I, J, K)
-                END DO
-            END DO
-        END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = 1, n3m
+          istart = 1 + mod(kpm(k), 2_8)
+          do j = 2, n2m
+            do i = istart, n1m, 2
+              gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
+            end do
+          end do
+        end do
 
-!$OMP PARALLEL DO private(ISTART)
-        DO K = 1, N3M
-            ISTART = 1 + MOD(KPM(K), 2_8)
-            DO J = N2M - 1, 1, -1
-                DO I = ISTART, N1M, 2
-                    GI(I, J, K) = GI(I, J, K) - GAM(I, J + 1, K) * GI(I, J + 1, K)
-                END DO
-            END DO
-        END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = 1, n3m
+          istart = 1 + mod(kpm(k), 2_8)
+          do j = n2m - 1, 1, -1
+            do i = istart, n1m, 2
+              gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
+            end do
+          end do
+        end do
 
-!------ make RHS of Zebra GS (even line)
-!$OMP PARALLEL DO private(ISTART, I, J)
-        DO K = 1, N3M
-            ISTART = 1 + MOD(K, 2_8)
-            DO J = 1, N2M
-                DO I = ISTART, N1M, 2
-                    GI(I, J, K) = RHS(I, J, K) &
-                                 - (AW(I) * GI(IMM(I), J, K) + AE(I) * GI(IPM(I), J, K) &
-                                  + AB(K) * GI(I, J, KMM(K)) + AF(K) * GI(I, J, KPM(K)))
-                END DO
-            END DO
-        END DO
+!------ MAKE RHS OF ZEBRA GS (EVEN LINE)
+!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
+        do k = 1, n3m
+          istart = 1 + mod(k, 2_8)
+          do j = 1, n2m
+            do i = istart, n1m, 2
+              gi(i, j, k) = rhs(i, j, k) &
+                            - (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
+                               + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
+            end do
+          end do
+        end do
 
-!------ solve TDMA
-!$OMP PARALLEL DO private(ISTART)
-        DO K = 1, N3M
-            ISTART = 1 + MOD(K, 2_8)
-            DO I = ISTART, N1M, 2
-                GI(I, 1, K) = GI(I, 1, K) * BET(I, 1, K)
-            END DO
-        END DO
+!------ SOLVE TDMA
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = 1, n3m
+          istart = 1 + mod(k, 2_8)
+          do i = istart, n1m, 2
+            gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
+          end do
+        end do
 
-!$OMP PARALLEL DO private(ISTART)
-        DO K = 1, N3M
-            ISTART = 1 + MOD(K, 2_8)
-            DO J = 2, N2M
-                DO I = ISTART, N1M, 2
-                    GI(I, J, K) = (GI(I, J, K) - AS(J) * GI(I, J - 1, K)) * BET(I, J, K)
-                END DO
-            END DO
-        END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = 1, n3m
+          istart = 1 + mod(k, 2_8)
+          do j = 2, n2m
+            do i = istart, n1m, 2
+              gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
+            end do
+          end do
+        end do
 
-!$OMP PARALLEL DO private(ISTART)
-        DO K = 1, N3M
-            ISTART = 1 + MOD(K, 2_8)
-            DO J = N2M - 1, 1, -1
-                DO I = ISTART, N1M, 2
-                    GI(I, J, K) = GI(I, J, K) - GAM(I, J + 1, K) * GI(I, J + 1, K)
-                END DO
-            END DO
-        END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = 1, n3m
+          istart = 1 + mod(k, 2_8)
+          do j = n2m - 1, 1, -1
+            do i = istart, n1m, 2
+              gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
+            end do
+          end do
+        end do
 
-!------ calculate residual
+!------ CALCULATE RESIDUAL
 
-        RESM = 0.0_8
-!$OMP PARALLEL DO private(I, J, ACC) reduction(MAX:RESM)
-        DO K = 1, N3M
-            DO J = 1, N2M
-                DO I = 1, N1M
-                    ACC = -1.0_8 * (AW(I) + AE(I) + AS(J) + AN(J) + AB(K) + AF(K))
-                    RESID(I, J, K) = RHS(I, J, K) - ACC * GI(I, J, K) &
-                                    - AW(I) * GI(IMM(I), J, K) - AE(I) * GI(IPM(I), J, K) &
-                                    - AS(J) * GI(I, J - 1, K) - AN(J) * GI(I, J + 1, K) &
-                                    - AB(K) * GI(I, J, KMM(K)) - AF(K) * GI(I, J, KPM(K))
-                    RESM = MAX(RESM, ABS(RESID(I, J, K)))
-                END DO
-            END DO
-        END DO
+        resm = 0.0_8
+!$OMP PARALLEL DO PRIVATE(I, J, ACC) REDUCTION(MAX:RESM)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              acc = -1.0_8 * (aw(i) + ae(i) + as(j) + an(j) + ab(k) + af(k))
+              resid(i, j, k) = rhs(i, j, k) - acc * gi(i, j, k) &
+                               - aw(i) * gi(imm(i), j, k) - ae(i) * gi(ipm(i), j, k) &
+                               - as(j) * gi(i, j - 1, k) - an(j) * gi(i, j + 1, k) &
+                               - ab(k) * gi(i, j, kmm(k)) - af(k) * gi(i, j, kpm(k))
+              resm = max(resm, abs(resid(i, j, k)))
+            end do
+          end do
+        end do
 
-        IF (NLEV == 0) GOTO 97
+        if (nlev == 0) goto 97
 
- 101    FORMAT(ES15.8, 3I6)
+101     format(es15.8, 3i6)
 
-!------ restrict residual to a lower level
-!$OMP PARALLEL DO private(I, J)
-        DO K = KKMG(NLEV - 1, 1), KKMG(NLEV - 1, 2)
-            DO J = 1, N2M
-                DO I = IIMG(NLEV - 1, 1), IIMG(NLEV - 1, 2)
-                    RESID(I, J, K) = (1.0_8 - FIDW(I)) * (1.0_8 - FKDW(K)) * RESID(IH1(I), J, KH1(K)) &
-                                   + FIDW(I) * (1.0_8 - FKDW(K)) * RESID(IH2(I), J, KH1(K)) &
-                                   + (1.0_8 - FIDW(I)) * FKDW(K) * RESID(IH1(I), J, KH2(K)) &
-                                   + FIDW(I) * FKDW(K) * RESID(IH2(I), J, KH2(K))
-                END DO
-            END DO
-        END DO
+!------ RESTRICT RESIDUAL TO A LOWER LEVEL
+!$OMP PARALLEL DO PRIVATE(I, J)
+        do k = kkmg(nlev - 1, 1), kkmg(nlev - 1, 2)
+          do j = 1, n2m
+            do i = iimg(nlev - 1, 1), iimg(nlev - 1, 2)
+              resid(i, j, k) = (1.0_8 - fidw(i)) * (1.0_8 - fkdw(k)) * resid(ih1(i), j, kh1(k)) &
+                               + fidw(i) * (1.0_8 - fkdw(k)) * resid(ih2(i), j, kh1(k)) &
+                               + (1.0_8 - fidw(i)) * fkdw(k) * resid(ih1(i), j, kh2(k)) &
+                               + fidw(i) * fkdw(k) * resid(ih2(i), j, kh2(k))
+            end do
+          end do
+        end do
 
- 97     RETURN
-        END SUBROUTINE TOPLEVEL
-
-!======================================================================
-        SUBROUTINE RESCAL(GI, RESID, ILEV)
-!======================================================================
-!      calculate residual at each level
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I, J, K
-       INTEGER(8)  :: ILEV
-       REAL(8)     :: RESID(N1MD, N2M, N3MD), GI(0:N1MD, 0:N2, 0:N3MD)
-       REAL(8)     :: ACC
-
-!$OMP PARALLEL DO private(I, J, ACC)
-        DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-            DO J = 1, N2M
-                DO I = IIMG(ILEV, 1), IIMG(ILEV, 2)
-                    ACC = -1.0_8 * (AW(I) + AE(I) + AS(J) + AN(J) + AB(K) + AF(K))
-                    RESID(I, J, K) = RESID(I, J, K) - ACC * GI(I, J, K) &
-                                    - AW(I) * GI(IMM(I), J, K) - AE(I) * GI(IPM(I), J, K) &
-                                    - AS(J) * GI(I, J - 1, K) - AN(J) * GI(I, J + 1, K) &
-                                    - AB(K) * GI(I, J, KMM(K)) - AF(K) * GI(I, J, KPM(K))
-                END DO
-            END DO
-        END DO
-
-        RETURN
-        END SUBROUTINE RESCAL
+97      return
+      end subroutine toplevel
 
 !======================================================================
-        SUBROUTINE GODOWN(RESID, ILEV)
+      subroutine rescal(gi, resid, ilev)
 !======================================================================
-!      restrict residual to a lower level
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I, J, K
-       INTEGER(8)  :: ILEV
-       REAL(8)     :: RESID(N1MD, N2M, N3MD)
+!      CALCULATE RESIDUAL AT EACH LEVEL
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: ilev
+        real(8) :: resid(n1md, n2m, n3md), gi(0:n1md, 0:n2, 0:n3md)
+        real(8) :: acc
 
-!$OMP PARALLEL DO private(I, J)
-        DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-            DO J = 1, N2M
-                DO I = IIMG(ILEV, 1), IIMG(ILEV, 2)
-                    RESID(I, J, K) = (1.0_8 - FIDW(I)) * (1.0_8 - FKDW(K)) * RESID(IH1(I), J, KH1(K)) &
-                                   + FIDW(I) * (1.0_8 - FKDW(K)) * RESID(IH2(I), J, KH1(K)) &
-                                   + (1.0_8 - FIDW(I)) * FKDW(K) * RESID(IH1(I), J, KH2(K)) &
-                                   + FIDW(I) * FKDW(K) * RESID(IH2(I), J, KH2(K))
-                END DO
-            END DO
-        END DO
+!$OMP PARALLEL DO PRIVATE(I, J, ACC)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          do j = 1, n2m
+            do i = iimg(ilev, 1), iimg(ilev, 2)
+              acc = -1.0_8 * (aw(i) + ae(i) + as(j) + an(j) + ab(k) + af(k))
+              resid(i, j, k) = resid(i, j, k) - acc * gi(i, j, k) &
+                               - aw(i) * gi(imm(i), j, k) - ae(i) * gi(ipm(i), j, k) &
+                               - as(j) * gi(i, j - 1, k) - an(j) * gi(i, j + 1, k) &
+                               - ab(k) * gi(i, j, kmm(k)) - af(k) * gi(i, j, kpm(k))
+            end do
+          end do
+        end do
 
-        RETURN
-        END SUBROUTINE GODOWN
-
-!======================================================================
-        SUBROUTINE GOUP(GI, ILEV)
-!======================================================================
-!       interpolate residual & add it to a higher level
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I, J, K
-       INTEGER(8)  :: ILEV, ISTART
-       REAL(8)     :: GI(0:N1MD, 0:N2, 0:N3MD)
-
-!$OMP PARALLEL DO private(ISTART, I, J)
-        DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-            ISTART = IIMG(ILEV, 1) + MOD(K, 2_8)
-            DO J = 1, N2M
-                DO I = ISTART, IIMG(ILEV, 2), 2
-                    GI(I, J, K) = GI(I, J, K) &
-                                + (1.0_8 - FIUP(I)) * (1.0_8 - FKUP(K)) * GI(IL1(I), J, KL1(K)) &
-                                + FIUP(I) * (1.0_8 - FKUP(K)) * GI(IL2(I), J, KL1(K)) &
-                                + (1.0_8 - FIUP(I)) * FKUP(K) * GI(IL1(I), J, KL2(K)) &
-                                + FIUP(I) * FKUP(K) * GI(IL2(I), J, KL2(K))
-                END DO
-            END DO
-        END DO
-
-        RETURN
-        END SUBROUTINE GOUP
+        return
+      end subroutine rescal
 
 !======================================================================
-        SUBROUTINE RELAX(GI, RESID, ILEV, ITER, IOLD)   ! Zebra Version
+      subroutine godown(resid, ilev)
 !======================================================================
-!       solve the Poisson equation with Zebra GS
+!      RESTRICT RESIDUAL TO A LOWER LEVEL
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: ilev
+        real(8) :: resid(n1md, n2m, n3md)
+
+!$OMP PARALLEL DO PRIVATE(I, J)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          do j = 1, n2m
+            do i = iimg(ilev, 1), iimg(ilev, 2)
+              resid(i, j, k) = (1.0_8 - fidw(i)) * (1.0_8 - fkdw(k)) * resid(ih1(i), j, kh1(k)) &
+                               + fidw(i) * (1.0_8 - fkdw(k)) * resid(ih2(i), j, kh1(k)) &
+                               + (1.0_8 - fidw(i)) * fkdw(k) * resid(ih1(i), j, kh2(k)) &
+                               + fidw(i) * fkdw(k) * resid(ih2(i), j, kh2(k))
+            end do
+          end do
+        end do
+
+        return
+      end subroutine godown
+
+!======================================================================
+      subroutine goup(gi, ilev)
+!======================================================================
+!       INTERPOLATE RESIDUAL & ADD IT TO A HIGHER LEVEL
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: ilev, istart
+        real(8) :: gi(0:n1md, 0:n2, 0:n3md)
+
+!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          istart = iimg(ilev, 1) + mod(k, 2_8)
+          do j = 1, n2m
+            do i = istart, iimg(ilev, 2), 2
+              gi(i, j, k) = gi(i, j, k) &
+                            + (1.0_8 - fiup(i)) * (1.0_8 - fkup(k)) * gi(il1(i), j, kl1(k)) &
+                            + fiup(i) * (1.0_8 - fkup(k)) * gi(il2(i), j, kl1(k)) &
+                            + (1.0_8 - fiup(i)) * fkup(k) * gi(il1(i), j, kl2(k)) &
+                            + fiup(i) * fkup(k) * gi(il2(i), j, kl2(k))
+            end do
+          end do
+        end do
+
+        return
+      end subroutine goup
+
+!======================================================================
+      subroutine relax(gi, resid, ilev, iter, iold)   ! ZEBRA VERSION
+!======================================================================
+!       SOLVE THE POISSON EQUATION WITH ZEBRA GS
 !       IOLD = 0 (GODOWN), 1 (GOUP)
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I, J, K
-       INTEGER(8)  :: ILEV, ITER, IOLD, ISTART, II
-       REAL(8)     :: RESID(N1MD, N2M, N3MD), GI(0:N1MD, 0:N2, 0:N3MD)
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: ilev, iter, iold, istart, ii
+        real(8) :: resid(n1md, n2m, n3md), gi(0:n1md, 0:n2, 0:n3md)
 
-!====== 1st iteration
-!------ make RHS of Zebra GS (odd line)
-!$OMP PARALLEL DO private(ISTART, I, J)
-        DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-            ISTART = IIMG(ILEV, 1) + MOD(KPM(K), 2_8)
-            DO J = 1, N2M
-                DO I = ISTART, IIMG(ILEV, 2), 2
-                    GI(I, J, K) = RESID(I, J, K) - IOLD * &
-                                  (AW(I) * GI(IMM(I), J, K) + AE(I) * GI(IPM(I), J, K) &
-                                 + AB(K) * GI(I, J, KMM(K)) + AF(K) * GI(I, J, KPM(K)))
-                END DO
-            END DO
-        END DO
+!====== 1ST ITERATION
+!------ MAKE RHS OF ZEBRA GS (ODD LINE)
+!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
+          do j = 1, n2m
+            do i = istart, iimg(ilev, 2), 2
+              gi(i, j, k) = resid(i, j, k) - iold * &
+                            (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
+                             + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
+            end do
+          end do
+        end do
 
-!------ solve TDMA
-!$OMP PARALLEL DO private(ISTART)
-        DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-            ISTART = IIMG(ILEV, 1) + MOD(KPM(K), 2_8)
-            DO I = ISTART, IIMG(ILEV, 2), 2
-                GI(I, 1, K) = GI(I, 1, K) * BET(I, 1, K)
-            END DO
-        END DO
+!------ SOLVE TDMA
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
+          do i = istart, iimg(ilev, 2), 2
+            gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
+          end do
+        end do
 
-!$OMP PARALLEL DO private(ISTART)
-        DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-            ISTART = IIMG(ILEV, 1) + MOD(KPM(K), 2_8)
-            DO J = 2, N2M
-                DO I = ISTART, IIMG(ILEV, 2), 2
-                    GI(I, J, K) = (GI(I, J, K) - AS(J) * GI(I, J - 1, K)) * BET(I, J, K)
-                END DO
-            END DO
-        END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
+          do j = 2, n2m
+            do i = istart, iimg(ilev, 2), 2
+              gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
+            end do
+          end do
+        end do
 
-!$OMP PARALLEL DO private(ISTART)
-        DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-            ISTART = IIMG(ILEV, 1) + MOD(KPM(K), 2_8)
-            DO J = N2M - 1, 1, -1
-                DO I = ISTART, IIMG(ILEV, 2), 2
-                    GI(I, J, K) = GI(I, J, K) - GAM(I, J + 1, K) * GI(I, J + 1, K)
-                END DO
-            END DO
-        END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
+          do j = n2m - 1, 1, -1
+            do i = istart, iimg(ilev, 2), 2
+              gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
+            end do
+          end do
+        end do
 
-!------ make RHS of Zebra GS (even line)
-!$OMP PARALLEL DO private(ISTART, I, J)
-        DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-            ISTART = IIMG(ILEV, 1) + MOD(K, 2_8)
-            DO J = 1, N2M
-                DO I = ISTART, IIMG(ILEV, 2), 2
-                    GI(I, J, K) = RESID(I, J, K) &
-                                 - (AW(I) * GI(IMM(I), J, K) + AE(I) * GI(IPM(I), J, K) &
-                                  + AB(K) * GI(I, J, KMM(K)) + AF(K) * GI(I, J, KPM(K)))
-                END DO
-            END DO
-        END DO
+!------ MAKE RHS OF ZEBRA GS (EVEN LINE)
+!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          istart = iimg(ilev, 1) + mod(k, 2_8)
+          do j = 1, n2m
+            do i = istart, iimg(ilev, 2), 2
+              gi(i, j, k) = resid(i, j, k) &
+                            - (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
+                               + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
+            end do
+          end do
+        end do
 
-!------ solve TDMA
-!$OMP PARALLEL DO private(ISTART)
-        DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-            ISTART = IIMG(ILEV, 1) + MOD(K, 2_8)
-            DO I = ISTART, IIMG(ILEV, 2), 2
-                GI(I, 1, K) = GI(I, 1, K) * BET(I, 1, K)
-            END DO
-        END DO
+!------ SOLVE TDMA
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          istart = iimg(ilev, 1) + mod(k, 2_8)
+          do i = istart, iimg(ilev, 2), 2
+            gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
+          end do
+        end do
 
-!$OMP PARALLEL DO private(ISTART)
-        DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-            ISTART = IIMG(ILEV, 1) + MOD(K, 2_8)
-            DO J = 2, N2M
-                DO I = ISTART, IIMG(ILEV, 2), 2
-                    GI(I, J, K) = (GI(I, J, K) - AS(J) * GI(I, J - 1, K)) * BET(I, J, K)
-                END DO
-            END DO
-        END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          istart = iimg(ilev, 1) + mod(k, 2_8)
+          do j = 2, n2m
+            do i = istart, iimg(ilev, 2), 2
+              gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
+            end do
+          end do
+        end do
 
-!$OMP PARALLEL DO private(ISTART)
-        DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-            ISTART = IIMG(ILEV, 1) + MOD(K, 2_8)
-            DO J = N2M - 1, 1, -1
-                DO I = ISTART, IIMG(ILEV, 2), 2
-                    GI(I, J, K) = GI(I, J, K) - GAM(I, J + 1, K) * GI(I, J + 1, K)
-                END DO
-            END DO
-        END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          istart = iimg(ilev, 1) + mod(k, 2_8)
+          do j = n2m - 1, 1, -1
+            do i = istart, iimg(ilev, 2), 2
+              gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
+            end do
+          end do
+        end do
 
-!====== repeat previous procedures
-        DO II = 1, ITER - 1
+!====== REPEAT PREVIOUS PROCEDURES
+        do ii = 1, iter - 1
 
-!------ make RHS of Zebra GS (odd line)
-!$OMP PARALLEL DO private(ISTART, I, J)
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                ISTART = IIMG(ILEV, 1) + MOD(KPM(K), 2_8)
-                DO J = 1, N2M
-                    DO I = ISTART, IIMG(ILEV, 2), 2
-                        GI(I, J, K) = RESID(I, J, K) &
-                                     - (AW(I) * GI(IMM(I), J, K) + AE(I) * GI(IPM(I), J, K) &
-                                      + AB(K) * GI(I, J, KMM(K)) + AF(K) * GI(I, J, KPM(K)))
-                    END DO
-                END DO
-            END DO
+!------ MAKE RHS OF ZEBRA GS (ODD LINE)
+!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
+            do j = 1, n2m
+              do i = istart, iimg(ilev, 2), 2
+                gi(i, j, k) = resid(i, j, k) &
+                              - (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
+                                 + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
+              end do
+            end do
+          end do
 
-!------ solve TDMA
-!$OMP PARALLEL DO private(ISTART)
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                ISTART = IIMG(ILEV, 1) + MOD(KPM(K), 2_8)
-                DO I = ISTART, IIMG(ILEV, 2), 2
-                    GI(I, 1, K) = GI(I, 1, K) * BET(I, 1, K)
-                END DO
-            END DO
+!------ SOLVE TDMA
+!$OMP PARALLEL DO PRIVATE(ISTART)
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
+            do i = istart, iimg(ilev, 2), 2
+              gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
+            end do
+          end do
 
-!$OMP PARALLEL DO private(ISTART)
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                ISTART = IIMG(ILEV, 1) + MOD(KPM(K), 2_8)
-                DO J = 2, N2M
-                    DO I = ISTART, IIMG(ILEV, 2), 2
-                        GI(I, J, K) = (GI(I, J, K) - AS(J) * GI(I, J - 1, K)) * BET(I, J, K)
-                    END DO
-                END DO
-            END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
+            do j = 2, n2m
+              do i = istart, iimg(ilev, 2), 2
+                gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
+              end do
+            end do
+          end do
 
-!$OMP PARALLEL DO private(ISTART)
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                ISTART = IIMG(ILEV, 1) + MOD(KPM(K), 2_8)
-                DO J = N2M - 1, 1, -1
-                    DO I = ISTART, IIMG(ILEV, 2), 2
-                        GI(I, J, K) = GI(I, J, K) - GAM(I, J + 1, K) * GI(I, J + 1, K)
-                    END DO
-                END DO
-            END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
+            do j = n2m - 1, 1, -1
+              do i = istart, iimg(ilev, 2), 2
+                gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
+              end do
+            end do
+          end do
 
-!------ make RHS of Zebra GS (even line)
-!$OMP PARALLEL DO private(ISTART, I, J)
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                ISTART = IIMG(ILEV, 1) + MOD(K, 2_8)
-                DO J = 1, N2M
-                    DO I = ISTART, IIMG(ILEV, 2), 2
-                        GI(I, J, K) = RESID(I, J, K) &
-                                     - (AW(I) * GI(IMM(I), J, K) + AE(I) * GI(IPM(I), J, K) &
-                                      + AB(K) * GI(I, J, KMM(K)) + AF(K) * GI(I, J, KPM(K)))
-                    END DO
-                END DO
-            END DO
+!------ MAKE RHS OF ZEBRA GS (EVEN LINE)
+!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            istart = iimg(ilev, 1) + mod(k, 2_8)
+            do j = 1, n2m
+              do i = istart, iimg(ilev, 2), 2
+                gi(i, j, k) = resid(i, j, k) &
+                              - (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
+                                 + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
+              end do
+            end do
+          end do
 
-!------ solve TDMA
-!$OMP PARALLEL DO private(ISTART)
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                ISTART = IIMG(ILEV, 1) + MOD(K, 2_8)
-                DO I = ISTART, IIMG(ILEV, 2), 2
-                    GI(I, 1, K) = GI(I, 1, K) * BET(I, 1, K)
-                END DO
-            END DO
+!------ SOLVE TDMA
+!$OMP PARALLEL DO PRIVATE(ISTART)
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            istart = iimg(ilev, 1) + mod(k, 2_8)
+            do i = istart, iimg(ilev, 2), 2
+              gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
+            end do
+          end do
 
-!$OMP PARALLEL DO private(ISTART)
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                ISTART = IIMG(ILEV, 1) + MOD(K, 2_8)
-                DO J = 2, N2M
-                    DO I = ISTART, IIMG(ILEV, 2), 2
-                        GI(I, J, K) = (GI(I, J, K) - AS(J) * GI(I, J - 1, K)) * BET(I, J, K)
-                    END DO
-                END DO
-            END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            istart = iimg(ilev, 1) + mod(k, 2_8)
+            do j = 2, n2m
+              do i = istart, iimg(ilev, 2), 2
+                gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
+              end do
+            end do
+          end do
 
-!$OMP PARALLEL DO private(ISTART)
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                ISTART = IIMG(ILEV, 1) + MOD(K, 2_8)
-                DO J = N2M - 1, 1, -1
-                    DO I = ISTART, IIMG(ILEV, 2), 2
-                        GI(I, J, K) = GI(I, J, K) - GAM(I, J + 1, K) * GI(I, J + 1, K)
-                    END DO
-                END DO
-            END DO
+!$OMP PARALLEL DO PRIVATE(ISTART)
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            istart = iimg(ilev, 1) + mod(k, 2_8)
+            do j = n2m - 1, 1, -1
+              do i = istart, iimg(ilev, 2), 2
+                gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
+              end do
+            end do
+          end do
 
-        END DO
+        end do
 
-        RETURN
-        END SUBROUTINE RELAX
+        return
+      end subroutine relax
 
 !======================================================================
-      SUBROUTINE POISINIT  ! CALCULATE COEFS FOR POISSON EQ.
+      subroutine poisinit  ! CALCULATE COEFS FOR POISSON EQ.
 !======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8)  :: I, J, K
-       INTEGER(8)  :: IP, JP, KP
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k
+        integer(8) :: ip, jp, kp
 
-       CALL MGRD_ALLO
+        call mgrd_allo
 
-       ALLOCATE(GAM(N1MD, N2M, N3MD))
-       ALLOCATE(BET(N1MD, N2M, N3MD))
+        allocate (gam(n1md, n2m, n3md))
+        allocate (bet(n1md, n2m, n3md))
 
 !-----COMPUTE COEFS OF POISSON EQ.
-      DO I = 1, N1M
-          IP = IPV(I)
-          AW(I) = (1.0_8 - FIXIL(I)) * C2CXI(I) * F2FXI(I)
-          AE(I) = (1.0_8 - FIXIU(I)) * C2CXI(IP) * F2FXI(I)
-      END DO
+        do i = 1, n1m
+          ip = ipv(i)
+          aw(i) = (1.0_8 - fixil(i)) * c2cxi(i) * f2fxi(i)
+          ae(i) = (1.0_8 - fixiu(i)) * c2cxi(ip) * f2fxi(i)
+        end do
 
-      DO J = 1, N2M
-          JP = JPV(J)
-          AS(J) = (1.0_8 - FIXJL(J)) * C2CYI(J) * F2FYI(J)
-          AN(J) = (1.0_8 - FIXJU(J)) * C2CYI(JP) * F2FYI(J)
-      END DO
+        do j = 1, n2m
+          jp = jpv(j)
+          as(j) = (1.0_8 - fixjl(j)) * c2cyi(j) * f2fyi(j)
+          an(j) = (1.0_8 - fixju(j)) * c2cyi(jp) * f2fyi(j)
+        end do
 
-      DO K = 1, N3M
-          KP = KPV(K)
-          AB(K) = (1.0_8 - FIXKL(K)) * C2CZI(K) * F2FZI(K)
-          AF(K) = (1.0_8 - FIXKU(K)) * C2CZI(KP) * F2FZI(K)
-      END DO
+        do k = 1, n3m
+          kp = kpv(k)
+          ab(k) = (1.0_8 - fixkl(k)) * c2czi(k) * f2fzi(k)
+          af(k) = (1.0_8 - fixku(k)) * c2czi(kp) * f2fzi(k)
+        end do
 
-      OPEN(77, FILE='../output/ftr/poiss_itr.dat')
-      OPEN(78, FILE='../output/ftr/ftrpoittr.dat')
+        open (77, file='../output/ftr/poiss_itr.dat')
+        open (78, file='../output/ftr/ftrpoittr.dat')
 
-      CALL MGCOEF
+        call mgcoef
 
-      RETURN
-      END SUBROUTINE POISINIT
+        return
+      end subroutine poisinit
 
 !======================================================================
-      SUBROUTINE MGCOEF  ! CALCULATE COEFS FOR POISSON EQ.
+      subroutine mgcoef  ! CALCULATE COEFS FOR POISSON EQ.
 !======================================================================
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8) :: I, J, K
-       REAL(8)    :: XMPM(0:N1MD), ZMPM(0:N3MD)
-       INTEGER(8) :: IWEST(N1MD), IEAST(N1MD), KBACK(N3MD), KFORW(N3MD)
-       INTEGER(8) :: ILEV
-       INTEGER(8) :: IC, IBG, ISP, IEND, KC, KBG, KSP, KEND, IBGH, KBGH, IBGL, KBGL, KENDL, IENDL
-       REAL(8)    :: VDZ_KBG, VDZ_KEND, SDZ_KBG, SDZ_KEND, DZ, DZ1, DZ2
-       REAL(8)    :: VDX_IBG, VDX_IEND, SDX_IBG, SDX_IEND, DX, DX1, DX2
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: xmpm(0:n1md), zmpm(0:n3md)
+        integer(8) :: iwest(n1md), ieast(n1md), kback(n3md), kforw(n3md)
+        integer(8) :: ilev
+        integer(8) :: ic, ibg, isp, iend, kc, kbg, ksp, kend, ibgh, kbgh, ibgl, kbgl, kendl, iendl
+        real(8) :: vdz_kbg, vdz_kend, sdz_kbg, sdz_kend, dz, dz1, dz2
+        real(8) :: vdx_ibg, vdx_iend, sdx_ibg, sdx_iend, dx, dx1, dx2
 
-!====== calculate indices at each level
+!====== CALCULATE INDICES AT EACH LEVEL
 !------ IIMG(),KKMG(),IKMG()
-        IIMG(NLEV, 1) = 1
-        IIMG(NLEV, 2) = N1M
-        IIMG(NLEV, 3) = N1M
-        KKMG(NLEV, 1) = 1
-        KKMG(NLEV, 2) = N3M
-        KKMG(NLEV, 3) = N3M
+        iimg(nlev, 1) = 1
+        iimg(nlev, 2) = n1m
+        iimg(nlev, 3) = n1m
+        kkmg(nlev, 1) = 1
+        kkmg(nlev, 2) = n3m
+        kkmg(nlev, 3) = n3m
 
-        DO ILEV = NLEV - 1, 0, -1
-            IIMG(ILEV, 1) = IIMG(ILEV + 1, 1) + IIMG(ILEV + 1, 3)
-            IIMG(ILEV, 3) = (N1M / (2**NLEV)) * (2**ILEV)
-            IIMG(ILEV, 2) = IIMG(ILEV, 1) + IIMG(ILEV, 3) - 1
-            
-            KKMG(ILEV, 1) = KKMG(ILEV + 1, 1) + KKMG(ILEV + 1, 3)
-            KKMG(ILEV, 3) = (N3M / (2**NLEV)) * (2**ILEV)
-            KKMG(ILEV, 2) = KKMG(ILEV, 1) + KKMG(ILEV, 3) - 1
-        END DO
+        do ilev = nlev - 1, 0, -1
+          iimg(ilev, 1) = iimg(ilev + 1, 1) + iimg(ilev + 1, 3)
+          iimg(ilev, 3) = (n1m / (2**nlev)) * (2**ilev)
+          iimg(ilev, 2) = iimg(ilev, 1) + iimg(ilev, 3) - 1
 
-!====== compute for the finest grid
-        DO I = 1, N1M
-            XMPM(I) = XMP(I)
-            IWEST(I) = 1 - 1/I          ! 1 for I > 1
-            IEAST(I) = 1 - I/N1M        ! 1 for I < N1M
-        END DO
-        
-        DO K = 1, N3M
-            ZMPM(K) = ZMP(K)
-            KBACK(K) = 1 - 1/K          ! 1 for K > 1
-            KFORW(K) = 1 - K/N3M        ! 1 for K < N3M
-        END DO
+          kkmg(ilev, 1) = kkmg(ilev + 1, 1) + kkmg(ilev + 1, 3)
+          kkmg(ilev, 3) = (n3m / (2**nlev)) * (2**ilev)
+          kkmg(ilev, 2) = kkmg(ilev, 1) + kkmg(ilev, 3) - 1
+        end do
 
-!====== compute for coarse grids
-        DO ILEV = NLEV - 1, 0, -1
+!====== COMPUTE FOR THE FINEST GRID
+        do i = 1, n1m
+          xmpm(i) = xmp(i)
+          iwest(i) = 1 - 1 / i          ! 1 FOR I > 1
+          ieast(i) = 1 - i / n1m        ! 1 FOR I < N1M
+        end do
 
-            IBG = IIMG(ILEV, 1)
-            IEND = IIMG(ILEV, 2)
-            ISP = 2**(NLEV - ILEV)
-            
-            KBG = KKMG(ILEV, 1)
-            KEND = KKMG(ILEV, 2)
-            KSP = 2**(NLEV - ILEV)
+        do k = 1, n3m
+          zmpm(k) = zmp(k)
+          kback(k) = 1 - 1 / k          ! 1 FOR K > 1
+          kforw(k) = 1 - k / n3m        ! 1 FOR K < N3M
+        end do
 
-            IC = 0
-            DO I = IBG, IEND
-                IC = IC + 1
-                XMPM(I) = 0.5_8 * (X((IC - 1) * ISP + 1) + X(IC * ISP + 1))
-                IWEST(I) = 1 - IBG/I        ! 1 for I > IBG
-                IEAST(I) = 1 - I/IEND       ! 1 for I < IEND
-            END DO
+!====== COMPUTE FOR COARSE GRIDS
+        do ilev = nlev - 1, 0, -1
 
-            KC = 0
-            DO K = KBG, KEND
-                KC = KC + 1
-                ZMPM(K) = 0.5_8 * (Z((KC - 1) * KSP + 1) + Z(KC * KSP + 1))
-                KBACK(K) = 1 - KBG/K        ! 1 for K > KBG
-                KFORW(K) = 1 - K/KEND       ! 1 for K < KEND
-            END DO
+          ibg = iimg(ilev, 1)
+          iend = iimg(ilev, 2)
+          isp = 2**(nlev - ilev)
 
-!------ calculate Poisson coefficients for coarse grids
-            IC = 0
-            DO I = IBG, IEND
-                IC = IC + 1
-                AW(I) = IWEST(I) * 1.0_8 / ((XMPM(I) - XMPM(I - 1)) * (X(IC * ISP + 1) - X((IC - 1) * ISP + 1)))
-                AE(I) = IEAST(I) * 1.0_8 / ((XMPM(I + 1) - XMPM(I)) * (X(IC * ISP + 1) - X((IC - 1) * ISP + 1)))
-            END DO
+          kbg = kkmg(ilev, 1)
+          kend = kkmg(ilev, 2)
+          ksp = 2**(nlev - ilev)
 
-            KC = 0
-            DO K = KBG, KEND
-                KC = KC + 1
-                AB(K) = KBACK(K) * 1.0_8 / ((ZMPM(K) - ZMPM(K - 1)) * (Z(KC * KSP + 1) - Z((KC - 1) * KSP + 1)))
-                AF(K) = KFORW(K) * 1.0_8 / ((ZMPM(K + 1) - ZMPM(K)) * (Z(KC * KSP + 1) - Z((KC - 1) * KSP + 1)))
-            END DO
+          ic = 0
+          do i = ibg, iend
+            ic = ic + 1
+            xmpm(i) = 0.5_8 * (x((ic - 1) * isp + 1) + x(ic * isp + 1))
+            iwest(i) = 1 - ibg / i        ! 1 FOR I > IBG
+            ieast(i) = 1 - i / iend       ! 1 FOR I < IEND
+          end do
 
-        END DO
+          kc = 0
+          do k = kbg, kend
+            kc = kc + 1
+            zmpm(k) = 0.5_8 * (z((kc - 1) * ksp + 1) + z(kc * ksp + 1))
+            kback(k) = 1 - kbg / k        ! 1 FOR K > KBG
+            kforw(k) = 1 - k / kend       ! 1 FOR K < KEND
+          end do
 
-!====== calculate restriction coefficients
-        DO ILEV = 0, NLEV - 1
+!------ CALCULATE POISSON COEFFICIENTS FOR COARSE GRIDS
+          ic = 0
+          do i = ibg, iend
+            ic = ic + 1
+            aw(i) = iwest(i) * 1.0_8 / ((xmpm(i) - xmpm(i - 1)) * (x(ic * isp + 1) - x((ic - 1) * isp + 1)))
+            ae(i) = ieast(i) * 1.0_8 / ((xmpm(i + 1) - xmpm(i)) * (x(ic * isp + 1) - x((ic - 1) * isp + 1)))
+          end do
 
-            IBGH = IIMG(ILEV + 1, 1)             ! at higher level
-            DO I = IIMG(ILEV, 1), IIMG(ILEV, 2)
-                FIDW(I) = (XMPM(I) - XMPM(IBGH)) / (XMPM(IBGH + 1) - XMPM(IBGH))
-                IH1(I) = IBGH
-                IH2(I) = IBGH + 1
-                IBGH = IBGH + 2
-            END DO
+          kc = 0
+          do k = kbg, kend
+            kc = kc + 1
+            ab(k) = kback(k) * 1.0_8 / ((zmpm(k) - zmpm(k - 1)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
+            af(k) = kforw(k) * 1.0_8 / ((zmpm(k + 1) - zmpm(k)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
+          end do
 
-            KBGH = KKMG(ILEV + 1, 1)             ! at higher level
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                FKDW(K) = (ZMPM(K) - ZMPM(KBGH)) / (ZMPM(KBGH + 1) - ZMPM(KBGH))
-                KH1(K) = KBGH
-                KH2(K) = KBGH + 1
-                KBGH = KBGH + 2
-            END DO
+        end do
 
-        END DO
+!====== CALCULATE RESTRICTION COEFFICIENTS
+        do ilev = 0, nlev - 1
 
-!====== calculate prolongation coefficients
-        DO ILEV = 1, NLEV
+          ibgh = iimg(ilev + 1, 1)             ! AT HIGHER LEVEL
+          do i = iimg(ilev, 1), iimg(ilev, 2)
+            fidw(i) = (xmpm(i) - xmpm(ibgh)) / (xmpm(ibgh + 1) - xmpm(ibgh))
+            ih1(i) = ibgh
+            ih2(i) = ibgh + 1
+            ibgh = ibgh + 2
+          end do
 
-            IBGL = IIMG(ILEV - 1, 1)             ! at lower level
-            DO I = IIMG(ILEV, 1), IIMG(ILEV, 2), 2
-                FIUP(I) = (XMPM(I) - XMPM(IBGL - 1)) / (XMPM(IBGL) - XMPM(IBGL - 1))
-                FIUP(I + 1) = (XMPM(I + 1) - XMPM(IBGL)) / (XMPM(IBGL + 1) - XMPM(IBGL))
-                IL1(I) = IBGL - 1
-                IL2(I) = IBGL
-                IL1(I + 1) = IBGL
-                IL2(I + 1) = IBGL + 1
-                IBGL = IBGL + 1
-            END DO
-            I = IIMG(ILEV, 1)
-            FIUP(I) = 1.0_8                      ! Neumann B.C.
-            I = IIMG(ILEV, 2)
-            FIUP(I) = 0.0_8                      ! Neumann B.C.
+          kbgh = kkmg(ilev + 1, 1)             ! AT HIGHER LEVEL
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            fkdw(k) = (zmpm(k) - zmpm(kbgh)) / (zmpm(kbgh + 1) - zmpm(kbgh))
+            kh1(k) = kbgh
+            kh2(k) = kbgh + 1
+            kbgh = kbgh + 2
+          end do
 
-            KBGL = KKMG(ILEV - 1, 1)             ! at lower level
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2), 2
-                FKUP(K) = (ZMPM(K) - ZMPM(KBGL - 1)) / (ZMPM(KBGL) - ZMPM(KBGL - 1))
-                FKUP(K + 1) = (ZMPM(K + 1) - ZMPM(KBGL)) / (ZMPM(KBGL + 1) - ZMPM(KBGL))
-                KL1(K) = KBGL - 1
-                KL2(K) = KBGL
-                KL1(K + 1) = KBGL
-                KL2(K + 1) = KBGL + 1
-                KBGL = KBGL + 1
-            END DO
-            K = KKMG(ILEV, 1)
-            FKUP(K) = 1.0_8                      ! Neumann B.C.
-            K = KKMG(ILEV, 2)
-            FKUP(K) = 0.0_8                      ! Neumann B.C.
+        end do
 
-        END DO
+!====== CALCULATE PROLONGATION COEFFICIENTS
+        do ilev = 1, nlev
+
+          ibgl = iimg(ilev - 1, 1)             ! AT LOWER LEVEL
+          do i = iimg(ilev, 1), iimg(ilev, 2), 2
+            fiup(i) = (xmpm(i) - xmpm(ibgl - 1)) / (xmpm(ibgl) - xmpm(ibgl - 1))
+            fiup(i + 1) = (xmpm(i + 1) - xmpm(ibgl)) / (xmpm(ibgl + 1) - xmpm(ibgl))
+            il1(i) = ibgl - 1
+            il2(i) = ibgl
+            il1(i + 1) = ibgl
+            il2(i + 1) = ibgl + 1
+            ibgl = ibgl + 1
+          end do
+          i = iimg(ilev, 1)
+          fiup(i) = 1.0_8                      ! NEUMANN B.C.
+          i = iimg(ilev, 2)
+          fiup(i) = 0.0_8                      ! NEUMANN B.C.
+
+          kbgl = kkmg(ilev - 1, 1)             ! AT LOWER LEVEL
+          do k = kkmg(ilev, 1), kkmg(ilev, 2), 2
+            fkup(k) = (zmpm(k) - zmpm(kbgl - 1)) / (zmpm(kbgl) - zmpm(kbgl - 1))
+            fkup(k + 1) = (zmpm(k + 1) - zmpm(kbgl)) / (zmpm(kbgl + 1) - zmpm(kbgl))
+            kl1(k) = kbgl - 1
+            kl2(k) = kbgl
+            kl1(k + 1) = kbgl
+            kl2(k + 1) = kbgl + 1
+            kbgl = kbgl + 1
+          end do
+          k = kkmg(ilev, 1)
+          fkup(k) = 1.0_8                      ! NEUMANN B.C.
+          k = kkmg(ilev, 2)
+          fkup(k) = 0.0_8                      ! NEUMANN B.C.
+
+        end do
 
 !       INTRODUCE DEFAULT BOUNDARY INDEX MAPPING
-        DO ILEV = NLEV, 0, -1
-            KBG = KKMG(ILEV, 1)
-            KEND = KKMG(ILEV, 2)
-            DO K = KBG, KEND
-                KPM(K) = K + 1
-                KMM(K) = K - 1
-            END DO
-            
-            IBG = IIMG(ILEV, 1)
-            IEND = IIMG(ILEV, 2)
-            DO I = IBG, IEND
-                IPM(I) = I + 1
-                IMM(I) = I - 1
-            END DO
-        END DO
+        do ilev = nlev, 0, -1
+          kbg = kkmg(ilev, 1)
+          kend = kkmg(ilev, 2)
+          do k = kbg, kend
+            kpm(k) = k + 1
+            kmm(k) = k - 1
+          end do
+
+          ibg = iimg(ilev, 1)
+          iend = iimg(ilev, 2)
+          do i = ibg, iend
+            ipm(i) = i + 1
+            imm(i) = i - 1
+          end do
+        end do
 
 !       FOR X-PERIODICITY
-        IF (XPRDIC == 1) THEN
-            DO ILEV = NLEV, 0, -1
-                IBG = IIMG(ILEV, 1)
-                IEND = IIMG(ILEV, 2)
-                IPM(IEND) = IBG
-                IMM(IBG) = IEND
-            END DO
+        if (xprdic == 1) then
+          do ilev = nlev, 0, -1
+            ibg = iimg(ilev, 1)
+            iend = iimg(ilev, 2)
+            ipm(iend) = ibg
+            imm(ibg) = iend
+          end do
 
-            DO ILEV = NLEV - 1, 0, -1
-                IBG = IIMG(ILEV, 1)
-                IEND = IIMG(ILEV, 2)
-                ISP = 2**(NLEV - ILEV)
-                VDX_IBG = XMPM(IBG) - X(1) + X(N1) - XMPM(IEND)
-                VDX_IEND = XMPM(IBG) - X(1) + X(N1) - XMPM(IEND)
-                SDX_IBG = X(1 + ISP) - X(1)
-                SDX_IEND = X(N1) - X(N1 - ISP)
-                AW(IBG) = 1.0_8 / (VDX_IBG * SDX_IBG)
-                AE(IEND) = 1.0_8 / (VDX_IEND * SDX_IEND)
-            END DO
+          do ilev = nlev - 1, 0, -1
+            ibg = iimg(ilev, 1)
+            iend = iimg(ilev, 2)
+            isp = 2**(nlev - ilev)
+            vdx_ibg = xmpm(ibg) - x(1) + x(n1) - xmpm(iend)
+            vdx_iend = xmpm(ibg) - x(1) + x(n1) - xmpm(iend)
+            sdx_ibg = x(1 + isp) - x(1)
+            sdx_iend = x(n1) - x(n1 - isp)
+            aw(ibg) = 1.0_8 / (vdx_ibg * sdx_ibg)
+            ae(iend) = 1.0_8 / (vdx_iend * sdx_iend)
+          end do
 
-            DO ILEV = 1, NLEV
-                IBG = IIMG(ILEV, 1)
-                IEND = IIMG(ILEV, 2)
-                IBGL = IIMG(ILEV - 1, 1)
-                IENDL = IIMG(ILEV - 1, 2)
-                DX = XMPM(IBGL) - X(1) + X(N1) - XMPM(IENDL)
-                DX1 = XMPM(IEND) - XMPM(IENDL)
-                DX2 = X(N1) - XMPM(IENDL) + XMPM(IBG) - X(1)
-                FIUP(IBG) = DX2 / DX
-                FIUP(IEND) = DX1 / DX
-                IL1(IBG) = IENDL
-                IL2(IBG) = IBGL
-                IL1(IEND) = IENDL
-                IL2(IEND) = IBGL
-            END DO
-        END IF
+          do ilev = 1, nlev
+            ibg = iimg(ilev, 1)
+            iend = iimg(ilev, 2)
+            ibgl = iimg(ilev - 1, 1)
+            iendl = iimg(ilev - 1, 2)
+            dx = xmpm(ibgl) - x(1) + x(n1) - xmpm(iendl)
+            dx1 = xmpm(iend) - xmpm(iendl)
+            dx2 = x(n1) - xmpm(iendl) + xmpm(ibg) - x(1)
+            fiup(ibg) = dx2 / dx
+            fiup(iend) = dx1 / dx
+            il1(ibg) = iendl
+            il2(ibg) = ibgl
+            il1(iend) = iendl
+            il2(iend) = ibgl
+          end do
+        end if
 
 !       FOR Z-PERIODICITY
-        IF (ZPRDIC == 1) THEN
-            DO ILEV = NLEV, 0, -1
-                KBG = KKMG(ILEV, 1)
-                KEND = KKMG(ILEV, 2)
-                KPM(KEND) = KBG
-                KMM(KBG) = KEND
-            END DO
+        if (zprdic == 1) then
+          do ilev = nlev, 0, -1
+            kbg = kkmg(ilev, 1)
+            kend = kkmg(ilev, 2)
+            kpm(kend) = kbg
+            kmm(kbg) = kend
+          end do
 
-            DO ILEV = NLEV - 1, 0, -1
-                KBG = KKMG(ILEV, 1)
-                KEND = KKMG(ILEV, 2)
-                KSP = 2**(NLEV - ILEV)
-                VDZ_KBG = ZMPM(KBG) - Z(1) + Z(N3) - ZMPM(KEND)
-                VDZ_KEND = ZMPM(KBG) - Z(1) + Z(N3) - ZMPM(KEND)
-                SDZ_KBG = Z(1 + KSP) - Z(1)
-                SDZ_KEND = Z(N3) - Z(N3 - KSP)
-                AB(KBG) = 1.0_8 / (VDZ_KBG * SDZ_KBG)
-                AF(KEND) = 1.0_8 / (VDZ_KEND * SDZ_KEND)
-            END DO
+          do ilev = nlev - 1, 0, -1
+            kbg = kkmg(ilev, 1)
+            kend = kkmg(ilev, 2)
+            ksp = 2**(nlev - ilev)
+            vdz_kbg = zmpm(kbg) - z(1) + z(n3) - zmpm(kend)
+            vdz_kend = zmpm(kbg) - z(1) + z(n3) - zmpm(kend)
+            sdz_kbg = z(1 + ksp) - z(1)
+            sdz_kend = z(n3) - z(n3 - ksp)
+            ab(kbg) = 1.0_8 / (vdz_kbg * sdz_kbg)
+            af(kend) = 1.0_8 / (vdz_kend * sdz_kend)
+          end do
 
-            DO ILEV = 1, NLEV
-                KBG = KKMG(ILEV, 1)
-                KEND = KKMG(ILEV, 2)
-                KBGL = KKMG(ILEV - 1, 1)
-                KENDL = KKMG(ILEV - 1, 2)
-                DZ = ZMPM(KBGL) - Z(1) + Z(N3) - ZMPM(KENDL)
-                DZ1 = ZMPM(KEND) - ZMPM(KENDL)
-                DZ2 = Z(N3) - ZMPM(KENDL) + ZMPM(KBG) - Z(1)
-                FKUP(KBG) = DZ2 / DZ
-                FKUP(KEND) = DZ1 / DZ
-                KL1(KBG) = KENDL
-                KL2(KBG) = KBGL
-                KL1(KEND) = KENDL
-                KL2(KEND) = KBGL
-            END DO
-        END IF
+          do ilev = 1, nlev
+            kbg = kkmg(ilev, 1)
+            kend = kkmg(ilev, 2)
+            kbgl = kkmg(ilev - 1, 1)
+            kendl = kkmg(ilev - 1, 2)
+            dz = zmpm(kbgl) - z(1) + z(n3) - zmpm(kendl)
+            dz1 = zmpm(kend) - zmpm(kendl)
+            dz2 = z(n3) - zmpm(kendl) + zmpm(kbg) - z(1)
+            fkup(kbg) = dz2 / dz
+            fkup(kend) = dz1 / dz
+            kl1(kbg) = kendl
+            kl2(kbg) = kbgl
+            kl1(kend) = kendl
+            kl2(kend) = kbgl
+          end do
+        end if
 
-        CALL TRIDCOEF
+        call tridcoef
 
-      RETURN
-      END SUBROUTINE MGCOEF
-
+        return
+      end subroutine mgcoef
 
 !======================================================================
-        SUBROUTINE TRIDCOEF
+      subroutine tridcoef
 !======================================================================
-!       compute tridiagonal matrix coefficients
-       USE MOD_COMMON
-       USE MOD_POISS
-       IMPLICIT NONE
-       INTEGER(8) :: I, J, K
-       REAL(8)    :: ACC
-       INTEGER(8) :: ILEV
+!       COMPUTE TRIDIAGONAL MATRIX COEFFICIENTS
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: i, j, k
+        real(8) :: acc
+        integer(8) :: ilev
 
-        DO ILEV = 0, NLEV
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                DO I = IIMG(ILEV, 1), IIMG(ILEV, 2)
-                    ACC = -1.0_8 * (AW(I) + AE(I) + AS(1) + AN(1) + AB(K) + AF(K))
-                    BET(I, 1, K) = 1.0_8 / ACC
-                END DO
-            END DO
+        do ilev = 0, nlev
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            do i = iimg(ilev, 1), iimg(ilev, 2)
+              acc = -1.0_8 * (aw(i) + ae(i) + as(1) + an(1) + ab(k) + af(k))
+              bet(i, 1, k) = 1.0_8 / acc
+            end do
+          end do
 
-            DO K = KKMG(ILEV, 1), KKMG(ILEV, 2)
-                DO J = 2, N2M
-                    DO I = IIMG(ILEV, 1), IIMG(ILEV, 2)
-                        ACC = -1.0_8 * (AW(I) + AE(I) + AS(J) + AN(J) + AB(K) + AF(K))
-                        GAM(I, J, K) = AN(J - 1) * BET(I, J - 1, K)
-                        BET(I, J, K) = 1.0_8 / (ACC - AS(J) * GAM(I, J, K))
-                    END DO
-                END DO
-            END DO
-        END DO
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            do j = 2, n2m
+              do i = iimg(ilev, 1), iimg(ilev, 2)
+                acc = -1.0_8 * (aw(i) + ae(i) + as(j) + an(j) + ab(k) + af(k))
+                gam(i, j, k) = an(j - 1) * bet(i, j - 1, k)
+                bet(i, j, k) = 1.0_8 / (acc - as(j) * gam(i, j, k))
+              end do
+            end do
+          end do
+        end do
 
-        RETURN
-        END SUBROUTINE TRIDCOEF
+        return
+      end subroutine tridcoef
