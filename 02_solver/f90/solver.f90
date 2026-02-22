@@ -64,11 +64,13 @@ program solver
   nv = 101
   nav = 3001
   perturb_applied = .false.
+  cdavg_dur = 0.0d0
+  cdavg_int = 0.0d0
 
   !===================================================================
   !     TIME-DEPENDENT CALCULATION (MAIN SOLVER)
   !===================================================================
-  do m = 1, ntst
+  do while ((ntime .lt. ntst) .and. (time .lt. tend))
     time_begin = omp_get_wtime()         ! INTRINSIC SUBROUTINE
     call stepinit()                      ! AT SLV_AUXI LIBRARY
     subdt = 0.0d0
@@ -139,7 +141,7 @@ program solver
     time = time + dt
 
     if ((iread .eq. 0) .and. (eps_ptr .ne. 0.0d0) .and. (.not. perturb_applied)) then
-      if ((time_prev .lt. 50.0d0) .and. (time .ge. 50.0d0)) then
+      if ((time_prev .lt. ptb_tst) .and. (time .ge. ptb_tst)) then
         call addperturb()
         call prdic_adj_uvw(0)
         perturb_applied = .true.
@@ -174,7 +176,7 @@ program solver
   call ftrfiles(0)
 
   if (mod(ntime, nprint) .ne. 0) call writefield()
-  if (iavg .eq. 1) call field_avg()
+  if (iavg .eq. 1) call field_avg_finalize()
 
   call cpu_time(total_time_e)
 

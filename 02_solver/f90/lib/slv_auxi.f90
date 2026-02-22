@@ -4,7 +4,7 @@
          use mod_common
          use mod_flowarray
          implicit none
-         real(8) :: dtcfl
+         real(8) :: dtcfl, dt_evt, eps_t
          integer(8) :: icfl, jcfl, kcfl
 
          ntime = ntime + 1
@@ -12,12 +12,29 @@
          fcvavg = 0.
          if (ich .eq. 1) pmiavg = 0.
 
+         if (idtopt .eq. 0) dt = dt_size
+
          call cfl(cflmax, icfl, jcfl, kcfl)         ! CALCULATE CFL NUMBER
 
          if (idtopt .ne. 0 .and. cflmax .ne. 0.) then
            dtcfl = dmin1(dt * cflfac / cflmax, dt * (0.80 + 0.20 * cflfac / cflmax))
            if (idtopt .eq. 1) dt = dtcfl
          end if
+
+         eps_t = 1.0d-12 * dmax1(1.0d0, dabs(time))
+         dt_evt = dt
+
+         if (ptb_tst .gt. (time + eps_t)) then
+           dt_evt = dmin1(dt_evt, ptb_tst - time)
+         end if
+         if (avg_tst .gt. (time + eps_t)) then
+           dt_evt = dmin1(dt_evt, avg_tst - time)
+         end if
+         if (tend .gt. (time + eps_t)) then
+           dt_evt = dmin1(dt_evt, tend - time)
+         end if
+
+         if (dt_evt .lt. dt) dt = dt_evt
 
          if (cflmax .gt. (cflfac * 1.1)) then
            print *, ' '
@@ -97,7 +114,7 @@
          test1 = resid1 * dtconsti               ! POISS. CONVG. CRITERION
          acoef = alpha * dt / re
          acoefi = 1./acoef
-         pmiavg = pmiavg + pmi(0) !*2.*ALPHA
+         pmiavg = pmiavg + pmi(0)*2.*ALPHA
          subdt = subdt + dtconst               ! SUBTIME FOR RK3 METHOD
          msub = substep
 
@@ -166,21 +183,21 @@
 
          flowvol = 0.
 
-!$OMP PARALLEL DO REDUCTION(+:FLOWVOL)
-         do k = 1, n3m
-           do j = 1, n2m
-             do i = 1, n1m
-               if (funcbody(x(i), ymp(j), zmp(k)) .ge. 1.e-10) then
-                 flowvol = flowvol + c2cx(i) * f2fy(j) * f2fz(k)
-               end if
-             end do
-           end do
-         end do
-!$OMP END PARALLEL DO
+! !$OMP PARALLEL DO REDUCTION(+:FLOWVOL)
+!          do k = 1, n3m
+!            do j = 1, n2m
+!              do i = 1, n1m
+!                if (funcbody(x(i), ymp(j), zmp(k)) .ge. 1.e-10) then
+!                  flowvol = flowvol + c2cx(i) * f2fy(j) * f2fz(k)
+!                end if
+!              end do
+!            end do
+!          end do
+! !$OMP END PARALLEL DO
+         ! phcap = (qvol(2) - qvol(1)) / flowvol
 
-         ! PHCAP = (QVOL(2) - QVOL(1)) / FLOWVOL
-         phcap = (qvol(2) - ubulk_i * flowvol) / flowvol
-
+         phcap = 0.D0 ! DISABLE THE ARTIFICIAL FLOW RATE CORRECTION
+                      ! INSTEAD, WE IMPLEMENT THE CONTROLLER IN MEANPG
          return
        end subroutine qvolcorr
 !=======================================================================
@@ -241,11 +258,12 @@
                im = imv(i)
                u(i, j, k) = u(i, j, k) &
                             - dtconst * (phi(i, j, k) - phi(im, j, k)) * c2cxi(i)
-               if (ich .eq. 1) then
-                 if (funcbody(x(i), ymp(j), zmp(k)) .ge. 1.e-10) then
-                   u(i, j, k) = u(i, j, k) - phcap
-                 end if
-               end if
+               ! DISABLED: PHCAP IS NOW 0.0 (SEE QCORR), AND WE USE THE ACTIVE CONTROLLER IN MEANPG  
+               ! if (ich .eq. 1) then
+               !   if (funcbody(x(i), ymp(j), zmp(k)) .ge. 1.e-10) then
+               !     u(i, j, k) = u(i, j, k) - phcap
+               !   end if
+               ! end if
              end do
            end do
          end do
@@ -527,13 +545,12 @@
            dwdta = 0.
          end if
 
-!$OMP PARALLEL DO PRIVATE(II,JJ,KK)
+!$OMP PARALLEL DO PRIVATE(II,JJ,KK) REDUCTION(+:DUDTA,DVDTA,DWDTA)
          do l = 1, 3
            do n = 1, nbody(l)
              ii = ifc(n, l)
              jj = jfc(n, l)
              kk = kfc(n, l)
-             !INTERMEDIATE INFORMATION
              if (l .eq. 1) then
                dudta = dudta + c2cx(ii) * f2fy(jj) * f2fz(kk) * (dudtr(n, l) - &
                                                                  (gamma(msub) * rk3xo(ii, jj, kk) + ro(msub) * rk3xoo(ii, jj, kk)))
@@ -544,7 +561,6 @@
                dwdta = dwdta + f2fx(ii) * f2fy(jj) * c2cz(kk) * (dudtr(n, l) - &
                                                                  (gamma(msub) * rk3zo(ii, jj, kk) + ro(msub) * rk3zoo(ii, jj, kk)))
              end if
-
            end do
          end do
 !$OMP END PARALLEL DO
@@ -613,7 +629,7 @@
          use mod_flowarray
          implicit none
          integer(8) :: i, j, k, n, l, ii, jj, kk
-         real(8) :: cd(3), vol_solid_geom, vol_cell
+         real(8) :: cd(3), cdavg(3), vol_solid_geom, vol_cell
          real(8) :: dti, funcbody
 
          dti = 1.0d0 / dt
@@ -660,16 +676,28 @@
          cd(3) = cd(3) + dwdta
 
          ! 4. NON-DIMENSIONALIZE TOTAL FORCE TO EVALUATE WALL SHEAR STRESS (TAU_W)
-         !    DIVIDE BY THE TOTAL WETTED SURFACE AREA: 2 WALLS * (L_X * L_Z)
-         cd(1) = cd(1) / (xl * zl * 2.d0)
-         cd(2) = cd(2) / (xl * zl * 2.d0)
-         cd(3) = cd(3) / (xl * zl * 2.d0)
+         cd(1) = cd(1) / (xl * yl * zl)
+         cd(2) = cd(2) / (xl * yl * zl)
+         cd(3) = cd(3) / (xl * yl * zl)
+
+         cdavg = 0.0d0
+         if (time .ge. avg_tst) then
+           cdavg_int(1) = cdavg_int(1) + cd(1) * dt
+           cdavg_int(2) = cdavg_int(2) + cd(2) * dt
+           cdavg_int(3) = cdavg_int(3) + cd(3) * dt
+           cdavg_dur = cdavg_dur + dt
+           if (cdavg_dur .gt. 0.0d0) then
+             cdavg(1) = cdavg_int(1) / cdavg_dur
+             cdavg(2) = cdavg_int(2) / cdavg_dur
+             cdavg(3) = cdavg_int(3) / cdavg_dur
+           end if
+         end if
 
          ! 5. OUTPUT TO HISTORY FILE
          if (mod(ntime, npin) .eq. 0) then
-           write (2001, 110) time, cd(1), cd(2), cd(3)
+           write (2001, 110) time, cd(1), cd(2), cd(3), cdavg(1), cdavg(2), cdavg(3)
          end if
-110      format(f13.5, 3es15.6)
+110      format(f13.5, 6es15.6)
 
          return
        end subroutine draglift

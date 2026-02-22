@@ -24,6 +24,12 @@
          integer(8) :: i, j, k, n
          real(8) :: tmp, volume
 
+         ! --- Controller Variables ---
+         real(8) :: flowvol, qvol_current, u_bulk_current, err_u
+         real(8), save :: err_integral = 0.0d0
+         real(8) :: Kp, Ki
+         real(8) :: funcbody
+
          pmi = 0.
 
          if (bc_ybtm .eq. 0) then
@@ -87,7 +93,7 @@
            stop
          else
            tmp = 0.
-!$OMP PARALLEL DO REDUCTION(+:TMP,VOLUME)
+!$OMP PARALLEL DO REDUCTION(+:TMP)
            do n = 1, nbody(1)
              tmp = tmp + fcv(n, 1) * c2cx(ifc(n, 1)) * f2fy(jfc(n, 1)) &
                    * f2fz(kfc(n, 1))
@@ -99,6 +105,50 @@
            do i = 0, 4
              pmi(i) = pmi(i) / volume
            end do
+         end if
+
+         ! =========================================================
+         ! ACTIVE PI CONTROLLER FOR MEAN PRESSURE GRADIENT
+         ! =========================================================
+         
+         ! GUARD: ONLY EXECUTE DURING ACTIVE TIME-STEPPING TO AVOID 
+         ! DIVISION BY ZERO OR NAN DURING THE SOLVER'S INITIALIZATION PHASE.
+         if (ntime .gt. 0 .and. dt .gt. 0.0d0) then
+         
+           flowvol = 0.0d0
+           qvol_current = 0.0d0
+           
+!$OMP PARALLEL DO REDUCTION(+:FLOWVOL, QVOL_CURRENT)
+           do k = 1, n3m
+             do j = 1, n2m
+               do i = 1, n1m
+                 if (funcbody(x(i), ymp(j), zmp(k)) .ge. 1.e-10) then
+                   flowvol = flowvol + c2cx(i) * f2fy(j) * f2fz(k)
+                   qvol_current = qvol_current + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
+                 end if
+               end do
+             end do
+           end do
+!$OMP END PARALLEL DO
+
+           ! EVALUATE FLOW DEFICIENCY (SETPOINT - CURRENT)
+           u_bulk_current = qvol_current / flowvol
+           err_u = ubulk_i - u_bulk_current
+
+           ! TUNING GAINS:
+           ! FIXED GAINS ACT AS A STABLE RELAXATION TIME. 
+           ! KP = 1.0 ACCELERATES THE FLOW BY 1 VELOCITY UNIT PER 1 PHYSICAL TIME UNIT.
+           Kp = 1.0d0
+           Ki = 0.1d0
+
+           ! ACCUMULATE INTEGRAL ERROR USING THE RK3 PHYSICAL SUBSTEP TIME.
+           err_integral = err_integral + err_u * dtconst
+
+           ! APPLY THE CONTROL TO THE MEAN PRESSURE GRADIENT.
+           ! (NEGATIVE SIGN BECAUSE A POSITIVE ERR_U MEANS THE FLOW IS TOO SLOW, 
+           ! REQUIRING A MORE NEGATIVE DP/DX TO ACCELERATE).
+           pmi(0) = pmi(0) - (Kp * err_u + Ki * err_integral)
+
          end if
 
          return

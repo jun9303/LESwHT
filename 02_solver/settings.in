@@ -1,15 +1,17 @@
 RE#     PR#     GR#     GRDIR   T_INF
 2865.   0.71    0.      2       1
 IRESET  IREAD   IAVG    IPZERO  EPS_PTR UBULK_I 
-1       0       1       0       0.1     1.      
+1       0       1       0       .25     1.      
 NTST    NPRINT  NPRIAVG NPIN
-100000  1000    50000   1
+999999  10000   50000   1
+TEND    PTB_TST AVG_TST
+5000.0  50.0    150.0
 IDTOPT  DT_SIZE CFLFAC
-1       .005    1.0
+1       .005    1.
 RESID1  NLEV    NBLI    IOLDV   MGITR   IMGSOR  WWSOR
 1.0E-6  5       3       0       500     170     1.8
 ILES    INSMDL  ITEMDL  IDVMON  CSGSTS  CSGSHF  FILTER
-1       1       0       0       0.025   0.025   3
+1       1       0       0       0.025   0.010   3
 IBMON   MASSON  IMOVING IHTRANS
 1       1       0       1
 FILES
@@ -35,6 +37,9 @@ EPS_PTR: Add the random perturbation to the initial field (0.; No perturb. ~ 1.;
 UBULK_I: Define the initial bulk velocity U_b (Only valid when IREAD: 0)
 
 NTST   : Time steps for calculation
+TEND   : End simulation time (simulation stops at whichever comes first: NTST or TEND)
+PTB_TST: Time to start adding perturbation
+AVG_TST: Time to start field averaging and CD time-averaging
 NPRINT : Time steps for writing instantaneous field
 NPRIAVG: Time steps for writing time-avg. field (Only valid when IAVG: 1)
 NPIN   : Time steps for writing time history

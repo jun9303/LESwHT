@@ -50,7 +50,7 @@ module mod_common
 
 !!!!!!!!!!!!!!!!!!!!! N-S EQUATION
   integer(8) :: ntime, ihist, m, msub, nv, nav
-  real(8) :: dt, time, subdt
+  real(8) :: dt, time, subdt, tend
   real(8) :: dvmax, cflmax, qmmax
   real(8) :: gamma(3)
   real(8) :: ro(3)
@@ -91,6 +91,10 @@ module mod_common
 !!!!!!!!!!!!!!!!!!!!! NON-DIMENSIONAL QUANTITIES
   real(8) :: forcesum(3), forcesuma(3)
   real(8) :: dudta, dvdta, dwdta
+  real(8) :: ptb_tst
+  real(8) :: avg_tst, cdavg_dur, cdavg_int(3)
+  integer(8) :: npriavg_count, ihistavg_start
+  logical :: avg_started
 !     FORCESUM(3),FORCESUMA(3) : FORCE OBTAINED FROM THE MOMENTUM FORCING IN IBM
 !     DUDTA,DVDTA,DWDTA        : INERTIA CONTRIBUTION IN IBM FORCING
 

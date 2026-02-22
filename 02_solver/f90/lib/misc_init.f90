@@ -31,6 +31,8 @@
         read (10, *) dummy
         read (10, *) ntst, nprint, npriavg, npin
         read (10, *) dummy
+        read (10, *) tend, ptb_tst, avg_tst
+        read (10, *) dummy
         read (10, *) idtopt, dt_size, cflfac
         read (10, *) dummy
         read (10, *) resid1, nlev, nbli, ioldv, mgitr, imgsor, wwsor
@@ -55,6 +57,7 @@
         write (*, 101) re, pr, gr
         write (*, 102) ireset, iread, iavg, ipzero, eps_ptr, ubulk_i
         write (*, 103) ntst, nprint, npriavg, npin
+        write (*, 111) tend, ptb_tst, avg_tst
         write (*, 104) idtopt, dt, cflfac
         write (*, 105) resid1, nlev, nbli, ioldv, mgitr, imgsor, wwsor
         write (*, 106) iles, insmdl, itemdl, idvmon, csgsts, csgshf, filter
@@ -74,6 +77,7 @@
 101     format('  RE=', es11.3, '  PR=', es11.3, '  GR=', es11.3)
 102     format('  IRESET=', i5, '  IREAD=', i5, '  IAVG=', i5, '  IPZERO=', i5, '  EPS_PTR=', f7.3, '  UBULK_I=', f7.3)
 103     format('  NTST=', i10, '  NPRINT=', i8, '  NPRIAVG=', i8, '  NPIN=', i5)
+111     format('  TEND=', es13.5, '  PTB_TST=', es13.5, '  AVG_TST=', es13.5)
 104     format('  IDTOPT=', i5, '  DT=', es13.5, '  CFLFAC=', f11.3)
 105     format('  RESID=', es12.4, '  NLEV=', i5, '  NBLI=', i5, '  IOLDV=', i5, '  MGITR=', i5, '  IMGSOR=', i5, '  WWSOR=', f7.3)
 106     format('  ILES=', i2, '  INSMDL=', i2, '  ITEMDL=', i2, '  IDVMON=', i2, '  CSGSTS='f12.4, '  CSGSHF=', f12.4, '  IFILTER=', i5)
@@ -723,39 +727,81 @@
         use mod_common
         use mod_flowarray, only: u, w
         implicit none
-        real(8) :: ptb
+        real(8) :: ptb, flowarea, pertb_rate, adj
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8), parameter :: ret = 180.0d0
 
+        ! --- PERTURB U ---
         do i = 1, n1m
-!$OMP PARALLEL DO PRIVATE(PTB)
-          do j = 0, n2
-            do k = 0, n3
-              if ((funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) .and. (ymp(j) .gt. 2.d0/3.d0)) then
-                ptb = eps_ptr * ubulk_i * cos(zmp(k)/zl*acos(-1.d0)) &
-                      * abs(y(n2 - 2) - ymp(j)) * ret                &
-                      * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0 + .5d0)
-                u(i, j, k) = u(i, j, k) + ptb
+          flowarea = 0.0d0
+          pertb_rate = 0.0d0
+!$OMP PARALLEL DO PRIVATE(PTB) REDUCTION(+:FLOWAREA, PERTB_RATE)
+          do j = 1, n2m
+            do k = 1, n3m
+              if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
+                flowarea = flowarea + f2fy(j) * f2fz(k)
+                if (ymp(j) .gt. 2.d0/3.d0) then
+                  ptb = eps_ptr * ubulk_i * cos(zmp(k)/zl*acos(-1.d0)) &
+                        * abs(y(n2 - 2) - ymp(j)) * ret                &
+                        * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0 + .5d0)
+                  u(i, j, k) = u(i, j, k) + ptb
+                  pertb_rate = pertb_rate + ptb * f2fy(j) * f2fz(k)
+                end if
               end if
             end do
           end do
 !$OMP END PARALLEL DO
+
+          ! SUBTRACT THE MEAN PERTURBATION TO ENSURE 0 NET MASS FLUX
+          if (flowarea .gt. 0.0d0) then
+            adj = pertb_rate / flowarea
+!$OMP PARALLEL DO
+            do j = 1, n2m
+              do k = 1, n3m
+                if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
+                  u(i, j, k) = u(i, j, k) - adj
+                end if
+              end do
+            end do
+!$OMP END PARALLEL DO
+          end if
         end do
 
-        do k = 1, n3
-!$OMP PARALLEL DO PRIVATE(PTB)
+        ! --- PERTURB W ---
+        do k = 1, n3m
+          flowarea = 0.0d0
+          pertb_rate = 0.0d0
+!$OMP PARALLEL DO PRIVATE(PTB) REDUCTION(+:FLOWAREA, PERTB_RATE)
           do i = 1, n1m
-            do j = 0, n2
-              if ((funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) .and. (ymp(j) .gt. 2.d0/3.d0)) then
-                ptb = eps_ptr * ubulk_i * sin(xmp(i)/xl*acos(-1.d0)) &
-                      * abs(y(n2 - 2) - ymp(j)) * ret                &
-                      * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0)
-                w(i, j, k) = w(i, j, k) + ptb
+            do j = 1, n2m
+              if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
+                flowarea = flowarea + f2fx(i) * f2fy(j)
+                if (ymp(j) .gt. 2.d0/3.d0) then
+                  ptb = eps_ptr * ubulk_i * sin(xmp(i)/xl*acos(-1.d0)) &
+                        * abs(y(n2 - 2) - ymp(j)) * ret                &
+                        * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0)
+                  w(i, j, k) = w(i, j, k) + ptb
+                  pertb_rate = pertb_rate + ptb * f2fx(i) * f2fy(j)
+                end if
               end if
             end do
           end do
 !$OMP END PARALLEL DO
+
+          ! SUBTRACT THE MEAN PERTURBATION TO ENSURE 0 NET MASS FLUX
+          if (flowarea .gt. 0.0d0) then
+            adj = pertb_rate / flowarea
+!$OMP PARALLEL DO
+            do i = 1, n1m
+              do j = 1, n2m
+                if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
+                  w(i, j, k) = w(i, j, k) - adj
+                end if
+              end do
+            end do
+!$OMP END PARALLEL DO
+          end if
         end do
 
         write (*, *) '--- ADDING SINUSOIDAL PERTURBATION'
@@ -773,17 +819,18 @@
         use mod_common
         use mod_flowarray, only: u, v, w
         implicit none
-        real(8) :: ptb_array(0:n1, 0:n2, 0:n3)
+        real(8) :: ptb_array(1:n1, 1:n2, 1:n3)
         integer(8) :: i, j, k
         real(8) :: funcbody
-        real(8) :: flowarea, pertb_rate, adj, flowrate
+        real(8) :: flowarea, pertb_rate, adj
 
+        ! --- PERTURB U ---
         call random_number(ptb_array)
         ptb_array = (ptb_array - .5d0) * 2.d0 * eps_ptr
 
-        do i = 2, n1m
-          flowarea = 0
-          pertb_rate = 0.
+        do i = 1, n1m
+          flowarea = 0.0d0
+          pertb_rate = 0.0d0
 !$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
           do j = 1, n2m
             do k = 1, n3m
@@ -795,30 +842,31 @@
             end do
           end do
 !$OMP END PARALLEL DO
-          adj = pertb_rate / flowarea
-          flowrate = 0
-!$OMP PARALLEL DO REDUCTION(+:FLOWRATE)
-          do j = 1, n2m
-            do k = 1, n3m
-              if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
-                u(i, j, k) = u(i, j, k) - adj
-                flowrate = flowrate + u(i, j, k) * f2fy(j) * f2fz(k)
-              end if
+          if (flowarea .gt. 0.0d0) then
+            adj = pertb_rate / flowarea
+!$OMP PARALLEL DO
+            do j = 1, n2m
+              do k = 1, n3m
+                if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
+                  u(i, j, k) = u(i, j, k) - adj
+                end if
+              end do
             end do
-          end do
 !$OMP END PARALLEL DO
+          end if
         end do
 
+        ! --- PERTURB V ---
         call random_number(ptb_array)
         ptb_array = (ptb_array - .5d0) * 2.d0 * eps_ptr
 
-        do j = 2, n2m
-          flowarea = 0
-          pertb_rate = 0.
+        do j = 1, n2m
+          flowarea = 0.0d0
+          pertb_rate = 0.0d0
 !$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
           do k = 1, n3m
             do i = 1, n1m
-              if (funcbody(xmp(i), y(j), zmp(k), time) .gt. 1.e-10) then
+               if (funcbody(xmp(i), y(j), zmp(k), time) .gt. 1.e-10) then
                 v(i, j, k) = v(i, j, k) + ptb_array(i, j, k)
                 flowarea = flowarea + f2fz(k) * f2fx(i)
                 pertb_rate = pertb_rate + ptb_array(i, j, k) * f2fz(k) * f2fx(i)
@@ -826,30 +874,31 @@
             end do
           end do
 !$OMP END PARALLEL DO
-          adj = pertb_rate / flowarea
-          flowrate = 0
-!$OMP PARALLEL DO REDUCTION(+:FLOWRATE)
-          do k = 1, n3m
-            do i = 1, n1m
-              if (funcbody(xmp(i), y(j), zmp(k), time) .gt. 1.e-10) then
-                v(i, j, k) = v(i, j, k) - adj
-                flowrate = flowrate + v(i, j, k) * f2fz(k) * f2fx(i)
-              end if
+          if (flowarea .gt. 0.0d0) then
+            adj = pertb_rate / flowarea
+!$OMP PARALLEL DO
+            do k = 1, n3m
+              do i = 1, n1m
+                if (funcbody(xmp(i), y(j), zmp(k), time) .gt. 1.e-10) then
+                  v(i, j, k) = v(i, j, k) - adj
+                end if
+              end do
             end do
-          end do
 !$OMP END PARALLEL DO
+          end if
         end do
 
+        ! --- PERTURB W ---
         call random_number(ptb_array)
         ptb_array = (ptb_array - .5d0) * 2.d0 * eps_ptr
 
-        do k = 3, n3m
-          flowarea = 0
-          pertb_rate = 0.
+        do k = 1, n3m
+          flowarea = 0.0d0
+          pertb_rate = 0.0d0
 !$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
           do i = 1, n1m
             do j = 1, n2m
-              if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
+               if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
                 w(i, j, k) = w(i, j, k) + ptb_array(i, j, k)
                 flowarea = flowarea + f2fx(i) * f2fy(j)
                 pertb_rate = pertb_rate + ptb_array(i, j, k) * f2fx(i) * f2fy(j)
@@ -857,43 +906,13 @@
             end do
           end do
 !$OMP END PARALLEL DO
-          adj = pertb_rate / flowarea
-          flowrate = 0
-!$OMP PARALLEL DO REDUCTION(+:FLOWRATE)
-          do i = 1, n1m
-            do j = 1, n2m
-              if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
-                w(i, j, k) = w(i, j, k) - adj
-                flowrate = flowrate + w(i, j, k) * f2fx(i) * f2fy(j)
-              end if
-            end do
-          end do
-!$OMP END PARALLEL DO
-        end do
-
-        do i = 0, n1
-          flowarea = 0.0d0
-          flowrate = 0.0d0
-
-!$OMP PARALLEL DO REDUCTION(+:FLOWAREA, FLOWRATE)
-          do j = 1, n2m
-            do k = 1, n3m
-              if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
-                flowarea = flowarea + f2fy(j) * f2fz(k)
-                flowrate = flowrate + u(i, j, k) * f2fy(j) * f2fz(k)
-              end if
-            end do
-          end do
-!$OMP END PARALLEL DO
-
           if (flowarea .gt. 0.0d0) then
-            adj = (ubulk_i * flowarea) / flowrate
-
+            adj = pertb_rate / flowarea
 !$OMP PARALLEL DO
-            do j = 0, n2
-              do k = 0, n3
-                if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
-                  u(i, j, k) = u(i, j, k) * adj
+            do i = 1, n1m
+              do j = 1, n2m
+                if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
+                  w(i, j, k) = w(i, j, k) - adj
                 end if
               end do
             end do
@@ -925,8 +944,15 @@
         ntime = 0
 
         if (iavg .eq. 1) then
-          timeinit = time
+          timeinit = avg_tst
           ihistinit = ihist
+          npriavg_count = 0
+          avg_started = .false.
+          ihistavg_start = ihist
+          if (iread .ne. 1) then
+            open (2999, file='../output/field_avg/fav_manifest.dat', status='replace')
+            close (2999)
+          end if
         end if
 
         return

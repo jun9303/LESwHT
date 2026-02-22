@@ -11,20 +11,11 @@
              open (2000, file='../output/ftr/fhist.dat')
              open (2001, file='../output/ftr/fcdcl.dat')
              open (2002, file='../output/ftr/fnusselt.dat')
-             if (iles .eq. 1) then
-               open (2003, file='../output/ftr/fles.dat')
-               if (ihtrans .eq. 1) then
-                 open (2004, file='../output/ftr/flest.dat')
-               end if
-             end if
              if (ntrace .ne. 0) then
                open (2005, file='../output/ftr/futrace.dat')
                open (2006, file='../output/ftr/fvtrace.dat')
                open (2007, file='../output/ftr/fwtrace.dat')
                open (2008, file='../output/ftr/fptrace.dat')
-               if (ihtrans .eq. 1) then
-                 open (2009, file='../output/ftr/fttrace.dat')
-               end if
              end if
              if (ich .eq. 1) then
                open (2010, file='../output/ftr/fcmfr.dat')
@@ -37,14 +28,6 @@
                    position='append')
              open (2002, file='../output/ftr/fnusselt.dat', &
                    position='append')
-             if (iles .eq. 1) then
-               open (2003, file='../output/ftr/fles.dat', &
-                     position='append')
-               if (ihtrans .eq. 1) then
-                 open (2004, file='../output/ftr/flest.dat', &
-                       position='append')
-               end if
-             end if
              if (ntrace .ne. 0) then
                open (2005, file='../output/ftr/futrace.dat', &
                      position='append')
@@ -54,10 +37,6 @@
                      position='append')
                open (2008, file='../output/ftr/fptrace.dat', &
                      position='append')
-               if (ihtrans .eq. 1) then
-                 open (2009, file='../output/ftr/fttrace.dat', &
-                       position='append')
-               end if
              end if
              if (ich .eq. 1) then
                open (2010, file='../output/ftr/fcmfr.dat', &
@@ -70,20 +49,11 @@
            close (2000)
            close (2001)
            close (2002)
-           if (iles .eq. 1) then
-             close (2003)
-             if (ihtrans .eq. 1) then
-               close (2004)
-             end if
-           end if
            if (ntrace .ne. 0) then
              close (2005)
              close (2006)
              close (2007)
              close (2008)
-             if (ihtrans .eq. 1) then
-               close (2009)
-             end if
            end if
            if (ich .eq. 1) then
              close (2010)
@@ -278,6 +248,29 @@
 
          tfnh = '-'
 
+         if (time .le. avg_tst) return
+
+         if (.not. avg_started) then
+           avg_started = .true.
+           npriavg_count = 0
+           ihistavg_start = ihist
+           timeinit = avg_tst
+           ihistinit = ihist
+           uavg = 0.
+           vavg = 0.
+           wavg = 0.
+           uiujavg = 0.
+           pavg = 0.
+           p2avg = 0.
+           if (ihtrans .eq. 1) then
+             tavg = 0.
+             t2avg = 0.
+           end if
+           voravg = 0.
+           vor2avg = 0.
+           ssavg = 0.
+         end if
+
 !$OMP PARALLEL DO &
 !$OMP PRIVATE(UCC,VCC,WCC)
          do k = 1, n3m
@@ -407,7 +400,9 @@
            end do
          end do
 
-         if (mod(ntime, npriavg) .eq. 0) then
+         npriavg_count = npriavg_count + 1
+
+         if (npriavg_count .ge. npriavg) then
 
            timeend = time
            ihistend = ihist
@@ -447,6 +442,10 @@
            end if
            close (nav)
 
+           open (2999, file='../output/field_avg/fav_manifest.dat', position='append')
+           write (2999, '(a)') trim(tname)
+           close (2999)
+
            nav = nav + 1
            uavg = 0.
            vavg = 0.
@@ -461,6 +460,7 @@
            voravg = 0.
            vor2avg = 0.
            ssavg = 0.
+           npriavg_count = 0
            timeinit = time
            ihistinit = ihist
 
@@ -468,4 +468,193 @@
 
          return
        end
+!=======================================================================
+!=======================================================================
+      subroutine field_avg_finalize
+!=======================================================================
+        use mod_common
+        use mod_flowarray, only: uavg, vavg, wavg, uiujavg, pavg, p2avg, tavg, t2avg, voravg, vor2avg, ssavg
+        implicit none
+        integer(8) :: i, j, k, l, iu, ios, file_count
+        integer(8) :: n1mr, n2mr, n3mr, ihist0, ihist1
+        integer(8) :: ihistend
+        integer(8) :: idg1, idg2, idg3, idg4, idg5, idg6
+        real(8) :: rer, time0, time1, timeend_all
+        logical :: have_data
+        character*24 :: tname
+        character*16 :: fname
+        character*7 :: tfn1
+        character*6 :: tfn2, tfn3
+        character*1 :: tfnh
+        real(8), allocatable :: tmp3d(:, :, :), tmp4d3(:, :, :, :), tmp4d6(:, :, :, :)
+
+        if ((iavg .ne. 1) .or. (.not. avg_started)) return
+
+        tfnh = '-'
+
+        if (npriavg_count .gt. 0) then
+          ihistend = ihist
+
+          idg1 = ihistinit / 100000
+          idg2 = (ihistinit - idg1 * 100000) / 10000
+          idg3 = (ihistinit - idg1 * 100000 - idg2 * 10000) / 1000
+          idg4 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
+          idg5 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
+          idg6 = ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
+          tfn2 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
+          idg1 = ihist / 100000
+          idg2 = (ihist - idg1 * 100000) / 10000
+          idg3 = (ihist - idg1 * 100000 - idg2 * 10000) / 1000
+          idg4 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
+          idg5 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
+          idg6 = ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
+          tfn3 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
+          tname = 'fav'//tfn2//tfnh//tfn3
+
+          open (nav, file='../output/field_avg/'//tname, form='unformatted')
+          write (nav) n1m, n2m, n3m, re
+          write (nav) timeinit, time, ihistinit, ihistend
+          write (nav) (((uavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+          write (nav) (((vavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+          write (nav) (((wavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+          write (nav) ((((uiujavg(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 6)
+          write (nav) (((pavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+          write (nav) (((p2avg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+          write (nav) ((((voravg(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 3)
+          write (nav) ((((vor2avg(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 6)
+          write (nav) (((ssavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+          if (ihtrans .eq. 1) then
+            write (nav) (((tavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+            write (nav) (((t2avg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+          end if
+          close (nav)
+
+          open (2999, file='../output/field_avg/fav_manifest.dat', position='append')
+          write (2999, '(a)') trim(tname)
+          close (2999)
+          nav = nav + 1
+        end if
+
+        uavg = 0.
+        vavg = 0.
+        wavg = 0.
+        uiujavg = 0.
+        pavg = 0.
+        p2avg = 0.
+        if (ihtrans .eq. 1) then
+          tavg = 0.
+          t2avg = 0.
+        end if
+        voravg = 0.
+        vor2avg = 0.
+        ssavg = 0.
+
+        allocate (tmp3d(n1m, n2m, n3m))
+        allocate (tmp4d3(n1m, n2m, n3m, 3))
+        allocate (tmp4d6(n1m, n2m, n3m, 6))
+
+        have_data = .false.
+        file_count = 0
+        timeend_all = avg_tst
+        open (2998, file='../output/field_avg/fav_manifest.dat', status='old', iostat=ios)
+        if (ios .ne. 0) then
+          deallocate (tmp3d, tmp4d3, tmp4d6)
+          return
+        end if
+
+        do
+          read (2998, '(a)', iostat=ios) fname
+          if (ios .ne. 0) exit
+          if (len_trim(fname) .le. 0) cycle
+
+          iu = 2997
+          open (iu, file='../output/field_avg/'//trim(fname), form='unformatted', status='old', iostat=ios)
+          if (ios .ne. 0) cycle
+
+          read (iu, iostat=ios) n1mr, n2mr, n3mr, rer
+          if (ios .ne. 0) then
+            close (iu)
+            cycle
+          end if
+          read (iu) time0, time1, ihist0, ihist1
+
+          read (iu) tmp3d
+          uavg = uavg + tmp3d
+          read (iu) tmp3d
+          vavg = vavg + tmp3d
+          read (iu) tmp3d
+          wavg = wavg + tmp3d
+          read (iu) tmp4d6
+          uiujavg = uiujavg + tmp4d6
+          read (iu) tmp3d
+          pavg = pavg + tmp3d
+          read (iu) tmp3d
+          p2avg = p2avg + tmp3d
+          read (iu) tmp4d3
+          voravg = voravg + tmp4d3
+          read (iu) tmp4d6
+          vor2avg = vor2avg + tmp4d6
+          read (iu) tmp3d
+          ssavg = ssavg + tmp3d
+          if (ihtrans .eq. 1) then
+            read (iu) tmp3d
+            tavg = tavg + tmp3d
+            read (iu) tmp3d
+            t2avg = t2avg + tmp3d
+          end if
+          close (iu)
+
+          file_count = file_count + 1
+          if (.not. have_data) then
+            timeinit = time0
+            ihistinit = ihist0
+            have_data = .true.
+          end if
+          timeend_all = time1
+          ihistend = ihist1
+        end do
+        close (2998)
+
+        deallocate (tmp3d, tmp4d3, tmp4d6)
+
+        if ((.not. have_data) .or. (file_count .le. 0)) return
+
+        idg1 = ihistinit / 100000
+        idg2 = (ihistinit - idg1 * 100000) / 10000
+        idg3 = (ihistinit - idg1 * 100000 - idg2 * 10000) / 1000
+        idg4 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
+        idg5 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
+        idg6 = ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
+        tfn2 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
+        idg1 = ihistend / 100000
+        idg2 = (ihistend - idg1 * 100000) / 10000
+        idg3 = (ihistend - idg1 * 100000 - idg2 * 10000) / 1000
+        idg4 = (ihistend - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
+        idg5 = (ihistend - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
+        idg6 = ihistend - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
+        tfn3 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
+        tfn1 = 'favcmp_'
+        tname = tfn1//tfn2//tfnh//tfn3
+
+        open (nav, file='../output/field_avg/'//tname, form='unformatted')
+        write (nav) n1m, n2m, n3m, re
+        write (nav) timeinit, timeend_all, ihistinit, ihistend
+        write (nav) (((uavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+        write (nav) (((vavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+        write (nav) (((wavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+        write (nav) ((((uiujavg(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 6)
+        write (nav) (((pavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+        write (nav) (((p2avg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+        write (nav) ((((voravg(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 3)
+        write (nav) ((((vor2avg(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 6)
+        write (nav) (((ssavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+        if (ihtrans .eq. 1) then
+          write (nav) (((tavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+          write (nav) (((t2avg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+        end if
+        close (nav)
+        nav = nav + 1
+
+        return
+      end subroutine field_avg_finalize
 !=======================================================================

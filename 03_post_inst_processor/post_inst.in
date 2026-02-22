@@ -12,9 +12,9 @@ Z_position
 0.
 3D_POST_OPTION
 ITOT
-0
+1
 ILD2    IUVWP    IWXYZ    IALL
-0       0        0        0
+0       1        0        0
 ISKIP   JSKIP    KSKIP
 1       1        1
 ISTART  IEND
@@ -22,8 +22,8 @@ ISTART  IEND
 JSTART  JEND
 1       320
 KSTART  KEND
-1       50  
+1       640  
 ANIFLD  IND_FILM
 2       1
 fld000000
-fld005000
+fld020000
