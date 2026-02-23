@@ -70,7 +70,7 @@ program solver
   !===================================================================
   !     TIME-DEPENDENT CALCULATION (MAIN SOLVER)
   !===================================================================
-  do while ((ntime .lt. ntst) .and. (time .lt. tend))
+  do while ((ntime .lt. nend) .and. (time .lt. tend))
     time_begin = omp_get_wtime()         ! INTRINSIC SUBROUTINE
     call stepinit()                      ! AT SLV_AUXI LIBRARY
     subdt = 0.0d0

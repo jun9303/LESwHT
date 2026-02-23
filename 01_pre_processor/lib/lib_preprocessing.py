@@ -216,6 +216,57 @@ def grid_preprocessing_data(grid):
 
     file.close()
 
+def write_ibmpre_placeholders(grid, lessgs='OFF', htrnfr='OFF', conjg='OFF'):
+    print('\n*** WRITING PLACEHOLDER IBM-PREPROCESSING DATA (SAFE DEFAULTS) ***')
+
+    # 1) IBM forcing-point file (mandatory for solver alloinit/ibmpreread)
+    with open('../output/ibmpre/ibmpre_fcpts.bin', 'w') as file:
+        file.write('0 0 0\n')
+        file.write('0 0 0\n')
+
+    # 2) Thermal IBM forcing-point file (mandatory when ihtrans==1)
+    if htrnfr == 'ON':
+        with open('../output/ibmpre/ibmpre_fcpts_t.bin', 'w') as file:
+            file.write('0\n')
+            file.write('0\n')
+
+    # 3) LES zero-SGS files (mandatory when iles==1)
+    if lessgs == 'ON':
+        n1m = grid['Cell_x']
+        n2m = grid['Cell_y']
+        n3m = grid['Cell_z']
+
+        with open('../output/ibmpre/ibmpre_nutzero.bin', 'w') as file:
+            file.write('0\n\n\n\n')
+
+        with open('../output/ibmpre/ibmpre_wallfdvm.bin', 'w') as file:
+            # Fluid everywhere: wall-distance mask defaults to 1
+            for _k in range(n3m):
+                for _j in range(n2m):
+                    for _i in range(n1m):
+                        file.write(' 1 ')
+
+    # 4) Conjugate heat-transfer fields (mandatory when iconjg==1 and read)
+    if conjg == 'ON':
+        n1m = grid['Cell_x']
+        n2m = grid['Cell_y']
+        n3m = grid['Cell_z']
+
+        with open('../output/ibmpre/ibmpre_conjg.bin', 'w') as file:
+            # cstar
+            for _k in range(n3m):
+                for _j in range(n2m):
+                    for _i in range(n1m):
+                        file.write(' 1.0 ')
+            file.write('\n')
+
+            # kstar (6 faces)
+            for _l in range(6):
+                for _k in range(n3m):
+                    for _j in range(n2m):
+                        for _i in range(n1m):
+                            file.write(' 1.0 ')
+
 def ibm_preprocessing_data(nintp,ninner,fcp,intpindx,geomfac):
     print('\n*** WRITING IMMERSED-BODY DATA INTO ../output/ibmpre/ibmpre_fcpts.bin ***')
     file = open('../output/ibmpre/ibmpre_fcpts.bin', 'w')

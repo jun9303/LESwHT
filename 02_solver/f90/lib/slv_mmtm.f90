@@ -76,7 +76,7 @@
 !$OMP PARALLEL DO PRIVATE(TMP) REDUCTION(+:PMI)
            do j = 1, n2m
              do i = 1, n1m
-               tmp = (u(i, j, n3m) - 0.) * c2czi(n3) * c2cx(i) * f2fz(j)
+               tmp = (u(i, j, n3m) - 0.) * c2czi(n3) * c2cx(i) * f2fy(j)
                pmi(4) = pmi(4) + tmp / re
              end do
            end do

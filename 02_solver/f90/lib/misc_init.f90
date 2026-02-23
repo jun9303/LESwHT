@@ -29,7 +29,7 @@
         read (10, *) dummy
         read (10, *) ireset, iread, iavg, ipzero, eps_ptr, ubulk_i
         read (10, *) dummy
-        read (10, *) ntst, nprint, npriavg, npin
+        read (10, *) nend, nprint, npriavg, npin
         read (10, *) dummy
         read (10, *) tend, ptb_tst, avg_tst
         read (10, *) dummy
@@ -56,7 +56,7 @@
         write (*, *) ''
         write (*, 101) re, pr, gr
         write (*, 102) ireset, iread, iavg, ipzero, eps_ptr, ubulk_i
-        write (*, 103) ntst, nprint, npriavg, npin
+        write (*, 103) nend, nprint, npriavg, npin
         write (*, 111) tend, ptb_tst, avg_tst
         write (*, 104) idtopt, dt, cflfac
         write (*, 105) resid1, nlev, nbli, ioldv, mgitr, imgsor, wwsor
@@ -76,7 +76,7 @@
 
 101     format('  RE=', es11.3, '  PR=', es11.3, '  GR=', es11.3)
 102     format('  IRESET=', i5, '  IREAD=', i5, '  IAVG=', i5, '  IPZERO=', i5, '  EPS_PTR=', f7.3, '  UBULK_I=', f7.3)
-103     format('  NTST=', i10, '  NPRINT=', i8, '  NPRIAVG=', i8, '  NPIN=', i5)
+103     format('  NEND=', i10, '  NPRINT=', i8, '  NPRIAVG=', i8, '  NPIN=', i5)
 111     format('  TEND=', es13.5, '  PTB_TST=', es13.5, '  AVG_TST=', es13.5)
 104     format('  IDTOPT=', i5, '  DT=', es13.5, '  CFLFAC=', f11.3)
 105     format('  RESID=', es12.4, '  NLEV=', i5, '  NBLI=', i5, '  IOLDV=', i5, '  MGITR=', i5, '  IMGSOR=', i5, '  WWSOR=', f7.3)

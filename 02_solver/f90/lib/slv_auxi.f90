@@ -630,7 +630,7 @@
          implicit none
          integer(8) :: i, j, k, n, l, ii, jj, kk
          real(8) :: cd(3), cdavg(3), vol_solid_geom, vol_cell
-         real(8) :: dti, funcbody
+         real(8) :: dti, funcbody, tmp
 
          dti = 1.0d0 / dt
 
@@ -675,7 +675,71 @@
          cd(2) = cd(2) + dvdta
          cd(3) = cd(3) + dwdta
 
-         ! 4. NON-DIMENSIONALIZE TOTAL FORCE TO EVALUATE WALL SHEAR STRESS (TAU_W)
+         ! 4. ADD COMPUTATIONAL-WALL SHEAR CONTRIBUTIONS
+         !    (ONLY FOR NO-SLIP WALL B.C.; PERIODIC BOUNDARIES CONTRIBUTE NOTHING).
+         !    STREAMWISE (U) SHEAR -> CD(1)
+         !    SPANWISE/TRANSVERSE SHEAR COMPONENTS -> CD(2), CD(3)
+         if (bc_ybtm .eq. 0) then
+           tmp = 0.0d0
+!$OMP PARALLEL DO PRIVATE(TMP) REDUCTION(+:CD)
+           do k = 1, n3m
+             do i = 1, n1m
+               tmp = (u(i, 1, k) - 0.0d0) * c2cyi(1) * c2cx(i) * f2fz(k)
+               cd(1) = cd(1) + tmp / re
+
+               tmp = (w(i, 1, k) - 0.0d0) * c2cyi(1) * c2cx(i) * f2fz(k)
+               cd(3) = cd(3) + tmp / re
+             end do
+           end do
+!$OMP END PARALLEL DO
+         end if
+
+         if (bc_ytop .eq. 0) then
+           tmp = 0.0d0
+!$OMP PARALLEL DO PRIVATE(TMP) REDUCTION(+:CD)
+           do k = 1, n3m
+             do i = 1, n1m
+               tmp = (u(i, n2m, k) - 0.0d0) * c2cyi(n2) * c2cx(i) * f2fz(k)
+               cd(1) = cd(1) + tmp / re
+
+               tmp = (w(i, n2m, k) - 0.0d0) * c2cyi(n2) * c2cx(i) * f2fz(k)
+               cd(3) = cd(3) + tmp / re
+             end do
+           end do
+!$OMP END PARALLEL DO
+         end if
+
+         if (bc_zbtm .eq. 0) then
+           tmp = 0.0d0
+!$OMP PARALLEL DO PRIVATE(TMP) REDUCTION(+:CD)
+           do j = 1, n2m
+             do i = 1, n1m
+               tmp = (u(i, j, 1) - 0.0d0) * c2czi(1) * c2cx(i) * f2fy(j)
+               cd(1) = cd(1) + tmp / re
+
+               tmp = (v(i, j, 1) - 0.0d0) * c2czi(1) * c2cx(i) * f2fy(j)
+               cd(2) = cd(2) + tmp / re
+             end do
+           end do
+!$OMP END PARALLEL DO
+         end if
+
+         if (bc_ztop .eq. 0) then
+           tmp = 0.0d0
+!$OMP PARALLEL DO PRIVATE(TMP) REDUCTION(+:CD)
+           do j = 1, n2m
+             do i = 1, n1m
+               tmp = (u(i, j, n3m) - 0.0d0) * c2czi(n3) * c2cx(i) * f2fy(j)
+               cd(1) = cd(1) + tmp / re
+
+               tmp = (v(i, j, n3m) - 0.0d0) * c2czi(n3) * c2cx(i) * f2fy(j)
+               cd(2) = cd(2) + tmp / re
+             end do
+           end do
+!$OMP END PARALLEL DO
+         end if
+
+         ! 5. NON-DIMENSIONALIZE TOTAL FORCE TO EVALUATE WALL SHEAR STRESS (TAU_W)
          cd(1) = cd(1) / (xl * yl * zl)
          cd(2) = cd(2) / (xl * yl * zl)
          cd(3) = cd(3) / (xl * yl * zl)
@@ -693,7 +757,7 @@
            end if
          end if
 
-         ! 5. OUTPUT TO HISTORY FILE
+         ! 6. OUTPUT TO HISTORY FILE
          if (mod(ntime, npin) .eq. 0) then
            write (2001, 110) time, cd(1), cd(2), cd(3), cdavg(1), cdavg(2), cdavg(3)
          end if

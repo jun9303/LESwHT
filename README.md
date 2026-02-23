@@ -1,60 +1,164 @@
 # LESwHT (Large Eddy Simulation with Heat Transfer)
 
-**LESwHT** is a computational fluid dynamics (CFD) solver designed for unsteady, incompressible, turbulent flows. It extends the LICA code to include complex heat transfer capabilities, making it suitable for simulating multi-physics problems involving fluid flow, heat transfer, and solid-fluid interactions.
+LESwHT is a CFD workflow for incompressible turbulent flow with immersed boundaries and optional heat transfer. The repository includes:
 
-## Key Features
-* **Large Eddy Simulation (LES):** Resolves large-scale turbulent structures.
-* **Immersed Boundary Method (IBM):** Handles complex geometries and solid boundaries on a Cartesian grid.
-* **Conjugate Heat Transfer (CHT):** Solves coupled heat conduction (solid) and convection (fluid) equations simultaneously.
-* **Subgrid-Scale Models:**
-    * **Turbulence:** Vreman model.
-    * **Heat Flux:** Linear Eddy viscosity model.
-* **Buoyancy:** Includes Boussinesq approximation (Grashof number) for natural convection.
+- Python-based grid generation and IBM pre-processing
+- Fortran solver (OpenMP)
+- Post-processors for instantaneous and averaged fields
 
-## Directory Structure
-* `01_pre_processor/`: Grid generation and geometry setup (IBM).
-* `02_solver/`: Main CFD engine (Fortran 90).
-* `03_post_inst_processor/`: Visualization of instantaneous flow fields.
-* `04_post_avg_processor/`: Calculation of time-averaged statistics.
-* `global_lib/`: Shared libraries and geometry definitions.
+## Current Repository Layout
 
-## Prerequisites
-* **OS:** Linux (Ubuntu 22.04 LTS recommended)
-* **Compilers:**
-    * Intel Fortran (`ifort`)
-    * Python (3.10.12 recommended) with NumPy (1.26.4)
-* **Hardware:** Multi-core CPU support via OpenMP
+- `01_pre_processor/`: grid generation (`grid.py`) and IBM pre-processing (`preprocessing.py`)
+- `02_solver/`: main LES/IBM/heat-transfer solver (`solver_exec` built from `f90/*.f90`)
+- `03_post_inst_processor/`: instantaneous field post-processing (`post_inst.f90`)
+- `04_post_avg_processor/`: averaged field post-processing (`post_avg.f90`, `post_avg_combine.f90`)
+- `geometry/`: body geometry function source (`geometry/f90/funcbody.f90`)
+- `output/`: simulation outputs (`field`, `field_avg`, `post`, `post_avg`, `grid`, `ibmpre`, `ftr`)
+- `run.sh`: full pipeline runner (reset → pre-process → solver)
+- `reset.sh`: cleanup and re-initialize output directories
 
-## Installation & Setup
+## Requirements
 
-### 1. Environment Setup
-Add the following alias to your shell configuration (`.bashrc`) to standardise the compilation command:
+- Linux
+- Intel Fortran compiler (`ifort`)
+- Intel C compiler (`icc`) for the f2py extension build path in pre-processing
+- Python 3
+- NumPy (with `numpy.f2py`)
+- OpenMP runtime (`libiomp5`)
+
+> Notes
+>
+> - `01_pre_processor/Makefile` builds `lib_ibm_body` using f2py with `--fcompiler=intelem`.
+> - Scripts set `OMP_NUM_THREADS` from `SLURM_CPUS_PER_TASK` when available; otherwise they default to `4`.
+
+## Quick Start (Full Workflow)
+
+From the project root:
+
 ```bash
-alias cf90='ifort -r8 -i8 -O3 -xT -mcmodel=medium -i-dynamic -vec-report0 -warn nounused'
+bash run.sh
 ```
-### 2. Compilation
-The repository includes Makefiles in respective directories. Alternatively, you can compile manually using the alias above. Ensure you include the `-openmp` flag for parallel support.
 
-#### Usage Workflow
-##### Step 1: Pre-processing
-Navigate to `01_pre_processor` and run the generation scripts to create the grid and IBM data:
+This executes:
+
+1. `bash reset.sh`
+2. `01_pre_processor/run_grid.sh`
+3. `01_pre_processor/run_preprocessing.sh`
+4. `02_solver/run_solver.sh`
+
+## Stage-by-Stage Run
+
+### 1) Reset
+
+```bash
+bash reset.sh
+```
+
+Actions:
+
+- cleans build artifacts in `01_pre_processor` and `02_solver`
+- recreates `output/` subdirectories
+
+### 2) Grid Generation
+
 ```bash
 cd 01_pre_processor
-./makegrid.sh
-./makeibmpre.sh
-```
-##### Step 2: Running the Solver
-1. Navigate to `02_solver`.
-2. Configure physics in settings.in (Re, Pr, Time steps) and boundaries in boundary.in.
-3. Execute the solver script:
-```bash
-./run_solver.sh
+bash run_grid.sh
 ```
 
-##### Step 3: Post-processing
-Navigate to `03_post_inst_processor` to convert binary output to Tecplot format:
+Inputs:
+
+- `01_pre_processor/grid.input`
+
+Outputs:
+
+- `output/grid/grid.dat`
+- optional debug files in `output/grid/` (depending on `grid.input` debug options)
+
+### 3) IBM Pre-processing
+
+```bash
+cd 01_pre_processor
+bash run_preprocessing.sh
+```
+
+Inputs:
+
+- `01_pre_processor/preprocessing.input`
+- `output/grid/grid.dat`
+
+Outputs:
+
+- IBM preprocessed binaries in `output/ibmpre/`
+
+### 4) Solver
+
+```bash
+cd 02_solver
+bash run_solver.sh
+```
+
+Inputs:
+
+- `02_solver/settings.in`
+- `02_solver/boundary.in`
+- preprocessed data in `output/ibmpre/`
+
+Outputs:
+
+- instantaneous fields in `output/field/`
+- averaged fields in `output/field_avg/` (if enabled in solver settings)
+
+## Post-processing
+
+### Instantaneous (`03_post_inst_processor`)
 
 ```bash
 cd 03_post_inst_processor
-./postprocess.sh
+bash postprocess.sh
+```
+
+Uses:
+
+- `03_post_inst_processor/post_inst.in`
+
+### Averaged (`04_post_avg_processor`)
+
+From `04_post_avg_processor/`:
+
+```bash
+make post
+```
+
+Uses:
+
+- `04_post_avg_processor/post_avg.in`
+
+## Common Input Files to Edit
+
+- `01_pre_processor/grid.input`: grid resolution/domain and spacing options
+- `01_pre_processor/preprocessing.input`: IBM/heat-transfer preprocessing options
+- `02_solver/settings.in`: solver physics and run controls
+- `02_solver/boundary.in`: boundary conditions
+- `03_post_inst_processor/post_inst.in`: instantaneous post-processing setup
+- `04_post_avg_processor/post_avg.in`: averaged post-processing setup
+
+## Cleaning and Re-running
+
+- Full cleanup + output reset:
+
+```bash
+bash reset.sh
+```
+
+- Clean solver build only:
+
+```bash
+cd 02_solver && make clean
+```
+
+- Clean preprocessor extension build only:
+
+```bash
+cd 01_pre_processor && make clean
 ```

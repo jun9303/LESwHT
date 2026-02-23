@@ -2,7 +2,7 @@ module mod_common
 !!!!!!!!!!!!!!!!!!!!! BASIC INPUTS (SETTINGS.INPUT)
   real(8) :: re, pr, gr, eps_ptr, ubulk_i, dt_size, &
              cflfac, resid1, wwsor, csgsts, csgshf
-  integer(8) :: ireset, iread, iavg, ipzero, ntst, nprint, &
+  integer(8) :: ireset, iread, iavg, ipzero, nend, nprint, &
                 npriavg, npin, idtopt, nlev, mode, nbli, &
                 ioldv, mgitr, imgsor, iles, insmdl, itemdl, &
                 idvmon, filter, ibmon, masson, grdir, t_inf, &

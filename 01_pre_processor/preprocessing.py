@@ -93,6 +93,7 @@ grid = lib_setgrid.setgrid('../output/grid/grid.dat', XPRDIC, YPRDIC, ZPRDIC)
 #                    [j]['lowerfix'] : 1 if lower end without periodic condition
 
 lib_preprocessing.grid_preprocessing_data(grid)
+lib_preprocessing.write_ibmpre_placeholders(grid, LESSGS, HTRNFR, CONJGHTRANS)
 
 N_x = grid['N_x']; N_y = grid['N_y']; N_z = grid['N_z']
 Cell_x = grid['Cell_x']; Cell_y = grid['Cell_y']; Cell_z = grid['Cell_z']

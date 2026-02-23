@@ -373,14 +373,21 @@ subroutine find_zero_nu_sgs(nx, ny, nz, xm, ym, zm, nzero, inout, t)
   do k = 1, nz - 1
     do j = 1, ny - 1
       do i = 1, nx - 1
-        ! CHECK 7-POINT STENCIL. IF ANY POINT IS INSIDE BODY, ZERO VISCOSITY.
-        if ((funcbody(xm(i), ym(j), zm(k), t) .le. 1.0d-10) .or. &
-            (funcbody(xm(i - 1), ym(j), zm(k), t) .le. 1.0d-10) .or. &
-            (funcbody(xm(i + 1), ym(j), zm(k), t) .le. 1.0d-10) .or. &
-            (funcbody(xm(i), ym(j - 1), zm(k), t) .le. 1.0d-10) .or. &
-            (funcbody(xm(i), ym(j + 1), zm(k), t) .le. 1.0d-10) .or. &
-            (funcbody(xm(i), ym(j), zm(k - 1), t) .le. 1.0d-10) .or. &
-            (funcbody(xm(i), ym(j), zm(k + 1), t) .le. 1.0d-10)) then
+        ! ! CHECK 7-POINT STENCIL. IF ANY POINT IS INSIDE BODY, ZERO VISCOSITY.
+        ! if ((funcbody(xm(i), ym(j), zm(k), t) .le. 1.0d-10) .or. &
+        !     (funcbody(xm(i - 1), ym(j), zm(k), t) .le. 1.0d-10) .or. &
+        !     (funcbody(xm(i + 1), ym(j), zm(k), t) .le. 1.0d-10) .or. &
+        !     (funcbody(xm(i), ym(j - 1), zm(k), t) .le. 1.0d-10) .or. &
+        !     (funcbody(xm(i), ym(j + 1), zm(k), t) .le. 1.0d-10) .or. &
+        !     (funcbody(xm(i), ym(j), zm(k - 1), t) .le. 1.0d-10) .or. &
+        !     (funcbody(xm(i), ym(j), zm(k + 1), t) .le. 1.0d-10)) then
+        !   nzero = nzero + 1
+        !   inout(i, j, k) = 0
+        ! end if
+        ! CORRECTION: Only zero the SGS viscosity if the cell center itself 
+        ! is inside the solid body. The 7-point neighbor check was removed 
+        ! to prevent artificial damping of near-wall turbulent structures.
+        if (funcbody(xm(i), ym(j), zm(k), t) .le. 1.0d-10) then
           nzero = nzero + 1
           inout(i, j, k) = 0
         end if
