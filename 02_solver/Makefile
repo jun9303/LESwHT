@@ -96,8 +96,8 @@ poiss_ftft.o: ./f90/lib/poiss/poiss_ftft.f90
 #-----------------------------------------------------------------------
 #     External & Geometry Linkage
 #-----------------------------------------------------------------------
-funcbody.o: ../geometry/f90/funcbody.f90
-	$(FC) ../geometry/f90/funcbody.f90 -c $(LIB)
+funcbody.o: ../geometry/funcbody.f90
+	$(FC) ../geometry/funcbody.f90 -c $(LIB)
 
 ibm_body.o: ./f90/lib/ibm_body.f90
 	$(FC) ./f90/lib/ibm_body.f90 -c $(LIB)

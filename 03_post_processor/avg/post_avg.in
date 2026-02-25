@@ -1,5 +1,7 @@
 IBMON   IHTRANS
 1       1
+OUTPUT_FORMAT   ! 0: VTK, 1: TEC, 2: BOTH
+2
 2D_POST_OPTION
 IUNIGRID        ! FOR THE CLEAR VECTOR (0: OFF, 1: ON)
 0
@@ -13,17 +15,16 @@ Z_position
 3D_POST_OPTION
 ITOT
 1
-ILD2    IUVWP    IWXYZ    IALL
+ISS     IUVWP    IWXYZ    IALL
 0       1        0        0
 ISKIP   JSKIP    KSKIP
 1       1        1
 ISTART  IEND
-1       320
+0       0
 JSTART  JEND
-1       320
+0       0
 KSTART  KEND
-1       640  
+0       0
 ANIFLD  IND_FILM
-2       1
-fld000000
-fld020000
+1       1
+combined/fav0005486-0132543

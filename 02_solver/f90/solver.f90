@@ -51,7 +51,7 @@ program solver
     call writefield()
   end if
 
-  if (ich .eq. 1) call meanpg()             ! AT SLV_MMTM LIBRARY
+  if (ich .ne. 0) call meanpg()             ! AT SLV_MMTM LIBRARY
 
   ! --- MISCELLANEOUS SETTINGS ---
   call dttimeinit()                        ! AT MISC_INIT LIBRARY
@@ -66,6 +66,14 @@ program solver
   perturb_applied = .false.
   cdavg_dur = 0.0d0
   cdavg_int = 0.0d0
+  cmfravg_dur = 0.0d0
+  cmfravg_int = 0.0d0
+
+  if ((iread .eq. 0) .and. (eps_ptr .ne. 0.0d0) .and. (ptb_tst .le. 0.0d0)) then
+    call addperturb()
+    call prdic_adj_uvw(0)
+    perturb_applied = .true.
+  end if
 
   !===================================================================
   !     TIME-DEPENDENT CALCULATION (MAIN SOLVER)
@@ -121,7 +129,7 @@ program solver
 
       call pcalc(phi, divgsum)
 
-      if (ich .eq. 1) call meanpg()    ! AT SLV_AUXI LIBRARY
+      if (ich .ne. 0) call meanpg()    ! AT SLV_AUXI LIBRARY
       if (ibmon .eq. 1) call lagforce()
 
       if (ihtrans .eq. 1) then

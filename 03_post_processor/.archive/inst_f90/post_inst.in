@@ -1,0 +1,30 @@
+IBMON   IHTRANS
+1       1
+OUTPUT_FORMAT   ! 0: VTK, 1: TEC, 2: BOTH
+2
+2D_POST_OPTION
+IUNIGRID        ! FOR THE CLEAR VECTOR (0: OFF, 1: ON)
+0
+X_position
+0
+Y_position
+0
+Z_position
+1
+0.
+3D_POST_OPTION
+ITOT
+1
+ILD2    IUVWP    IWXYZ    IALL
+0       1        0        0
+ISKIP   JSKIP    KSKIP
+1       1        1
+ISTART  IEND
+0       0
+JSTART  JEND
+0       0
+KSTART  KEND
+0       0
+ANIFLD  IND_FILM
+1       1
+fld132543

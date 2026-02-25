@@ -3,8 +3,11 @@ PYTHON ?= python3
 F2PY = $(PYTHON) -m numpy.f2py
 
 # Intel Compiler Configuration
-FCOMPILER = intelem
-CC = icc
+FCOMPILER ?= intelem
+COMPILER ?= intel
+INTEL_CC ?= icc
+INTEL_CXX ?= icpc
+INTEL_FC ?= ifort
 
 # Optimization & OpenMP Flags
 OPT_FLAGS = -O3 -qopenmp -fpp
@@ -16,7 +19,7 @@ LIBS = -liomp5
 OUTPUT_NAME = lib_ibm_body
 
 SRCS = ../02_solver/f90/lib/ibm_body.f90 \
-       ../geometry/f90/funcbody.f90
+	../geometry/funcbody.f90
 
 .PHONY: all flib clean
 
@@ -26,8 +29,9 @@ flib:
 	@echo "----------------------------------------------------------"
 	@echo "Building $(OUTPUT_NAME) using $(FCOMPILER) via f2py..."
 	@echo "----------------------------------------------------------"
-	CC=$(CC) $(F2PY) -c $(SRCS) \
+	CC=$(INTEL_CC) CXX=$(INTEL_CXX) FC=$(INTEL_FC) F77=$(INTEL_FC) F90=$(INTEL_FC) LDSHARED="$(INTEL_FC)" $(F2PY) -c $(SRCS) \
 		-m $(OUTPUT_NAME) \
+		--compiler=$(COMPILER) \
 		--fcompiler=$(FCOMPILER) \
 		--opt="$(OPT_FLAGS)" \
 		$(LIBS)

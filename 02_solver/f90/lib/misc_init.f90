@@ -27,7 +27,7 @@
         read (10, *) dummy
         read (10, *) re, pr, gr, grdir, t_inf
         read (10, *) dummy
-        read (10, *) ireset, iread, iavg, ipzero, eps_ptr, ubulk_i
+        read (10, *) ireset, iread, iavg, ipzero, eps_ptr, udrv_i
         read (10, *) dummy
         read (10, *) nend, nprint, npriavg, npin
         read (10, *) dummy
@@ -55,7 +55,7 @@
         write (*, *) '========= SETTINGS ========='
         write (*, *) ''
         write (*, 101) re, pr, gr
-        write (*, 102) ireset, iread, iavg, ipzero, eps_ptr, ubulk_i
+        write (*, 102) ireset, iread, iavg, ipzero, eps_ptr, udrv_i
         write (*, 103) nend, nprint, npriavg, npin
         write (*, 111) tend, ptb_tst, avg_tst
         write (*, 104) idtopt, dt, cflfac
@@ -75,7 +75,7 @@
         end if
 
 101     format('  RE=', es11.3, '  PR=', es11.3, '  GR=', es11.3)
-102     format('  IRESET=', i5, '  IREAD=', i5, '  IAVG=', i5, '  IPZERO=', i5, '  EPS_PTR=', f7.3, '  UBULK_I=', f7.3)
+102     format('  IRESET=', i5, '  IREAD=', i5, '  IAVG=', i5, '  IPZERO=', i5, '  EPS_PTR=', f7.3, '  UDRV_I=', f7.3)
 103     format('  NEND=', i10, '  NPRINT=', i8, '  NPRIAVG=', i8, '  NPIN=', i5)
 111     format('  TEND=', es13.5, '  PTB_TST=', es13.5, '  AVG_TST=', es13.5)
 104     format('  IDTOPT=', i5, '  DT=', es13.5, '  CFLFAC=', f11.3)
@@ -410,7 +410,15 @@
             do k = 0, n3
               ! APPLY PROFILE ONLY IN THE FLUID DOMAIN
               if (funcbody(x(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
-                u(i, j, k) = 1.5d0 * ubulk_i * (1.0d0 - ymp(j)**2)
+                if (ich .eq. 0) then
+                  u(i, j, k) = udrv_i
+                elseif (ich .eq. 1) then
+                  u(i, j, k) = 1.5d0 * udrv_i * (1.0d0 - ymp(j)**2)
+                elseif (ich .eq. 2) then
+                  u(i, j, k) = ( 1.5d0 * (1.0d0 - ymp(j)**2) ) * .75D0 ! LET INITIAL UBULK_I = .75D0
+                else
+                  u(i, j, k) = udrv_i
+                end if
               else
                 u(i, j, k) = 0.0d0
               end if
@@ -742,7 +750,7 @@
               if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
                 flowarea = flowarea + f2fy(j) * f2fz(k)
                 if (ymp(j) .gt. 2.d0/3.d0) then
-                  ptb = eps_ptr * ubulk_i * cos(zmp(k)/zl*acos(-1.d0)) &
+                  ptb = eps_ptr * udrv_i * cos(zmp(k)/zl*acos(-1.d0)) &
                         * abs(y(n2 - 2) - ymp(j)) * ret                &
                         * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0 + .5d0)
                   u(i, j, k) = u(i, j, k) + ptb
@@ -778,7 +786,7 @@
               if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
                 flowarea = flowarea + f2fx(i) * f2fy(j)
                 if (ymp(j) .gt. 2.d0/3.d0) then
-                  ptb = eps_ptr * ubulk_i * sin(xmp(i)/xl*acos(-1.d0)) &
+                  ptb = eps_ptr * sin(xmp(i)/xl*acos(-1.d0)) &
                         * abs(y(n2 - 2) - ymp(j)) * ret                &
                         * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0)
                   w(i, j, k) = w(i, j, k) + ptb

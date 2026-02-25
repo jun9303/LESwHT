@@ -10,10 +10,11 @@ LESwHT is a CFD workflow for incompressible turbulent flow with immersed boundar
 
 - `01_pre_processor/`: grid generation (`grid.py`) and IBM pre-processing (`preprocessing.py`)
 - `02_solver/`: main LES/IBM/heat-transfer solver (`solver_exec` built from `f90/*.f90`)
-- `03_post_inst_processor/`: instantaneous field post-processing (`post_inst.f90`)
-- `04_post_avg_processor/`: averaged field post-processing (`post_avg.f90`, `post_avg_combine.f90`)
-- `geometry/`: body geometry function source (`geometry/f90/funcbody.f90`)
-- `output/`: simulation outputs (`field`, `field_avg`, `post`, `post_avg`, `grid`, `ibmpre`, `ftr`)
+- `03_post_processor/`: Python post-processing package
+	- `inst/`: instantaneous field post-processing
+	- `avg/`: averaged field post-processing
+- `geometry/`: body geometry function source (`geometry/funcbody.f90`)
+- `output/`: simulation outputs (`field`, `field_avg`, `post_inst`, `post_avg`, `grid`, `ibmpre`, `ftr`)
 - `run.sh`: full pipeline runner (reset → pre-process → solver)
 - `reset.sh`: cleanup and re-initialize output directories
 
@@ -111,28 +112,28 @@ Outputs:
 
 ## Post-processing
 
-### Instantaneous (`03_post_inst_processor`)
+### Instantaneous (`03_post_processor/inst`)
 
 ```bash
-cd 03_post_inst_processor
+cd 03_post_processor/inst
 bash postprocess.sh
 ```
 
 Uses:
 
-- `03_post_inst_processor/post_inst.in`
+- `03_post_processor/inst/post_inst.in`
 
-### Averaged (`04_post_avg_processor`)
+### Averaged (`03_post_processor/avg`)
 
-From `04_post_avg_processor/`:
+From `03_post_processor/avg/`:
 
 ```bash
-make post
+bash postavgprocess.sh
 ```
 
 Uses:
 
-- `04_post_avg_processor/post_avg.in`
+- `03_post_processor/avg/post_avg.in`
 
 ## Common Input Files to Edit
 
@@ -140,8 +141,8 @@ Uses:
 - `01_pre_processor/preprocessing.input`: IBM/heat-transfer preprocessing options
 - `02_solver/settings.in`: solver physics and run controls
 - `02_solver/boundary.in`: boundary conditions
-- `03_post_inst_processor/post_inst.in`: instantaneous post-processing setup
-- `04_post_avg_processor/post_avg.in`: averaged post-processing setup
+- `03_post_processor/inst/post_inst.in`: instantaneous post-processing setup
+- `03_post_processor/avg/post_avg.in`: averaged post-processing setup
 
 ## Cleaning and Re-running
 

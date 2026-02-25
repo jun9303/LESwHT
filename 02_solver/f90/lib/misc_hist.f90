@@ -17,7 +17,7 @@
                open (2007, file='../output/ftr/fwtrace.dat')
                open (2008, file='../output/ftr/fptrace.dat')
              end if
-             if (ich .eq. 1) then
+             if (ich .ne. 0) then
                open (2010, file='../output/ftr/fcmfr.dat')
              end if
              open (2011, file='../output/ftr/ftime.dat')
@@ -38,7 +38,7 @@
                open (2008, file='../output/ftr/fptrace.dat', &
                      position='append')
              end if
-             if (ich .eq. 1) then
+             if (ich .ne. 0) then
                open (2010, file='../output/ftr/fcmfr.dat', &
                      position='append')
              end if
@@ -55,7 +55,7 @@
              close (2007)
              close (2008)
            end if
-           if (ich .eq. 1) then
+           if (ich .ne. 0) then
              close (2010)
            end if
            close (2011)
@@ -81,23 +81,51 @@
          use mod_flowarray
          implicit none
          integer(8) :: i, j, k
+         real(8) :: ubulk_inst, cmfravg(3), funcbody, flowvol, qvol_u
 
          qflux = 0.
+         flowvol = 0.0d0
+         qvol_u = 0.0d0
 
 !$OMP PARALLEL DO &
-!$OMP REDUCTION(+:QFLUX)
+!$OMP REDUCTION(+:QVOL_U,FLOWVOL)
          do k = 1, n3m
            do j = 1, n2m
-             qflux = qflux + u(1, j, k) * f2fy(j) * f2fz(k)
+             do i = 1, n1m
+               if (funcbody(x(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                 qvol_u = qvol_u + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
+                 flowvol = flowvol + c2cx(i) * f2fy(j) * f2fz(k)
+               end if
+             end do
            end do
          end do
+
+         qflux = qvol_u / xl
+         if (flowvol .gt. 0.0d0) then
+           ubulk_inst = qvol_u / flowvol
+         else
+           ubulk_inst = 0.0d0
+         end if
+         cmfravg = 0.0d0
 
          write (2000, 130) time, dt, cflmax, dvmax, qmmax
 130      format(f13.5, 4es15.7)
 
-         if (ich .eq. 1) then
-           write (2010, 140) time, qflux, -pmiavg
-140        format(f13.5, 6es20.12)
+         if (ich .ne. 0) then
+           if (time .ge. avg_tst) then
+             cmfravg_int(1) = cmfravg_int(1) + qflux * dt
+             cmfravg_int(2) = cmfravg_int(2) + ubulk_inst * dt
+             cmfravg_int(3) = cmfravg_int(3) + pmiavg * dt
+             cmfravg_dur = cmfravg_dur + dt
+             if (cmfravg_dur .gt. 0.0d0) then
+               cmfravg(1) = cmfravg_int(1) / cmfravg_dur
+               cmfravg(2) = cmfravg_int(2) / cmfravg_dur
+               cmfravg(3) = cmfravg_int(3) / cmfravg_dur
+             end if
+           end if
+
+           write (2010, 140) time, qflux, ubulk_inst, pmiavg, cmfravg(1), cmfravg(2), cmfravg(3)
+140        format(f13.5, 6es15.7)
          end if
 
          return
@@ -138,30 +166,23 @@
 !     MAKE AN OUTPUT FILE OF INSTANTANEOUS FIELD, WHEN MOD(NTIME,NPRINT)=0,
 !     NPRINT : INSTANTANEOUS FIELD FILE PRINTING INTERVAL
 !     TFN1='FLD': PREFIX FOR INSTANTANEOUS FLOW FIELD
-!     TNAME     : INSTANTANEOUS FIELD FILE NAME EX) FLD006100
+!     TNAME     : INSTANTANEOUS FIELD FILE NAME EX) FLD0006100
 !
 !-----------------------------------------------------------------------
          use mod_common
          use mod_flowarray, only: u, v, w, t, p
          implicit none
          integer(8) :: i, j, k
-         integer(8) :: idum, idg1, idg2, idg3, idg4, idg5, idg6
+         integer(8) :: idum
          real(8) :: dum
-         character*25 :: tname
+         character*26 :: tname
          character*19 :: tfn1
 
          idum = 0
          dum = 0.
 
          tfn1 = '../output/field/fld'
-         idg1 = ihist / 100000
-         idg2 = (ihist - idg1 * 100000) / 10000
-         idg3 = (ihist - idg1 * 100000 - idg2 * 10000) / 1000
-         idg4 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
-         idg5 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
-         idg6 = ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
-         tname = tfn1//char(idg1 + 48)//char(idg2 + 48)// &
-                 char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
+         write (tname, '(a,i7.7)') tfn1, ihist
 
          open (nv, file=tname, form='unformatted')
          write (nv) n1, n2, n3, re, pr, gr
@@ -208,7 +229,7 @@
 203      format('TIME FOR POISSON: ', f12.3, ' SECONDS')
 204      format('TIME OF OPERTION: ', f12.3, ' SECONDS')
          write (2011, 206) time, ftrtime1, ftrtime2, ftrtime3, ftrtime4
-206      format(f13.5, 5f12.4)
+206      format(f13.5, 4es15.7)
 
          return
        end
@@ -226,7 +247,7 @@
 !     PRINT AN AVERAGED FLOW-FIELD FILE, WHEN MOD(NTIME,NPRIAVG)=0,
 !     SATISFYING THE AVERAGED FLOW-FIELD FILE PRINTING INTERVAL (NPRIAVG SET IN LICA.IN).
 !     TFN1='FAV': PREFIX FOR AVERAGE FLOW FIELD
-!     TNAME     : AVERAGE FIELD FILE NAME  EX) FAV100000-110000
+!     TNAME     : AVERAGE FIELD FILE NAME  EX) FAV0100000-0110000
 !
 !-----------------------------------------------------------------------
          use mod_common
@@ -240,10 +261,9 @@
          real(8) :: wx, wy, wz
          real(8) :: timeend
          integer(8) :: ihistend
-         integer(8) :: idg1, idg2, idg3, idg4, idg5, idg6
-         character*16 :: tname
+         character*18 :: tname
          character*3 :: tfn1
-         character*6 :: tfn2, tfn3
+         character*7 :: tfn2, tfn3
          character*1 :: tfnh
 
          tfnh = '-'
@@ -408,25 +428,13 @@
            ihistend = ihist
 
            tfn1 = 'fav'
-           idg1 = ihistinit / 100000
-           idg2 = (ihistinit - idg1 * 100000) / 10000
-           idg3 = (ihistinit - idg1 * 100000 - idg2 * 10000) / 1000
-           idg4 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
-           idg5 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
-           idg6 = ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
-           tfn2 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
-           idg1 = ihist / 100000
-           idg2 = (ihist - idg1 * 100000) / 10000
-           idg3 = (ihist - idg1 * 100000 - idg2 * 10000) / 1000
-           idg4 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
-           idg5 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
-           idg6 = ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
-           tfn3 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
+           write (tfn2, '(i7.7)') ihistinit
+           write (tfn3, '(i7.7)') ihist
            tname = tfn1//tfn2//tfnh//tfn3
 
            open (nav, file='../output/field_avg/'//tname, form='unformatted')
            write (nav) n1m, n2m, n3m, re
-           write (nav) timeinit, timeend, ihistinit, ihistend
+          write (nav) timeinit, timeend, dble(ihistinit), dble(ihistend)
            write (nav) (((uavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
            write (nav) (((vavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
            write (nav) (((wavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
@@ -476,15 +484,15 @@
         use mod_flowarray, only: uavg, vavg, wavg, uiujavg, pavg, p2avg, tavg, t2avg, voravg, vor2avg, ssavg
         implicit none
         integer(8) :: i, j, k, l, iu, ios, file_count
+        integer :: cmdstat
         integer(8) :: n1mr, n2mr, n3mr, ihist0, ihist1
         integer(8) :: ihistend
-        integer(8) :: idg1, idg2, idg3, idg4, idg5, idg6
         real(8) :: rer, time0, time1, timeend_all
         logical :: have_data
         character*24 :: tname
-        character*16 :: fname
+        character*24 :: fname
         character*7 :: tfn1
-        character*6 :: tfn2, tfn3
+        character*7 :: tfn2, tfn3
         character*1 :: tfnh
         real(8), allocatable :: tmp3d(:, :, :), tmp4d3(:, :, :, :), tmp4d6(:, :, :, :)
 
@@ -495,25 +503,13 @@
         if (npriavg_count .gt. 0) then
           ihistend = ihist
 
-          idg1 = ihistinit / 100000
-          idg2 = (ihistinit - idg1 * 100000) / 10000
-          idg3 = (ihistinit - idg1 * 100000 - idg2 * 10000) / 1000
-          idg4 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
-          idg5 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
-          idg6 = ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
-          tfn2 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
-          idg1 = ihist / 100000
-          idg2 = (ihist - idg1 * 100000) / 10000
-          idg3 = (ihist - idg1 * 100000 - idg2 * 10000) / 1000
-          idg4 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
-          idg5 = (ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
-          idg6 = ihist - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
-          tfn3 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
+          write (tfn2, '(i7.7)') ihistinit
+          write (tfn3, '(i7.7)') ihist
           tname = 'fav'//tfn2//tfnh//tfn3
 
           open (nav, file='../output/field_avg/'//tname, form='unformatted')
           write (nav) n1m, n2m, n3m, re
-          write (nav) timeinit, time, ihistinit, ihistend
+          write (nav) timeinit, time, dble(ihistinit), dble(ihistend)
           write (nav) (((uavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
           write (nav) (((vavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
           write (nav) (((wavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
@@ -619,26 +615,20 @@
 
         if ((.not. have_data) .or. (file_count .le. 0)) return
 
-        idg1 = ihistinit / 100000
-        idg2 = (ihistinit - idg1 * 100000) / 10000
-        idg3 = (ihistinit - idg1 * 100000 - idg2 * 10000) / 1000
-        idg4 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
-        idg5 = (ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
-        idg6 = ihistinit - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
-        tfn2 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
-        idg1 = ihistend / 100000
-        idg2 = (ihistend - idg1 * 100000) / 10000
-        idg3 = (ihistend - idg1 * 100000 - idg2 * 10000) / 1000
-        idg4 = (ihistend - idg1 * 100000 - idg2 * 10000 - idg3 * 1000) / 100
-        idg5 = (ihistend - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100) / 10
-        idg6 = ihistend - idg1 * 100000 - idg2 * 10000 - idg3 * 1000 - idg4 * 100 - idg5 * 10
-        tfn3 = char(idg1 + 48)//char(idg2 + 48)//char(idg3 + 48)//char(idg4 + 48)//char(idg5 + 48)//char(idg6 + 48)
-        tfn1 = 'favcmp_'
+        write (tfn2, '(i7.7)') ihistinit
+        write (tfn3, '(i7.7)') ihistend
+        tfn1 = 'fav'
         tname = tfn1//tfn2//tfnh//tfn3
 
-        open (nav, file='../output/field_avg/'//tname, form='unformatted')
+        call execute_command_line('mkdir -p ../output/field_avg/combined', exitstat=cmdstat)
+        if (cmdstat .ne. 0) then
+          write (*, *) 'WARNING: failed to create ../output/field_avg/combined; writing combined file in ../output/field_avg/'
+          open (nav, file='../output/field_avg/'//tname, form='unformatted')
+        else
+          open (nav, file='../output/field_avg/combined/'//tname, form='unformatted')
+        end if
         write (nav) n1m, n2m, n3m, re
-        write (nav) timeinit, timeend_all, ihistinit, ihistend
+        write (nav) timeinit, timeend_all, dble(ihistinit), dble(ihistend)
         write (nav) (((uavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
         write (nav) (((vavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
         write (nav) (((wavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)

@@ -29,67 +29,103 @@
          real(8), save :: err_integral = 0.0d0
          real(8) :: Kp, Ki
          real(8) :: funcbody
+         real(8) :: dy1, dy2, dz1, dz2, grad_u
+
+         flowvol = 0.0d0
+         qvol_current = 0.0d0
+         u_bulk_current = 0.0d0
+
+!$OMP PARALLEL DO REDUCTION(+:FLOWVOL, QVOL_CURRENT)
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
+               if (funcbody(x(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                 flowvol = flowvol + c2cx(i) * f2fy(j) * f2fz(k)
+                 qvol_current = qvol_current + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
+               end if
+             end do
+           end do
+         end do
+!$OMP END PARALLEL DO
+
+         if (flowvol .gt. 0.0d0) then
+           u_bulk_current = qvol_current / flowvol
+         else
+           u_bulk_current = 0.0d0
+         end if
 
          pmi = 0.
 
          if (bc_ybtm .eq. 0) then
            tmp = 0.
-!$OMP PARALLEL DO PRIVATE(TMP) REDUCTION(+:PMI)
+           dy1 = 1.0d0 / c2cyi(1)
+           dy2 = dy1 + 1.0d0 / c2cyi(2)
+!$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do k = 1, n3m
              do i = 1, n1m
-               tmp = (u(i, 1, k) - 0.) * c2cyi(1) * c2cx(i) * f2fz(k)
-               pmi(1) = pmi(1) + tmp / re
+               grad_u = (u(i, 1, k) * dy2**2 - u(i, 2, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
+               tmp = tmp + grad_u * c2cx(i) * f2fz(k) / re
              end do
            end do
 !$OMP END PARALLEL DO
+           pmi(1) = pmi(1) + tmp
 
          end if
 
          if (bc_ytop .eq. 0) then
            tmp = 0.
-!$OMP PARALLEL DO PRIVATE(TMP) REDUCTION(+:PMI)
+           dy1 = 1.0d0 / c2cyi(n2)
+           dy2 = dy1 + 1.0d0 / c2cyi(n2m)
+!$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do k = 1, n3m
              do i = 1, n1m
-               tmp = (u(i, n2m, k) - 0.) * c2cyi(n2) * c2cx(i) * f2fz(k)
-               pmi(2) = pmi(2) + tmp / re
+               grad_u = (u(i, n2m, k) * dy2**2 - u(i, n2m-1, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
+               tmp = tmp + grad_u * c2cx(i) * f2fz(k) / re
              end do
            end do
 !$OMP END PARALLEL DO
+           pmi(2) = pmi(2) + tmp
 
          end if
 
          if (bc_zbtm .eq. 0) then
            tmp = 0.
-!$OMP PARALLEL DO PRIVATE(TMP) REDUCTION(+:PMI)
+           dz1 = 1.0d0 / c2czi(1)
+           dz2 = dz1 + 1.0d0 / c2czi(2)
+!$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do j = 1, n2m
              do i = 1, n1m
-               tmp = (u(i, j, 1) - 0.) * c2czi(1) * c2cx(i) * f2fy(j)
-               pmi(3) = pmi(3) + tmp / re
+               grad_u = (u(i, j, 1) * dz2**2 - u(i, j, 2) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
+               tmp = tmp + grad_u * c2cx(i) * f2fy(j) / re
              end do
            end do
 !$OMP END PARALLEL DO
+           pmi(3) = pmi(3) + tmp
 
          end if
 
          if (bc_ztop .eq. 0) then
            tmp = 0.
-!$OMP PARALLEL DO PRIVATE(TMP) REDUCTION(+:PMI)
+           dz1 = 1.0d0 / c2czi(n3)
+           dz2 = dz1 + 1.0d0 / c2czi(n3m)
+!$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do j = 1, n2m
              do i = 1, n1m
-               tmp = (u(i, j, n3m) - 0.) * c2czi(n3) * c2cx(i) * f2fy(j)
-               pmi(4) = pmi(4) + tmp / re
+               grad_u = (u(i, j, n3m) * dz2**2 - u(i, j, n3m-1) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
+               tmp = tmp + grad_u * c2cx(i) * f2fy(j) / re
              end do
            end do
 !$OMP END PARALLEL DO
+           pmi(4) = pmi(4) + tmp
 
          end if
 
          pmi(0) = pmi(1) + pmi(2) + pmi(3) + pmi(4)
 
-         if ((bc_ybtm .ne. 0) .and. (bc_ytop .ne. 0) .and. &
+         if ((ich .ne. 0) .and. (bc_ybtm .ne. 0) .and. (bc_ytop .ne. 0) .and. &
              (bc_zbtm .ne. 0) .and. (bc_ztop .ne. 0)) then
-           write (*, *) ' TO USE ICH CONDITION, AT LEAST ONE OF Y,Z-WALLS'
-           write (*, *) ' SHOULD BE WALL SO THAT WALL-SHEAR STRESS EXISTS.'
+           write (*, *) ' TO USE ICH=/=0, AT LEAST ONE OF Y,Z-WALLS MUST'
+           write (*, *) ' BE WALL SO THAT WALL-SHEAR STRESS EXISTS.'
            stop
          else
            tmp = 0.
@@ -107,48 +143,26 @@
            end do
          end if
 
-         ! =========================================================
-         ! ACTIVE PI CONTROLLER FOR MEAN PRESSURE GRADIENT
-         ! =========================================================
-         
-         ! GUARD: ONLY EXECUTE DURING ACTIVE TIME-STEPPING TO AVOID 
-         ! DIVISION BY ZERO OR NAN DURING THE SOLVER'S INITIALIZATION PHASE.
-         if (ntime .gt. 0 .and. dt .gt. 0.0d0) then
-         
-           flowvol = 0.0d0
-           qvol_current = 0.0d0
-           
-!$OMP PARALLEL DO REDUCTION(+:FLOWVOL, QVOL_CURRENT)
-           do k = 1, n3m
-             do j = 1, n2m
-               do i = 1, n1m
-                 if (funcbody(x(i), ymp(j), zmp(k)) .ge. 1.e-10) then
-                   flowvol = flowvol + c2cx(i) * f2fy(j) * f2fz(k)
-                   qvol_current = qvol_current + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
-                 end if
-               end do
-             end do
-           end do
-!$OMP END PARALLEL DO
+         if (ich .eq. 0) then
+           pmi(0) = 0.0d0
+         elseif (ich .eq. 1) then
+           ! =========================================================
+           ! ACTIVE PI CONTROLLER FOR CONSTANT FLOW RATE (CFR)
+           ! =========================================================
+           if (ntime .gt. 0 .and. dt .gt. 0.0d0) then
+             err_u = udrv_i - u_bulk_current
 
-           ! EVALUATE FLOW DEFICIENCY (SETPOINT - CURRENT)
-           u_bulk_current = qvol_current / flowvol
-           err_u = ubulk_i - u_bulk_current
+             Kp = 1.0d0
+             Ki = 0.1d0
 
-           ! TUNING GAINS:
-           ! FIXED GAINS ACT AS A STABLE RELAXATION TIME. 
-           ! KP = 1.0 ACCELERATES THE FLOW BY 1 VELOCITY UNIT PER 1 PHYSICAL TIME UNIT.
-           Kp = 1.0d0
-           Ki = 0.1d0
+             err_integral = err_integral + err_u * dtconst
 
-           ! ACCUMULATE INTEGRAL ERROR USING THE RK3 PHYSICAL SUBSTEP TIME.
-           err_integral = err_integral + err_u * dtconst
-
-           ! APPLY THE CONTROL TO THE MEAN PRESSURE GRADIENT.
-           ! (NEGATIVE SIGN BECAUSE A POSITIVE ERR_U MEANS THE FLOW IS TOO SLOW, 
-           ! REQUIRING A MORE NEGATIVE DP/DX TO ACCELERATE).
-           pmi(0) = pmi(0) - (Kp * err_u + Ki * err_integral)
-
+             pmi(0) = pmi(0) - (Kp * err_u + Ki * err_integral)
+           end if
+         elseif (ich .eq. 2) then
+           ! CONSTANT PRESSURE GRADIENT (CPG)
+           ! RHS USES "-pmi(0)" IN X-MOMENTUM, SO NEGATIVE PMI DRIVES +X FLOW.
+           pmi(0) = -udrv_i
          end if
 
          return
@@ -311,6 +325,7 @@
                                   , rk3xo, rk3yo, rk3zo, rk3xoo, rk3yoo, rk3zoo
          implicit none
          integer(8) :: i, j, k
+         integer(8) :: ichfac
 
 !------------ VARIABLES FOR U (X, STREAMWISE) VELOCITY
          real(8) :: un, us, uc, uf, vnx, vsx, wcx, wfx
@@ -327,6 +342,12 @@
          real(8) :: anzc, anzf, anzz, anz1, anz2, rk3z
          real(8) :: alz1, alz2, alz3, alz4, alz5, alz6, alzx, alzy, alzz, alz
          real(8) :: talzx, talzy, talzz
+
+         if (ich .ne. 0) then
+           ichfac = 1
+         else
+           ichfac = 0
+         end if
 
 !-----RHS1 CALCULATION FOR U MOMENTUM -----------------
 !$OMP PARALLEL DO  &
@@ -389,7 +410,7 @@
                                   * (gamma(msub) * rk3x + ro(msub) * rk3xo(i, j, k) &
                                      + 2.*alpha * alx &
                                      - 2.*alpha * (p(i, j, k) - p(i - 1, j, k)) * c2cxi(i) &
-                                     - 2.*alpha * pmi(0) * float(ich))
+                             - 2.*alpha * pmi(0) * dble(ichfac))
                rk3xoo(i, j, k) = rk3xo(i, j, k)
                rk3xo(i, j, k) = rk3x
 

@@ -20,6 +20,15 @@ else
     echo "Warning: 02_solver directory not found."
 fi
 
+if [ -d "03_post_processor" ]; then
+    echo "Cleaning 03_post_processor..."
+    make -C 03_post_processor clean
+    make -C 03_post_processor/inst clean
+    make -C 03_post_processor/avg clean
+else
+    echo "Warning: 03_post_processor directory not found."
+fi
+
 # COMPLETE RESET: Check if the directory exists, and if so, wipe it.
 if [ -d "$OUT_DIR" ]; then
     echo "Resetting: Removing existing '$OUT_DIR' directory and old data..."
@@ -33,7 +42,7 @@ echo "Initializing clean '$OUT_DIR' directory structure..."
 mkdir -p "$OUT_DIR/ftr"
 mkdir -p "$OUT_DIR/field"
 mkdir -p "$OUT_DIR/field_avg"
-mkdir -p "$OUT_DIR/post"
+mkdir -p "$OUT_DIR/post_inst"
 mkdir -p "$OUT_DIR/post_avg"
 mkdir -p "$OUT_DIR/grid"
 mkdir -p "$OUT_DIR/ibmpre"

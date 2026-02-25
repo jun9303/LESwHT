@@ -11,7 +11,7 @@ FUNCTION FUNCBODY(X, Y, Z, T) RESULT(VAL)
     !-------------------------------------------------------------------
 
     ! Example: A channel (-1. < Y < 1.)
-    VAL = (1.d0 + EPS) - ABS(Y)
+    VAL = (1.d0 - EPS) - ABS(Y)
 
     RETURN
 END FUNCTION FUNCBODY

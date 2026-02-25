@@ -1,6 +1,6 @@
 module mod_common
 !!!!!!!!!!!!!!!!!!!!! BASIC INPUTS (SETTINGS.INPUT)
-  real(8) :: re, pr, gr, eps_ptr, ubulk_i, dt_size, &
+  real(8) :: re, pr, gr, eps_ptr, udrv_i, dt_size, &
              cflfac, resid1, wwsor, csgsts, csgshf
   integer(8) :: ireset, iread, iavg, ipzero, nend, nprint, &
                 npriavg, npin, idtopt, nlev, mode, nbli, &
@@ -93,6 +93,7 @@ module mod_common
   real(8) :: dudta, dvdta, dwdta
   real(8) :: ptb_tst
   real(8) :: avg_tst, cdavg_dur, cdavg_int(3)
+  real(8) :: cmfravg_dur, cmfravg_int(3)
   integer(8) :: npriavg_count, ihistavg_start
   logical :: avg_started
 !     FORCESUM(3),FORCESUMA(3) : FORCE OBTAINED FROM THE MOMENTUM FORCING IN IBM

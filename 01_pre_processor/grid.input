@@ -1,10 +1,13 @@
 N_x         N_y         N_z         L_x         L_y         L_z
-55          145         19          3.          2.          1.
+37          97          73          6.2832      2.0333334   3.1416
 Dir.        Coord_i     Coord_f     Index_i     Index_f     Grid_opt     Factor1       Factor2
-X           -1.5        1.5         1           55          U            0             0
-Y           -1.         -.75        1           91          U            0             0
-Y           -.75        1.          91          145         H            0.5           4.809
-Z           -.5         .5          1           19          U            0             0
+X           -3.1416     3.1416      1           37          U            0             0
+Y           -1.0166667  -1.         1           4           U            0             0
+Y           -1.         -.8333333   4           34          U            0             0
+Y           -.8333333   .8333333    34          64          H            0.5           4.701
+Y           .8333333    1.          64          94          U            0             0
+Y           1.          1.0166667   94          97          U            0             0
+Z           -1.5708     1.5708      1           73          U            0             0
 ----- (Do not remove this 5-slash line. Declaration of the end of the gridline inputs)
 Debugging Options
 Midpoints    XY-plane_grid   YZ-plane_grid   ZX-plane_grid   dx_plot     dy_plot     dz_plot

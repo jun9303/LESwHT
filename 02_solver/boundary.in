@@ -31,5 +31,5 @@ unless they were set to periodic (4) boundary conditions at the pre-processing s
 0    : Dirichlet (Constant Temperature). Use VAL_T to specify the target temperature.
 1    : Neumann (Constant Heat Flux). Use VAL_T to specify the temperature gradient (dT/dn).
 
-ICH   : Mean flow rate condition (0; Deactivate, 1; Activate)
+ICH   : Driving mode (0; Off, 1; Constant Flow Rate (CFR), 2; Constant Pressure Gradient (CPG))
 ICONJG: Conjugate heat transfer condition (0; Constant temp., 1; Conjugate heat transfer) 
