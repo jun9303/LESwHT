@@ -353,7 +353,7 @@
         real(8) :: a(9), b(6)
         real(8) :: aaa, bbb
 
-!$OMP PARALLEL DO PRIVATE(UP,UM,VP,VM,WP,WM)&
+!$OMP PARALLEL DO PRIVATE(UP,UM,VP,VM,WP,WM) &
 !$OMP PRIVATE(A,B,AAA,BBB)
         do k = 1, n3m
           do j = 1, n2m
@@ -431,8 +431,8 @@
         allocate (mmij(n1m, n2m, n3m, 6))
         allocate (uui(n1m, n2m, n3m, 3))
 
-!$OMP PARALLEL DO&
-!$OMP PRIVATE(B,STR,ALP)&
+!$OMP PARALLEL DO &
+!$OMP PRIVATE(B,STR,ALP) &
 !$OMP PRIVATE(SDXF2,SDYF2,SDZF2,AAA,BBB)
         do k = 1, n3m
           do j = 1, n2m
@@ -501,8 +501,8 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO&
-!$OMP PRIVATE(B,STR,ALP)&
+!$OMP PARALLEL DO &
+!$OMP PRIVATE(B,STR,ALP) &
 !$OMP PRIVATE(SDXF2,SDYF2,SDZF2,AAA,BBB,AMI)
         do k = 1, n3m
           do j = 1, n2m
@@ -574,7 +574,7 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO&
+!$OMP PARALLEL DO &
 !$OMP REDUCTION(+:LJMJ_V,MJMJ_V)
         do k = 1, n3m
           do j = 1, n2m
@@ -879,8 +879,8 @@
         area = 0.
         nusgsmax = 0.
 
-!$OMP PARALLEL DO&
-!$OMP REDUCTION(+:NUSGSAVG, AREA)&
+!$OMP PARALLEL DO &
+!$OMP REDUCTION(+:NUSGSAVG, AREA) &
 !$OMP REDUCTION(MAX:NUSGSMAX)
         do k = 1, n3m
           do j = 1, n2m
@@ -1125,7 +1125,7 @@
         integer(8) :: i, j, k
         real(8) :: rhsu2, rhsu3, rhsv1, rhsv3, rhsw1, rhsw2
 
-!$OMP PARALLEL DO&
+!$OMP PARALLEL DO &
 !$OMP PRIVATE(RHSU2,RHSU3)
         do k = 1, n3m
           do j = 1, n2m
@@ -1142,7 +1142,7 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO&
+!$OMP PARALLEL DO &
 !$OMP PRIVATE(RHSV1,RHSV3)
         do k = 1, n3m
           do j = j_bgpy, n2m
@@ -1159,7 +1159,7 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO&
+!$OMP PARALLEL DO &
 !$OMP PRIVATE(RHSW1,RHSW2)
         do k = k_bgpz, n3m
           do j = 1, n2m
@@ -1302,8 +1302,8 @@
         allocate (mmij(n1m, n2m, n3m, 3))
         allocate (uui(n1m, n2m, n3m, 3))
 
-!$OMP PARALLEL DO&
-!$OMP PRIVATE(D,S,ALP)&
+!$OMP PARALLEL DO &
+!$OMP PRIVATE(D,S,ALP) &
 !$OMP PRIVATE(DEL,SSS)
         do k = 1, n3m
           do j = 1, n2m
@@ -1338,8 +1338,8 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO&
-!$OMP PRIVATE(D,S,ALP)&
+!$OMP PARALLEL DO &
+!$OMP PRIVATE(D,S,ALP) &
 !$OMP PRIVATE(DEL,SSS)
         do k = 1, n3m
           do j = 1, n2m
@@ -1396,7 +1396,7 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO&
+!$OMP PARALLEL DO &
 !$OMP REDUCTION(+:LJMJ_V,MJMJ_V)
         do k = 1, n3m
           do j = 1, n2m
@@ -1512,8 +1512,8 @@
         area = 0.
         alsgsmax = 0.
 
-!$OMP PARALLEL DO&
-!$OMP REDUCTION(+:ALSGSAVG, AREA)&
+!$OMP PARALLEL DO &
+!$OMP REDUCTION(+:ALSGSAVG, AREA) &
 !$OMP REDUCTION(MAX:ALSGSMAX)
         do k = 1, n3m
           do j = 1, n2m
@@ -1748,7 +1748,7 @@
         integer(8) :: i, j, k
         real(8) :: rhst1, rhst2, rhst3
 
-!$OMP PARALLEL DO&
+!$OMP PARALLEL DO &
 !$OMP PRIVATE(RHST1,RHST2,RHST3)
         do k = 1, n3m
           do j = 1, n2m

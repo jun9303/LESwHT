@@ -341,9 +341,11 @@
 
         open (14, file='../output/ibmpre/ibmpre_nutzero.bin')
         read (14, *) nzero
-        read (14, *) (inz(n), n=1, nzero)
-        read (14, *) (jnz(n), n=1, nzero)
-        read (14, *) (knz(n), n=1, nzero)
+        if (nzero .gt. 0) then
+          read (14, *) (inz(n), n=1, nzero)
+          read (14, *) (jnz(n), n=1, nzero)
+          read (14, *) (knz(n), n=1, nzero)
+        end if
         close (14)
 
         open (15, file='../output/ibmpre/ibmpre_wallfdvm.bin')

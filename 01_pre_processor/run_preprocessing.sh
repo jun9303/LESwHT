@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # 1. Resource Limits
 ulimit -s unlimited
 # ulimit -v unlimited  # Let scheduler handle memory
@@ -15,21 +17,24 @@ export OMP_STACKSIZE=1G
 export OMP_SCHEDULE="dynamic"
 export OMP_DYNAMIC=TRUE
 
-# 3. Clean Previous Output
+# 3. GNU Toolchain (hardened)
+export CC=gcc
+export CXX=g++
+export FC=gfortran
+export F77=gfortran
+export F90=gfortran
+
+# 4. Clean Previous Output
 echo "Cleaning old IBM pre-processing files..."
 make clean
 rm -rf ../output/ibmpre/*
 
-# 4. Compilation (f2py)
+# 5. Compilation (f2py)
 #    Ensure standard output/error is visible if compilation fails
 echo "Compiling Fortran Extension (make new)..."
 make flib
-if [ $? -ne 0 ]; then
-    echo "Error: Compilation failed."
-    exit 1
-fi
 
-# 5. Execution
+# 6. Execution
 echo "Running IBM Pre-processor..."
 python3 preprocessing.py
 

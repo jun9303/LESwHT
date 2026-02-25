@@ -21,15 +21,16 @@ LESwHT is a CFD workflow for incompressible turbulent flow with immersed boundar
 ## Requirements
 
 - Linux
-- Intel Fortran compiler (`ifort`)
-- Intel C compiler (`icc`) for the f2py extension build path in pre-processing
+- GNU Fortran compiler (`gfortran`)
+- GNU C compiler (`gcc`) for the f2py extension build path in pre-processing
 - Python 3
 - NumPy (with `numpy.f2py`)
-- OpenMP runtime (`libiomp5`)
+- OpenMP runtime (`libgomp`)
 
 > Notes
 >
-> - `01_pre_processor/Makefile` builds `lib_ibm_body` using f2py with `--fcompiler=intelem`.
+> - `01_pre_processor/Makefile` builds `lib_ibm_body` using f2py with `--fcompiler=gnu95`.
+> - The preprocessor and solver run scripts export `CC/CXX/FC/F77/F90` as `gcc/g++/gfortran` to prevent accidental compiler switching from environment defaults.
 > - Scripts set `OMP_NUM_THREADS` from `SLURM_CPUS_PER_TASK` when available; otherwise they default to `4`.
 
 ## Quick Start (Full Workflow)

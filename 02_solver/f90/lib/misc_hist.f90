@@ -485,13 +485,13 @@
         implicit none
         integer(8) :: i, j, k, l, iu, ios, file_count
         integer :: cmdstat
-        integer(8) :: n1mr, n2mr, n3mr, ihist0, ihist1
+        integer(8) :: n1mr, n2mr, n3mr
+        real(8) :: ihist0, ihist1
         integer(8) :: ihistend
         real(8) :: rer, time0, time1, timeend_all
         logical :: have_data
         character*24 :: tname
         character*24 :: fname
-        character*7 :: tfn1
         character*7 :: tfn2, tfn3
         character*1 :: tfnh
         real(8), allocatable :: tmp3d(:, :, :), tmp4d3(:, :, :, :), tmp4d6(:, :, :, :)
@@ -603,11 +603,11 @@
           file_count = file_count + 1
           if (.not. have_data) then
             timeinit = time0
-            ihistinit = ihist0
+            ihistinit = nint(ihist0)
             have_data = .true.
           end if
           timeend_all = time1
-          ihistend = ihist1
+          ihistend = nint(ihist1)
         end do
         close (2998)
 
@@ -617,8 +617,7 @@
 
         write (tfn2, '(i7.7)') ihistinit
         write (tfn3, '(i7.7)') ihistend
-        tfn1 = 'fav'
-        tname = tfn1//tfn2//tfnh//tfn3
+        tname = 'fav'//tfn2//tfnh//tfn3
 
         call execute_command_line('mkdir -p ../output/field_avg/combined', exitstat=cmdstat)
         if (cmdstat .ne. 0) then

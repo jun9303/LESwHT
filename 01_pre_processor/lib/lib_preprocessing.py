@@ -2,7 +2,7 @@ import numpy as np
 
 def GFIDebug(geomfac, intptype, intpindx, fcp, x, y, z):
     gfimax = [0, 0, 0]
-    gfimax_indx = [0, 0, 0]
+    gfimax_indx = [np.array([], dtype=int), np.array([], dtype=int), np.array([], dtype=int)]
     gfi_ltone = 0
 
     max_type1 = 0; type1 = 0 
@@ -11,21 +11,21 @@ def GFIDebug(geomfac, intptype, intpindx, fcp, x, y, z):
 
     temp = geomfac['u'].copy(); temp = np.absolute(temp); temp[:,0,0,0] = 0
     temp2 = temp.flatten()
-    if temp2.shape[0] is not 0:
+    if temp2.shape[0] != 0:
         gfimax[0] = max(np.max(temp2),gfimax[0]); del(temp2)
         gfimax_indx[0]=np.where(temp >= gfimax[0])[0]
         gfi_ltone = gfi_ltone + len(np.where(temp > 1.0)[0])
     
     temp = geomfac['v'].copy(); temp = np.absolute(temp); temp[:,0,0,0] = 0
     temp2 = temp.flatten()
-    if temp2.shape[0] is not 0:
+    if temp2.shape[0] != 0:
         gfimax[1] = max(np.max(temp2),gfimax[1]); del(temp2)
         gfimax_indx[1]=np.where(temp >= gfimax[1])[0]
         gfi_ltone = gfi_ltone + len(np.where(temp > 1.0)[0])
     
     temp = geomfac['w'].copy(); temp = np.absolute(temp); temp[:,0,0,0] = 0
     temp2 = temp.flatten()
-    if temp2.shape[0] is not 0:
+    if temp2.shape[0] != 0:
         gfimax[2] = max(np.max(temp2),gfimax[2]); del(temp2)
         gfimax_indx[2]=np.where(temp >= gfimax[2])[0]
         gfi_ltone = gfi_ltone + len(np.where(temp > 1.0)[0])
@@ -111,106 +111,59 @@ def surf3D(x_coord, y_coord, z_coord, INOUT, filename):
 
 def grid_preprocessing_data(grid):
     file = open('../output/grid/grid.bin', 'w')
+
+    def write_int_line(values):
+        for value in values:
+            file.write(' %d ' % int(value))
+        file.write('\n')
+
+    def write_real_line(values):
+        for value in values:
+            file.write(' %f ' % value)
+        file.write('\n')
+
     file.write('%d %d %d\n' %(grid['N_x'], grid['N_y'], grid['N_z']))
     file.write('%d %d %d\n' %(grid['Cell_x'], grid['Cell_y'], grid['Cell_z']))
     file.write('%f %f %f\n' %(grid['L_x'], grid['L_y'], grid['L_z']))
 
-    for tmp in [grid['grid_info_x'][i]['coord'] for i in range(1,grid['N_x']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_y'][j]['coord'] for j in range(1,grid['N_y']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_z'][k]['coord'] for k in range(1,grid['N_z']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
+    write_real_line([grid['grid_info_x'][i]['coord'] for i in range(1,grid['N_x']+1)])
+    write_real_line([grid['grid_info_y'][j]['coord'] for j in range(1,grid['N_y']+1)])
+    write_real_line([grid['grid_info_z'][k]['coord'] for k in range(1,grid['N_z']+1)])
 
-    for tmp in [grid['grid_info_x'][i]['idxplus'] for i in range(1,grid['Cell_x']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_y'][j]['idxplus'] for j in range(1,grid['Cell_y']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_z'][k]['idxplus'] for k in range(1,grid['Cell_z']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
+    write_int_line([grid['grid_info_x'][i]['idxplus'] for i in range(1,grid['Cell_x']+1)])
+    write_int_line([grid['grid_info_y'][j]['idxplus'] for j in range(1,grid['Cell_y']+1)])
+    write_int_line([grid['grid_info_z'][k]['idxplus'] for k in range(1,grid['Cell_z']+1)])
 
-    for tmp in [grid['grid_info_x'][i]['idxminus'] for i in range(1,grid['Cell_x']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_y'][j]['idxminus'] for j in range(1,grid['Cell_y']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_z'][k]['idxminus'] for k in range(1,grid['Cell_z']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
+    write_int_line([grid['grid_info_x'][i]['idxminus'] for i in range(1,grid['Cell_x']+1)])
+    write_int_line([grid['grid_info_y'][j]['idxminus'] for j in range(1,grid['Cell_y']+1)])
+    write_int_line([grid['grid_info_z'][k]['idxminus'] for k in range(1,grid['Cell_z']+1)])
 
-    for tmp in [grid['grid_info_x'][i]['lowerfix'] for i in range(1,grid['Cell_x']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_y'][j]['lowerfix'] for j in range(1,grid['Cell_y']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_z'][k]['lowerfix'] for k in range(1,grid['Cell_z']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
+    write_int_line([grid['grid_info_x'][i]['lowerfix'] for i in range(1,grid['Cell_x']+1)])
+    write_int_line([grid['grid_info_y'][j]['lowerfix'] for j in range(1,grid['Cell_y']+1)])
+    write_int_line([grid['grid_info_z'][k]['lowerfix'] for k in range(1,grid['Cell_z']+1)])
 
-    for tmp in [grid['grid_info_x'][i]['upperfix'] for i in range(1,grid['Cell_x']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_y'][j]['upperfix'] for j in range(1,grid['Cell_y']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_z'][k]['upperfix'] for k in range(1,grid['Cell_z']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
+    write_int_line([grid['grid_info_x'][i]['upperfix'] for i in range(1,grid['Cell_x']+1)])
+    write_int_line([grid['grid_info_y'][j]['upperfix'] for j in range(1,grid['Cell_y']+1)])
+    write_int_line([grid['grid_info_z'][k]['upperfix'] for k in range(1,grid['Cell_z']+1)])
 
-    for tmp in [grid['grid_info_x'][i]['c2cd'] for i in range(grid['N_x']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_y'][j]['c2cd'] for j in range(grid['N_y']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_z'][k]['c2cd'] for k in range(grid['N_z']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
+    write_real_line([grid['grid_info_x'][i]['c2cd'] for i in range(grid['N_x']+1)])
+    write_real_line([grid['grid_info_y'][j]['c2cd'] for j in range(grid['N_y']+1)])
+    write_real_line([grid['grid_info_z'][k]['c2cd'] for k in range(grid['N_z']+1)])
 
-    for tmp in [grid['grid_info_x'][i]['1/c2cd'] for i in range(grid['N_x']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_y'][j]['1/c2cd'] for j in range(grid['N_y']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_z'][k]['1/c2cd'] for k in range(grid['N_z']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
+    write_real_line([grid['grid_info_x'][i]['1/c2cd'] for i in range(grid['N_x']+1)])
+    write_real_line([grid['grid_info_y'][j]['1/c2cd'] for j in range(grid['N_y']+1)])
+    write_real_line([grid['grid_info_z'][k]['1/c2cd'] for k in range(grid['N_z']+1)])
 
-    for tmp in [grid['grid_info_x'][i]['f2fd'] for i in range(grid['N_x']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_y'][j]['f2fd'] for j in range(grid['N_y']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_z'][k]['f2fd'] for k in range(grid['N_z']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
+    write_real_line([grid['grid_info_x'][i]['f2fd'] for i in range(grid['N_x']+1)])
+    write_real_line([grid['grid_info_y'][j]['f2fd'] for j in range(grid['N_y']+1)])
+    write_real_line([grid['grid_info_z'][k]['f2fd'] for k in range(grid['N_z']+1)])
 
-    for tmp in [grid['grid_info_x'][i]['1/f2fd'] for i in range(grid['N_x']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_y'][j]['1/f2fd'] for j in range(grid['N_y']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_z'][k]['1/f2fd'] for k in range(grid['N_z']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
+    write_real_line([grid['grid_info_x'][i]['1/f2fd'] for i in range(grid['N_x']+1)])
+    write_real_line([grid['grid_info_y'][j]['1/f2fd'] for j in range(grid['N_y']+1)])
+    write_real_line([grid['grid_info_z'][k]['1/f2fd'] for k in range(grid['N_z']+1)])
 
-    for tmp in [grid['grid_info_x'][i]['center'] for i in range(grid['N_x']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
-    for tmp in [grid['grid_info_y'][j]['center'] for j in range(grid['N_y']+1)]:
-        file.write(' %f ' %(tmp))
-    file.write('\n')
+    write_real_line([grid['grid_info_x'][i]['center'] for i in range(grid['N_x']+1)])
+    write_real_line([grid['grid_info_y'][j]['center'] for j in range(grid['N_y']+1)])
     for tmp in [grid['grid_info_z'][k]['center'] for k in range(grid['N_z']+1)]:
         file.write(' %f ' %(tmp))
 
@@ -372,6 +325,7 @@ def les_preprocessing_data(nzero,iszero):
     file.write('\n')
     for index in indices:
         file.write(' %d ' %(index[2]))
+    file.write('\n')
 
     file.close()
 
