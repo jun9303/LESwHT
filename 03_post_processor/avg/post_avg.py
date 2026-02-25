@@ -6,7 +6,7 @@ Python port of 04_post_avg_processor/post_avg.f90.
 Usage (from the 03_post_processor/avg/ directory):
     python post_avg.py
 
-Input:  post_avg.in
+Input:  post_avg.input
     ../../output/grid/grid.dat
     ../../output/field_avg/<fldname>   (Fortran unformatted binary)
 
@@ -634,7 +634,7 @@ def output_3d_tec(
 def main():
     SEP = '=' * 68
 
-    params   = read_input_avg('post_avg.in')
+    params   = read_input_avg('post_avg.input')
     IBMON    = params['IBMON']
     IHTRANS  = params['IHTRANS']
     IOUTFMT  = params['IOUTFMT']

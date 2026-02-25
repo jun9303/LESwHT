@@ -23,7 +23,7 @@
         integer(8) :: n
         character*10 :: dummy
 
-        open (10, file='settings.in')
+        open (10, file='settings.input')
         read (10, *) dummy
         read (10, *) re, pr, gr, grdir, t_inf
         read (10, *) dummy
@@ -96,7 +96,7 @@
         implicit none
         character*10 :: dummy
 
-        open (10, file='boundary.in')
+        open (10, file='boundary.input')
         read (10, *) dummy
         read (10, *) bc_ybtm, bc_ytop
         read (10, *) dummy

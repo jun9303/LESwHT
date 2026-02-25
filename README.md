@@ -101,8 +101,8 @@ bash run_solver.sh
 
 Inputs:
 
-- `02_solver/settings.in`
-- `02_solver/boundary.in`
+- `02_solver/settings.input`
+- `02_solver/boundary.input`
 - preprocessed data in `output/ibmpre/`
 
 Outputs:
@@ -121,7 +121,7 @@ bash postprocess.sh
 
 Uses:
 
-- `03_post_processor/inst/post_inst.in`
+- `03_post_processor/inst/post_inst.input`
 
 ### Averaged (`03_post_processor/avg`)
 
@@ -133,16 +133,16 @@ bash postavgprocess.sh
 
 Uses:
 
-- `03_post_processor/avg/post_avg.in`
+- `03_post_processor/avg/post_avg.input`
 
 ## Common Input Files to Edit
 
 - `01_pre_processor/grid.input`: grid resolution/domain and spacing options
 - `01_pre_processor/preprocessing.input`: IBM/heat-transfer preprocessing options
-- `02_solver/settings.in`: solver physics and run controls
-- `02_solver/boundary.in`: boundary conditions
-- `03_post_processor/inst/post_inst.in`: instantaneous post-processing setup
-- `03_post_processor/avg/post_avg.in`: averaged post-processing setup
+- `02_solver/settings.input`: solver physics and run controls
+- `02_solver/boundary.input`: boundary conditions
+- `03_post_processor/inst/post_inst.input`: instantaneous post-processing setup
+- `03_post_processor/avg/post_avg.input`: averaged post-processing setup
 
 ## Cleaning and Re-running
 

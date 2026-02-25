@@ -6,7 +6,7 @@ Python port of 03_post_inst_processor/post_inst.f90.
 Usage (from the 03_post_processor/inst/ directory):
     python post_inst.py
 
-Input:  post_inst.in   (control parameters)
+Input:  post_inst.input   (control parameters)
     ../../output/grid/grid.dat
     ../../output/field/<fldname>   (Fortran unformatted binary)
 
@@ -975,7 +975,7 @@ def main():
     SEP = '=' * 68
 
     # --- Read input file ---
-    params = read_input_inst('post_inst.in')
+    params = read_input_inst('post_inst.input')
     IBMON    = params['IBMON']
     IHTRANS  = params['IHTRANS']
     IOUTFMT  = params['IOUTFMT']

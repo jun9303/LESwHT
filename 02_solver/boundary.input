@@ -18,7 +18,7 @@ BC_XBTM & BC_XTOP (Momentum) will be automatically set to velocity_inlet (2) & c
 unless they were set to periodic (4) boundary conditions at the pre-processing step.
 
 ### For Thermal BC_T_XBTM & BC_T_XTOP:
-* If XPRDIC is OFF: The inlet (XBTM) is set to Dirichlet using the mapped T_INF (from settings.in)
+* If XPRDIC is OFF: The inlet (XBTM) is set to Dirichlet using the mapped T_INF (from settings.input)
                     The outlet (XTOP) defaults to a convective outlet boundary.
 * If XPRDIC is ON: The solver tracks the mean bulk temperature rise/fall (delta_T = T_avg_out - T_avg_in)
                    and applies it as an offset to the periodic ghost cells to balance the global heat flux.
