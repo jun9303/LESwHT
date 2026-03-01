@@ -281,11 +281,13 @@ if LESSGS == 'ON':
     
         CSTAR = np.empty((N_x-1,N_y-1,N_z-1), dtype=float, order='F')
         KSTAR = np.empty((N_x-1,N_y-1,N_z-1,6), dtype=float, order='F')
+        OMASK = np.empty((N_x-1,N_y-1,N_z-1), dtype=int, order='F')
     
-        [CSTAR, KSTAR] = lib_ibm_body.conjg_intp(CRATIO,KRATIO,XM,YM,ZM,X,Y,Z,ISZERO,0,XPRDIC_,YPRDIC_,ZPRDIC_)
+        [CSTAR, KSTAR, OMASK] = lib_ibm_body.conjg_intp(CRATIO,KRATIO,XM,YM,ZM,X,Y,Z,ISZERO,0,XPRDIC_,YPRDIC_,ZPRDIC_)
         # np.set_printoptions(threshold=np.nan)
         # print(KSTAR[:,:,1,5])
         lib_preprocessing.conjg_preprocessing_data(CSTAR,KSTAR)
+        lib_preprocessing.omega_preprocessing_data(OMASK)
 
 print('\n***** PRE-PROCESSING FINISHED. *****')
 

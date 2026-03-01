@@ -400,7 +400,7 @@ end subroutine find_zero_nu_sgs
 
 !=======================================================================
 subroutine conjg_intp(nx, ny, nz, cratio, kratio, xm, ym, zm, x, y, z, &
-                      iszero, t, xprdic, yprdic, zprdic, cstar, kstar)
+                      iszero, t, xprdic, yprdic, zprdic, cstar, kstar, omask)
 !$ USE OMP_LIB
   implicit none
 
@@ -414,6 +414,7 @@ subroutine conjg_intp(nx, ny, nz, cratio, kratio, xm, ym, zm, x, y, z, &
 
   real(8), intent(out) :: cstar(1:nx - 1, 1:ny - 1, 1:nz - 1)
   real(8), intent(out) :: kstar(1:nx - 1, 1:ny - 1, 1:nz - 1, 6)
+  integer(8), intent(out) :: omask(1:nx - 1, 1:ny - 1, 1:nz - 1)
 
   integer(8) :: i, j, k, subc
   integer(8) :: ip, im, jp, jm, kp, km
@@ -436,6 +437,11 @@ subroutine conjg_intp(nx, ny, nz, cratio, kratio, xm, ym, zm, x, y, z, &
         ! HEAT CAPACITY C*
         fptemp = fluid_portion(x(i), x(i + 1), y(j), y(j + 1), z(k), z(k + 1), t, subc)
         cstar(i, j, k) = (1.0d0 - fptemp) * cratio + fptemp * 1.0d0
+        if (fptemp .ge. (1.0d0 - 1.0d-12)) then
+          omask(i, j, k) = 1
+        else
+          omask(i, j, k) = 0
+        end if
 
         ! THERMAL CONDUCTIVITY K* (6 FACES)
 

@@ -44,7 +44,7 @@
 !-----------------------------------------------------------------------
           use mod_common
           use mod_flowarray, only: u, v, w, p, t, alsgs, alsgs1, rhs1 &
-                                   , rk3to, rk3too, nwall_dvm, cstar, kstar
+                                   , rk3to, rk3too, omega_dvm, cstar, kstar
           implicit none
           integer(8) :: i, j, k
           integer(8) :: iplus, iminus, jplus, jminus, kplus, kminus
@@ -132,13 +132,13 @@
                 ant2 = (tn * v(i, jplus, k) - ts * v(i, j, k)) * f2fyi(j)
                 ant3 = (tc * w(i, j, kplus) - tf * w(i, j, k)) * f2fzi(k)
 
-                ! OMEGA ACTS AS A SWITCH FOR THE CONVECTIVE TERM.
-                ! FOR STATIONARY CONJUGATE HEAT TRANSFER (IMOVINGON = 0), VELOCITY INSIDE THE SOLID IS ZERO,
-                ! SO WE FORCE OMEGA = 0. TO GUARANTEE PURE CONDUCTION AND SUPPRESS NUMERICAL NOISE.
-                if ((iconjg .eq. 1) .and. (nwall_dvm(i, j, k) .eq. 0) .and. (imovingon .eq. 0)) then
-                  omega = 0.
+                ! OMEGA MASK FROM PREPROCESSING:
+                !   0 => SOLID / INTERFACE CELLS
+                !   1 => PURE FLUID CELLS
+                if ((iconjg .eq. 1) .and. (imovingon .eq. 0)) then
+                  omega = dble(omega_dvm(i, j, k))
                 else
-                  omega = 1.
+                  omega = 1.0d0
                 end if
 
                 src_t = 0.0d0
@@ -179,8 +179,8 @@
                   taltz = f2fzi(k) * &
                           (alsgs1(i, j, kplus, 3) * c2czi(kplus) * (t(i, j, kplus) - t(i, j, k)) &
                            - alsgs1(i, j, k, 3) * c2czi(k) * (t(i, j, k) - t(i, j, kminus)))
-                  alt = alt + float(iles) * (taltx + talty + taltz)
-                  rk3t = rk3t + float(iles) * rhs1(i, j, k, 4)
+                  alt = alt + float(iles) * omega * (taltx + talty + taltz)
+                  rk3t = rk3t + float(iles) * omega * rhs1(i, j, k, 4)
                 end if
 !-----LES
 
@@ -416,10 +416,10 @@
         subroutine rhsincorpbc_t
 !=======================================================================
           use mod_common
-          use mod_flowarray, only: u, v, w, t, rhs1, alsgs, cstar, kstar
+          use mod_flowarray, only: u, v, w, t, rhs1, alsgs, cstar, kstar, omega_dvm
           implicit none
           integer(8) :: i, j, k
-          real(8) :: cre, cre2, cs, ks
+          real(8) :: cre, cre2, cs, ks, omc
 
           if (iles .eq. 1) then
             cre = re * pr
@@ -436,14 +436,20 @@
                 cs = cstar(n1m, j, k)
                 ks = (kstar(n1m, j, k, 1) + kstar(n1m, j, k, 2) + kstar(n1m, j, k, 3) &
                       + kstar(n1m, j, k, 4) + kstar(n1m, j, k, 5) + kstar(n1m, j, k, 6)) / 6.
+                if (imovingon .eq. 0) then
+                  omc = dble(omega_dvm(n1m, j, k))
+                else
+                  omc = 1.0d0
+                end if
               else
                 cs = 1.
                 ks = 1.
+                omc = 1.0d0
               end if
 
               rhs1(n1m, j, k, 4) = rhs1(n1m, j, k, 4) &
                                    - acoef * cs * ks &
-                                   * ciu(n1m) * (1.+cre2 * alsgs(n1m, j, k)) * dtout(j, k)
+                                   * ciu(n1m) * (1.+cre2 * omc * alsgs(n1m, j, k)) * dtout(j, k)
             end do
           end do
 
@@ -459,10 +465,10 @@
 !
 !-----------------------------------------------------------------------
           use mod_common
-          use mod_flowarray, only: u, v, w, t, rhs1, alsgs, alsgs1, cstar, kstar
+          use mod_flowarray, only: u, v, w, t, rhs1, alsgs, alsgs1, cstar, kstar, omega_dvm
           implicit none
           integer(8) :: i, j, k
-          real(8) :: cre, cre2, cs, ks1, ks2
+          real(8) :: cre, cre2, cs, ks1, ks2, omc
           real(8), dimension(:, :), allocatable :: ai, bi, ci, gi
           real(8), dimension(:, :), allocatable :: aj, bj, cj, gj
           real(8), dimension(:, :), allocatable :: ak, bk, ck, gk
@@ -475,7 +481,7 @@
           if (n3m .eq. 1) goto 100
 !-----Z-DIRECTION
 !$OMP PARALLEL &
-!$OMP PRIVATE(AK,CK,BK,GK,CS,KS1,KS2)
+!$OMP PRIVATE(AK,CK,BK,GK,CS,KS1,KS2,OMC)
           allocate (ak(n1, n3), bk(n1, n3), ck(n1, n3), gk(n1, n3))
 !$OMP DO
           do j = 1, n2m
@@ -485,13 +491,19 @@
                   cs = cstar(i, j, k)
                   ks1 = kstar(i, j, k, 6)
                   ks2 = kstar(i, j, k, 5)
+                  if (imovingon .eq. 0) then
+                    omc = dble(omega_dvm(i, j, k))
+                  else
+                    omc = 1.0d0
+                  end if
                 else
                   cs = 1.
                   ks1 = 1.
                   ks2 = 1.
+                  omc = 1.0d0
                 end if
-                ak(i, k) = akuv(k) * (cs * ks1 + cre * alsgs1(i, j, k, 2))
-                ck(i, k) = ckuv(k) * (cs * ks2 + cre * alsgs1(i, j, k + 1, 2))
+                ak(i, k) = akuv(k) * (cs * ks1 + cre * omc * alsgs1(i, j, k, 2))
+                ck(i, k) = ckuv(k) * (cs * ks2 + cre * omc * alsgs1(i, j, k + 1, 2))
                 bk(i, k) = acoefi * pr - ak(i, k) - ck(i, k)
                 gk(i, k) = acoefi * pr * rhs1(i, j, k, 4)
               end do
@@ -517,7 +529,7 @@
 
 !$OMP PARALLEL  &
 !$OMP PRIVATE(AJ,CJ,BJ,GJ)  &
-!$OMP PRIVATE(AI,CI,BI,GI,CS,KS1,KS2)
+!$OMP PRIVATE(AI,CI,BI,GI,CS,KS1,KS2,OMC)
           allocate (ai(n2, n1), bi(n2, n1), ci(n2, n1), gi(n2, n1))
           allocate (aj(n1, n2), bj(n1, n2), cj(n1, n2), gj(n1, n2))
 !$OMP DO
@@ -530,13 +542,19 @@
                   cs = cstar(i, j, k)
                   ks1 = kstar(i, j, k, 4)
                   ks2 = kstar(i, j, k, 3)
+                  if (imovingon .eq. 0) then
+                    omc = dble(omega_dvm(i, j, k))
+                  else
+                    omc = 1.0d0
+                  end if
                 else
                   cs = 1.
                   ks1 = 1.
                   ks2 = 1.
+                  omc = 1.0d0
                 end if
-                aj(i, j) = ajuw(j) * (cs * ks1 + cre * alsgs1(i, j, k, 3))
-                cj(i, j) = cjuw(j) * (cs * ks2 + cre * alsgs1(i, j + 1, k, 3))
+                aj(i, j) = ajuw(j) * (cs * ks1 + cre * omc * alsgs1(i, j, k, 3))
+                cj(i, j) = cjuw(j) * (cs * ks2 + cre * omc * alsgs1(i, j + 1, k, 3))
                 bj(i, j) = acoefi * pr - aj(i, j) - cj(i, j)
                 gj(i, j) = acoefi * pr * rhs1(i, j, k, 4)
               end do
@@ -551,19 +569,29 @@
                   cs = cstar(i, j, k)
                   ks1 = kstar(i, j, k, 2)
                   ks2 = kstar(i, j, k, 1)
+                  if (imovingon .eq. 0) then
+                    omc = dble(omega_dvm(i, j, k))
+                  else
+                    omc = 1.0d0
+                  end if
                 else
                   cs = 1.
                   ks1 = 1.
                   ks2 = 1.
+                  omc = 1.0d0
                 end if
-                ai(j, i) = aivw(i) * (cs * ks1 + cre * alsgs1(i, j, k, 1))
-                ci(j, i) = civw(i) * (cs * ks2 + cre * alsgs1(i + 1, j, k, 1))
+                ai(j, i) = aivw(i) * (cs * ks1 + cre * omc * alsgs1(i, j, k, 1))
+                ci(j, i) = civw(i) * (cs * ks2 + cre * omc * alsgs1(i + 1, j, k, 1))
                 bi(j, i) = acoefi * pr - ai(j, i) - ci(j, i)
                 gi(j, i) = acoefi * pr * gj(i, j)
               end do
             end do
 
-            call trdiag1(ai, bi, ci, gi, gi, 1, n1m, 1, n2m)
+            if (xprdic .eq. 0) then
+              call trdiag1(ai, bi, ci, gi, gi, 1, n1m, 1, n2m)
+            else if (xprdic .eq. 1) then
+              call trdiag1p(ai, bi, ci, gi, 1, n1m, 1, n2m)
+            end if
 
             do j = 1, n2m
               do i = 1, n1m
@@ -600,6 +628,7 @@
               t(n1, j, k) = tout(j, k)
             end do
           end do
+!$OMP END PARALLEL DO
 
           return
         end subroutine retrv_t
@@ -692,6 +721,7 @@
                 t(i, n2, k) = t(i, 1, k)
               end do
             end do
+!$OMP END PARALLEL DO
           end if
 
 ! Z PERIODICITY
@@ -703,6 +733,7 @@
                 t(i, j, n3) = t(i, j, 1)
               end do
             end do
+!$OMP END PARALLEL DO
           end if
 
           return

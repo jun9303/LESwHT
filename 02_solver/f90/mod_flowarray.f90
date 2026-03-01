@@ -43,6 +43,7 @@ module mod_flowarray
 !!!!!!!!!!!!!!!!!!!!! CONJUGATE HEAT TRANSFER
   real(8), dimension(:, :, :), allocatable :: cstar
   real(8), dimension(:, :, :, :), allocatable :: kstar
+  integer(8), dimension(:, :, :), allocatable :: omega_dvm
 
 !!!!!!!!!!!!!!!!!!!!! SEMI_IMPLICIT
   real(8), dimension(:, :, :), allocatable :: rk3xoo, rk3yoo, rk3zoo, rk3too
@@ -324,9 +325,11 @@ contains
 
     allocate (cstar(n1m, n2m, n3m))
     allocate (kstar(n1m, n2m, n3m, 6))
+    allocate (omega_dvm(n1m, n2m, n3m))
 
     cstar = 1.
     kstar = 1.
+    omega_dvm = 1
 
     return
   end subroutine conjg_allo
@@ -335,7 +338,7 @@ contains
 !=======================================================================
     implicit none
 
-    deallocate (cstar, kstar)
+    deallocate (cstar, kstar, omega_dvm)
 
     return
   end subroutine conjg_deallo

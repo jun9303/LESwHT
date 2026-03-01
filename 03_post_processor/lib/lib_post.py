@@ -492,19 +492,13 @@ def find_ip_jp_kp(g: GridData, params: dict) -> tuple[list, list, list]:
     KP = [1] * params['NKP']
 
     for n, xi in enumerate(params['XIP']):
-        for j in range(g.N1M, 0, -1):
-            if xi >= g.XMP[j]:
-                IP[n] = j; break
+        IP[n] = int(np.argmin(np.abs(g.XMP[1:g.N1M + 1] - xi))) + 1
 
     for n, yj in enumerate(params['YJP']):
-        for j in range(g.N2M, 0, -1):
-            if yj >= g.YMP[j]:
-                JP[n] = j; break
+        JP[n] = int(np.argmin(np.abs(g.YMP[1:g.N2M + 1] - yj))) + 1
 
     for n, zk in enumerate(params['ZKP']):
-        for j in range(g.N3M, 0, -1):
-            if zk >= g.ZMP[j]:
-                KP[n] = j; break
+        KP[n] = int(np.argmin(np.abs(g.ZMP[1:g.N3M + 1] - zk))) + 1
 
     return IP, JP, KP
 

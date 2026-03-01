@@ -346,7 +346,7 @@ def conjg_preprocessing_data(cstar,kstar):
     for k in range(cstar.shape[2]):
         for j in range(cstar.shape[1]):
             for i in range(cstar.shape[0]):
-                file.write(' %f ' %(cstar[i][j][k]))
+                file.write(' %.16e ' %(cstar[i][j][k]))
 
     file.write('\n')
 
@@ -354,6 +354,17 @@ def conjg_preprocessing_data(cstar,kstar):
         for k in range(kstar.shape[2]):
             for j in range(kstar.shape[1]):
                 for i in range(kstar.shape[0]):
-                    file.write(' %f ' %(kstar[i][j][k][l]))
+                    file.write(' %.16e ' %(kstar[i][j][k][l]))
+
+    file.close()
+
+def omega_preprocessing_data(omask):
+    print('\n*** WRITING OMEGA MASK DATA INTO ../output/ibmpre/ibmpre_omega.bin ***')
+    file = open('../output/ibmpre/ibmpre_omega.bin', 'w')
+
+    for k in range(omask.shape[2]):
+        for j in range(omask.shape[1]):
+            for i in range(omask.shape[0]):
+                file.write(' %d ' %(omask[i][j][k]))
 
     file.close()

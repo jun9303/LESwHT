@@ -416,11 +416,22 @@
         implicit none
         integer(8) :: i, j, k
         integer(8) :: l
+        logical :: has_omega_mask
 
         open (15, file='../output/ibmpre/ibmpre_conjg.bin')
         read (15, *) (((cstar(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
         read (15, *) ((((kstar(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 6)
         close (15)
+
+        inquire (file='../output/ibmpre/ibmpre_omega.bin', exist=has_omega_mask)
+        if (has_omega_mask) then
+          open (16, file='../output/ibmpre/ibmpre_omega.bin')
+          read (16, *) (((omega_dvm(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
+          close (16)
+        else
+          write (*, *) ' --- WARNING: ibmpre_omega.bin NOT FOUND. USING DEFAULT OMEGA=1.'
+          omega_dvm = 1
+        end if
 
         write (*, *) '========= LOADING CONJUGATE H.TRANS DATA ========='
         write (*, *) ''
@@ -1108,6 +1119,8 @@
           call les_deallo()
           if (ihtrans .eq. 1) call les_thermal_deallo()
         end if
+
+        if (iconjg .eq. 1) call conjg_deallo()
 
         if (iavg .eq. 1) call avg_deallo()
 
