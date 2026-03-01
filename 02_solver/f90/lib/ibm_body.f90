@@ -387,7 +387,7 @@ subroutine find_zero_nu_sgs(nx, ny, nz, xm, ym, zm, nzero, inout, t)
         ! ! CORRECTION: Only zero the SGS viscosity if the cell center itself 
         ! ! is inside the solid body. The 7-point neighbor check was removed 
         ! ! to prevent artificial damping of near-wall turbulent structures.
-        ! ! if (funcbody(xm(i), ym(j), zm(k), t) .le. 1.0d-10) then
+        ! if (funcbody(xm(i), ym(j), zm(k), t) .le. 1.0d-10) then
         !   nzero = nzero + 1
         !   inout(i, j, k) = 0
         ! end if
@@ -400,7 +400,7 @@ end subroutine find_zero_nu_sgs
 
 !=======================================================================
 subroutine conjg_intp(nx, ny, nz, cratio, kratio, xm, ym, zm, x, y, z, &
-                      iszero, t, cstar, kstar)
+                      iszero, t, xprdic, yprdic, zprdic, cstar, kstar)
 !$ USE OMP_LIB
   implicit none
 
@@ -410,18 +410,23 @@ subroutine conjg_intp(nx, ny, nz, cratio, kratio, xm, ym, zm, x, y, z, &
   real(8), intent(in) :: x(0:nx), y(0:ny), z(0:nz)
   integer(8), intent(in) :: iszero(1:nx - 1, 1:ny - 1, 1:nz - 1)
   real(8), intent(in) :: t
+  integer(8), intent(in) :: xprdic, yprdic, zprdic
 
   real(8), intent(out) :: cstar(1:nx - 1, 1:ny - 1, 1:nz - 1)
   real(8), intent(out) :: kstar(1:nx - 1, 1:ny - 1, 1:nz - 1, 6)
 
   integer(8) :: i, j, k, subc
-  real(8) :: fptemp, aa
+  integer(8) :: ip, im, jp, jm, kp, km
+  real(8) :: fptemp, aa, lx, ly, lz, xmp, xmm, ymp, ymm, zmp, zmm
   real(8), external :: funcbody, fluid_portion
 
   ! SUBDIVISION LEVEL FOR FLOOD FILL
   subc = 6  ! OPTIMIZED VALUE FROM LEE & HWANG (2019)
+  lx = x(nx) - x(1)
+  ly = y(ny) - y(1)
+  lz = z(nz) - z(1)
 
-  !$OMP PARALLEL DO PRIVATE(I, J, K, FPTEMP, AA)
+  !$OMP PARALLEL DO PRIVATE(I, J, K, IP, IM, JP, JM, KP, KM, FPTEMP, AA, XMP, XMM, YMP, YMM, ZMP, ZMM)
   do k = 1, nz - 1
     do j = 1, ny - 1
       do i = 1, nx - 1
@@ -436,8 +441,16 @@ subroutine conjg_intp(nx, ny, nz, cratio, kratio, xm, ym, zm, x, y, z, &
 
         ! EAST FACE (I+1/2) - CENTER (XM) TO (XM+1)
         ! USING 'INTERIM' CELL LOGIC FROM PAPER
-        fptemp = fluid_portion(xm(i), xm(i + 1), y(j), y(j + 1), z(k), z(k + 1), t, subc)
-        if (aa * funcbody(xm(i + 1), ym(j), zm(k), t) .ge. 0.0d0) then
+        if ((xprdic .eq. 1) .and. (i .eq. nx - 1)) then
+          ip = 1
+          xmp = xm(ip) + lx
+        else
+          ip = i + 1
+          xmp = xm(ip)
+        end if
+
+        fptemp = fluid_portion(xm(i), xmp, y(j), y(j + 1), z(k), z(k + 1), t, subc)
+        if (aa * funcbody(xmp, ym(j), zm(k), t) .ge. 0.0d0) then
           ! SAME PHASE
           kstar(i, j, k, 1) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
         else
@@ -446,40 +459,80 @@ subroutine conjg_intp(nx, ny, nz, cratio, kratio, xm, ym, zm, x, y, z, &
         end if
 
         ! WEST FACE (I-1/2)
-        fptemp = fluid_portion(xm(i - 1), xm(i), y(j), y(j + 1), z(k), z(k + 1), t, subc)
-        if (aa * funcbody(xm(i - 1), ym(j), zm(k), t) .ge. 0.0d0) then
+        if ((xprdic .eq. 1) .and. (i .eq. 1)) then
+          im = nx - 1
+          xmm = xm(im) - lx
+        else
+          im = i - 1
+          xmm = xm(im)
+        end if
+
+        fptemp = fluid_portion(xmm, xm(i), y(j), y(j + 1), z(k), z(k + 1), t, subc)
+        if (aa * funcbody(xmm, ym(j), zm(k), t) .ge. 0.0d0) then
           kstar(i, j, k, 2) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
         else
           kstar(i, j, k, 2) = kratio / (kratio * fptemp + 1.0d0 * (1.0d0 - fptemp))
         end if
 
         ! NORTH FACE (J+1/2)
-        fptemp = fluid_portion(x(i), x(i + 1), ym(j), ym(j + 1), z(k), z(k + 1), t, subc)
-        if (aa * funcbody(xm(i), ym(j + 1), zm(k), t) .ge. 0.0d0) then
+        if ((yprdic .eq. 1) .and. (j .eq. ny - 1)) then
+          jp = 1
+          ymp = ym(jp) + ly
+        else
+          jp = j + 1
+          ymp = ym(jp)
+        end if
+
+        fptemp = fluid_portion(x(i), x(i + 1), ym(j), ymp, z(k), z(k + 1), t, subc)
+        if (aa * funcbody(xm(i), ymp, zm(k), t) .ge. 0.0d0) then
           kstar(i, j, k, 3) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
         else
           kstar(i, j, k, 3) = kratio / (kratio * fptemp + 1.0d0 * (1.0d0 - fptemp))
         end if
 
         ! SOUTH FACE (J-1/2)
-        fptemp = fluid_portion(x(i), x(i + 1), ym(j - 1), ym(j), z(k), z(k + 1), t, subc)
-        if (aa * funcbody(xm(i), ym(j - 1), zm(k), t) .ge. 0.0d0) then
+        if ((yprdic .eq. 1) .and. (j .eq. 1)) then
+          jm = ny - 1
+          ymm = ym(jm) - ly
+        else
+          jm = j - 1
+          ymm = ym(jm)
+        end if
+
+        fptemp = fluid_portion(x(i), x(i + 1), ymm, ym(j), z(k), z(k + 1), t, subc)
+        if (aa * funcbody(xm(i), ymm, zm(k), t) .ge. 0.0d0) then
           kstar(i, j, k, 4) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
         else
           kstar(i, j, k, 4) = kratio / (kratio * fptemp + 1.0d0 * (1.0d0 - fptemp))
         end if
 
         ! TOP FACE (K+1/2)
-        fptemp = fluid_portion(x(i), x(i + 1), y(j), y(j + 1), zm(k), zm(k + 1), t, subc)
-        if (aa * funcbody(xm(i), ym(j), zm(k + 1), t) .ge. 0.0d0) then
+        if ((zprdic .eq. 1) .and. (k .eq. nz - 1)) then
+          kp = 1
+          zmp = zm(kp) + lz
+        else
+          kp = k + 1
+          zmp = zm(kp)
+        end if
+
+        fptemp = fluid_portion(x(i), x(i + 1), y(j), y(j + 1), zm(k), zmp, t, subc)
+        if (aa * funcbody(xm(i), ym(j), zmp, t) .ge. 0.0d0) then
           kstar(i, j, k, 5) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
         else
           kstar(i, j, k, 5) = kratio / (kratio * fptemp + 1.0d0 * (1.0d0 - fptemp))
         end if
 
         ! BOTTOM FACE (K-1/2)
-        fptemp = fluid_portion(x(i), x(i + 1), y(j), y(j + 1), zm(k - 1), zm(k), t, subc)
-        if (aa * funcbody(xm(i), ym(j), zm(k - 1), t) .ge. 0.0d0) then
+        if ((zprdic .eq. 1) .and. (k .eq. 1)) then
+          km = nz - 1
+          zmm = zm(km) - lz
+        else
+          km = k - 1
+          zmm = zm(km)
+        end if
+
+        fptemp = fluid_portion(x(i), x(i + 1), y(j), y(j + 1), zmm, zm(k), t, subc)
+        if (aa * funcbody(xm(i), ym(j), zmm, t) .ge. 0.0d0) then
           kstar(i, j, k, 6) = (1.0d0 - fptemp) * kratio + fptemp * 1.0d0
         else
           kstar(i, j, k, 6) = kratio / (kratio * fptemp + 1.0d0 * (1.0d0 - fptemp))

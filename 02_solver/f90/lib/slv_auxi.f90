@@ -70,8 +70,10 @@
          integer(8) :: i, j, k
 
          cflm = 0.
+         icfl = 1
+         jcfl = 1
+         kcfl = 1
 
-!$OMP PARALLEL DO PRIVATE(CFLI) REDUCTION(MAX:CFLM)
          do k = 1, n3m
            do j = 1, n2m
              do i = 1, n1m
@@ -88,7 +90,6 @@
              end do
            end do
          end do
-!$OMP END PARALLEL DO
 
          cflmax = cflm
 

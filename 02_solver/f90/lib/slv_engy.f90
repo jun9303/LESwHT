@@ -49,6 +49,10 @@
           integer(8) :: i, j, k
           integer(8) :: iplus, iminus, jplus, jminus, kplus, kminus
           real(8) :: omega
+          real(8) :: funcbody
+          real(8) :: flowvol, qvol_u, u_bulk, cellvol
+          real(8) :: ucc, src_t
+          real(8), parameter :: eps_ubulk = 1.0d-12
 
 !------------ VARIABLES FOR T (TEMPERATURE)
           real(8) :: te, tw, tn, ts, tc, tf
@@ -56,12 +60,40 @@
           real(8) :: alt1, alt2, alt3, alt4, alt5, alt6, altx, alty, altz, alt
           real(8) :: taltx, talty, taltz
 
+          u_bulk = 1.0d0
+          if (idecomp .eq. 1) then
+            flowvol = 0.0d0
+            qvol_u = 0.0d0
+!$OMP PARALLEL DO PRIVATE(CELLVOL,UCC) REDUCTION(+:FLOWVOL,QVOL_U)
+            do k = 1, n3m
+              do j = 1, n2m
+                do i = 1, n1m
+                  if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                    cellvol = c2cx(i) * f2fy(j) * f2fz(k)
+                    ucc = 0.5d0 * (u(i, j, k) + u(i + 1, j, k))
+                    flowvol = flowvol + cellvol
+                    qvol_u = qvol_u + ucc * cellvol
+                  end if
+                end do
+              end do
+            end do
+!$OMP END PARALLEL DO
+
+            if (flowvol .gt. eps_ubulk) then
+              u_bulk = qvol_u / flowvol
+            else if (dabs(udrv_i) .gt. eps_ubulk) then
+              u_bulk = udrv_i
+            else
+              u_bulk = 1.0d0
+            end if
+          end if
+
 !-----RHS1 CALCULATION FOR T -----------------
 !$OMP PARALLEL DO  &
 !$OMP PRIVATE(TE,TW,TN,TS,TC,TF)   &
 !$OMP PRIVATE(ANT1,ANT2,ANT3,RK3T) &
 !$OMP PRIVATE(ALT1,ALT2,ALT3,ALT4,ALT5,ALT6,ALTX,ALTY,ALTZ,ALT) &
-!$OMP PRIVATE(TALTX,TALTY,TALTZ,OMEGA)
+!$OMP PRIVATE(TALTX,TALTY,TALTZ,OMEGA,UCC,SRC_T)
           do k = 1, n3m
             do j = 1, n2m
               do i = 1, n1m
@@ -73,8 +105,10 @@
                 iplus = ipv(i)
                 iminus = imv(i)
 
-                ! DECOUPLE PERIODIC WRAP-AROUND FOR TEMPERATURE SCALING
-                if (xprdic .eq. 1) then
+                ! DECOUPLE PERIODIC WRAP-AROUND ONLY FOR THE SCALING MODE.
+                ! FOR IDECOMP=1, USE THE NATIVE PERIODIC NEIGHBOR MAP (IPV/IMV)
+                ! TO KEEP THE X-STENCIL SYMMETRIC ACROSS BOTH SOLID SLABS.
+                if ((xprdic .eq. 1) .and. (idecomp .eq. 0)) then
                   if (i .eq. n1m) iplus = n1
                   if (i .eq. 1) iminus = 0
                 end if
@@ -107,7 +141,13 @@
                   omega = 1.
                 end if
 
-                rk3t = -omega * (ant1 + ant2 + ant3)              ! NON-LINEAR TERM AT K-SUBSTEP
+                src_t = 0.0d0
+                if (idecomp .eq. 1) then
+                  ucc = 0.5d0 * (u(i, j, k) + u(i + 1, j, k))
+                  src_t = omega * (ucc / u_bulk)
+                end if
+
+                rk3t = -omega * (ant1 + ant2 + ant3) + src_t      ! NON-LINEAR TERM AT K-SUBSTEP
 
                 alt1 = (t(iplus, j, k) - t(i, j, k)) * c2cxi(iplus)
                 alt2 = (t(i, j, k) - t(iminus, j, k)) * c2cxi(i)
@@ -574,11 +614,23 @@
           real(8) :: t_b_out, m_dot
           real(8) :: t_wall, t_b_in, ratio
           real(8), parameter :: eps_denom = 1.0d-14
-          real(8) :: denom
+          real(8) :: denom, numer
           real(8) :: funcbody
 
 ! X PERIODICITY WITH DIRICHLET SCALING (RECYCLING METHOD)
           if (xprdic .eq. 1) then
+
+            if (idecomp .eq. 1) then
+!$OMP PARALLEL DO
+              do k = 0, n3
+                do j = 0, n2
+                  t(0, j, k) = t(n1m, j, k)
+                  t(n1, j, k) = t(1, j, k)
+                end do
+              end do
+!$OMP END PARALLEL DO
+
+            else
 
             t_wall = tsol_i
             t_b_in = tflu_i
@@ -604,9 +656,13 @@
               t_b_out = t_b_in
             end if
 
+            numer = t_wall - t_b_in
             denom = t_wall - t_b_out
-            if (dabs(denom) .gt. eps_denom) then
-              ratio = (t_wall - t_b_in) / denom
+            if (dabs(numer) .le. eps_denom) then
+              ratio = 1.0d0
+            else if (dabs(denom) .gt. eps_denom) then
+              ratio = numer / denom
+              if (dabs(ratio) .le. eps_denom) ratio = 1.0d0
             else
               ratio = 1.0d0
             end if
@@ -622,6 +678,8 @@
               end do
             end do
 !$OMP END PARALLEL DO
+
+            end if
 
           end if
 

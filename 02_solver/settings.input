@@ -1,9 +1,9 @@
 RE#     PR#     GR#     GRDIR   TFLU_I  TSOL_I
-180.    0.71    0.      2       0.      1.
+180.    0.71    0.      2       0.      0.
 IRESET  IREAD   IAVG    IPZERO  EPS_PTR UDRV_I
 1       0       1       0       6.      1.
 NEND    NPRINT  NPRIAVG NPIN
-999999  10000   50000   1
+999999  100    50000   1
 TEND    PTB_TST AVG_TST
 200.    4.      20.
 IDTOPT  DT_SIZE CFLFAC
@@ -12,8 +12,8 @@ RESID1  NLEV    NBLI    IOLDV   MGITR   IMGSOR  WWSOR
 1.0E-6  5       3       0       500     170     1.8
 ILES    INSMDL  ITEMDL  IDVMON  CSGSTS  CSGSHF  FILTER
 1       1       0       1       0.025   0.003   3
-IBMON   MASSON  IMOVING IHTRANS
-1       1       0       1
+IBMON   MASSON  IMOVING IHTRANS IDECOMP
+1       1       0       1       1
 FILES
 "../output/grid/grid.bin"
 "../output/field/fld000000"
@@ -70,6 +70,7 @@ IBMON  : Immersed boundary method (0; Deactivate, 1; Activate)
 MASSON : Mass source/sink correction (0; Deactivate, 1; Activate)
 IMOVING: Moving-body method (0; Deactivate, 1; Activate) 
 IHTRANS: Conjugated heat transfer equation (0; Deactivate, 1; Activate)
+IDECOMP: Temperature decomposition option (0; Off, 1; On)
 
 FILES  : 
  -> Line 1; grid.dat (MANDATORY)

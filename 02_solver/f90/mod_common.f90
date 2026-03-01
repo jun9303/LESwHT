@@ -6,7 +6,7 @@ module mod_common
                 npriavg, npin, idtopt, nlev, mode, nbli, &
                 ioldv, mgitr, imgsor, iles, insmdl, itemdl, &
              idvmon, filter, ibmon, masson, grdir, &
-                imovingon, ihtrans, ntrace, ntr, trpts(64, 3)
+               imovingon, ihtrans, idecomp, ntrace, ntr, trpts(64, 3)
   character*25 :: gridfile
   character*25 :: prev_fld
 

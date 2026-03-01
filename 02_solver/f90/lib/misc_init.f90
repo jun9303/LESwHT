@@ -39,7 +39,7 @@
         read (10, *) dummy
         read (10, *) iles, insmdl, itemdl, idvmon, csgsts, csgshf, filter
         read (10, *) dummy
-        read (10, *) ibmon, masson, imovingon, ihtrans
+        read (10, *) ibmon, masson, imovingon, ihtrans, idecomp
         read (10, *) dummy
         read (10, *) gridfile
         read (10, *) prev_fld
@@ -62,7 +62,7 @@
         write (*, 104) idtopt, dt, cflfac
         write (*, 105) resid1, nlev, nbli, ioldv, mgitr, imgsor, wwsor
         write (*, 106) iles, insmdl, itemdl, idvmon, csgsts, csgshf, filter
-        write (*, 107) ibmon, masson, imovingon, ihtrans
+        write (*, 107) ibmon, masson, imovingon, ihtrans, idecomp
         write (*, 108) gridfile
         write (*, 109) prev_fld
         write (*, *) ''
@@ -83,7 +83,7 @@
 104     format('  IDTOPT=', i5, '  DT=', es13.5, '  CFLFAC=', f11.3)
 105     format('  RESID=', es12.4, '  NLEV=', i5, '  NBLI=', i5, '  IOLDV=', i5, '  MGITR=', i5, '  IMGSOR=', i5, '  WWSOR=', f7.3)
 106     format('  ILES=', i2, '  INSMDL=', i2, '  ITEMDL=', i2, '  IDVMON=', i2, '  CSGSTS='f12.4, '  CSGSHF=', f12.4, '  IFILTER=', i5)
-107     format('  IBMON=', i2, '  MASSON=', i2, '  IMOVINGON=', i2, '  IHTRANS=', i2)
+107     format('  IBMON=', i2, '  MASSON=', i2, '  IMOVINGON=', i2, '  IHTRANS=', i2, '  IDECOMP=', i2)
 108     format('  GRIDFILE=', a25)
 109     format('  PREV_FLD=', a25)
 110     format(i5, 3i6)
@@ -137,6 +137,8 @@
           bc_ztop = 4
         end if
 
+        call check_idecomp_input
+
         write (*, *) '========= BOUNDARY CONDITIONS ========='
         write (*, *) ''
         write (*, *) '(0: WALL; 1: FARF; 2: VELIN; 3: CONVOUT; 4: PRDIC)'
@@ -154,6 +156,49 @@
 
         return
       end subroutine readbcs
+!=======================================================================
+!=======================================================================
+      subroutine check_idecomp_input
+!=======================================================================
+        use mod_common
+        implicit none
+        real(8), parameter :: eps_bc = 1.0d-12
+
+        if (idecomp .ne. 1) return
+
+        if (xprdic .ne. 1) then
+          write (*, *) ' --- IDECOMP=1 REQUIRES X PERIODICITY (XPRDIC=1).'
+          stop
+        end if
+
+        if ((bc_ybtm .ne. 0) .or. (bc_ytop .ne. 0)) then
+          write (*, *) ' --- IDECOMP=1 REQUIRES BOTH Y MOMENTUM BOUNDARIES TO BE WALLS.'
+          stop
+        end if
+
+        if ((bc_t_ybtm .ne. 0) .or. (bc_t_ytop .ne. 0)) then
+          write (*, *) ' --- IDECOMP=1 REQUIRES Y THERMAL BC TO BE DIRICHLET AT BOTH ENDS.'
+          stop
+        end if
+
+        if ((dabs(val_t_ybtm) .gt. eps_bc) .or. (dabs(val_t_ytop) .gt. eps_bc)) then
+          write (*, *) ' --- IDECOMP=1 REQUIRES HOMOGENEOUS Y THERMAL DIRICHLET: VAL_T_YBTM=VAL_T_YTOP=0.'
+          stop
+        end if
+
+        if ((zprdic .eq. 0) .and. (bc_zbtm .eq. 0) .and. (bc_ztop .eq. 0)) then
+          if ((bc_t_zbtm .ne. 0) .or. (bc_t_ztop .ne. 0)) then
+            write (*, *) ' --- IDECOMP=1 WITH Z WALLS REQUIRES Z THERMAL BC TO BE DIRICHLET AT BOTH ENDS.'
+            stop
+          end if
+          if ((dabs(val_t_zbtm) .gt. eps_bc) .or. (dabs(val_t_ztop) .gt. eps_bc)) then
+            write (*, *) ' --- IDECOMP=1 WITH Z WALLS REQUIRES VAL_T_ZBTM=VAL_T_ZTOP=0.'
+            stop
+          end if
+        end if
+
+        return
+      end subroutine check_idecomp_input
 !=======================================================================
 !=======================================================================
       subroutine readgeom
@@ -393,7 +438,7 @@
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8) :: flowarea(n1), fl, fl_s, adj
-        real(8) :: t_solid
+        real(8), parameter :: eps_pr = 1.0d-12
 
         ihist = 0
         time = 0.
@@ -468,7 +513,6 @@
         end if
 
         if (ihtrans .eq. 1) then
-          t_solid = tsol_i
           t = tsol_i
 
 !$OMP PARALLEL DO
@@ -476,7 +520,15 @@
             do j = 1, n2m
               do k = 0, n3
                 if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
-                  t(i, j, k) = tflu_i  ! FLUID DOMAIN
+                  if (idecomp .eq. 1) then
+                    if (dabs(pr) .gt. eps_pr) then
+                      t(i, j, k) = u(i, j, k) / pr
+                    else
+                      t(i, j, k) = u(i, j, k)
+                    end if
+                  else
+                    t(i, j, k) = tflu_i  ! FLUID DOMAIN
+                  end if
                 end if
               end do
             end do
@@ -488,11 +540,10 @@
 !$OMP PARALLEL DO
             do k = 0, n3
               do j = 0, n2
-                ! SEPARATE SOLID VS FLUID DIRICHLETS GEOMETRICALLY
                 if (funcbody(xmp(0), ymp(j), zmp(k), time) .ge. 1.e-10) then
                   t(0, j, k) = tflu_i
                 else
-                  t(0, j, k) = t_solid
+                  t(0, j, k) = tsol_i
                 end if
               end do
             end do
@@ -731,35 +782,38 @@
         use mod_flowarray, only: u, v, w
         implicit none
         real(8) :: ptb, flowarea, pertb_rate, adj
+        real(8) :: flowarea_g, pertb_rate_g
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8), parameter :: ret = 180.0d0
 
-        ! --- PERTURB U ---
+        ! --- PERTURB U (GLOBAL MEAN CORRECTION) ---
+        flowarea_g = 0.0d0
+        pertb_rate_g = 0.0d0
+
+!$OMP PARALLEL DO PRIVATE(PTB) REDUCTION(+:FLOWAREA_G, PERTB_RATE_G)
         do i = 1, n1m
-          flowarea = 0.0d0
-          pertb_rate = 0.0d0
-!$OMP PARALLEL DO PRIVATE(PTB) REDUCTION(+:FLOWAREA, PERTB_RATE)
           do j = 1, n2m
             do k = 1, n3m
               if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
-                flowarea = flowarea + f2fy(j) * f2fz(k)
+                flowarea_g = flowarea_g + f2fy(j) * f2fz(k)
                 if ((ymp(j) .gt. .5d0) .and. (ymp(j) .lt. .99d0)) then
                   ptb = eps_ptr * udrv_i * cos(zmp(k)/zl*acos(-1.d0)) &
                         * abs(y(n2 - 2) - ymp(j)) * ret                &
                         * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0 + .5d0)
                   u(i, j, k) = u(i, j, k) + ptb
-                  pertb_rate = pertb_rate + ptb * f2fy(j) * f2fz(k)
+                  pertb_rate_g = pertb_rate_g + ptb * f2fy(j) * f2fz(k)
                 end if
               end if
             end do
           end do
+        end do
 !$OMP END PARALLEL DO
 
-          ! SUBTRACT THE MEAN PERTURBATION TO ENSURE 0 NET MASS FLUX
-          if (flowarea .gt. 0.0d0) then
-            adj = pertb_rate / flowarea
+        if (flowarea_g .gt. 0.0d0) then
+          adj = pertb_rate_g / flowarea_g
 !$OMP PARALLEL DO
+          do i = 1, n1m
             do j = 1, n2m
               do k = 1, n3m
                 if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
@@ -767,35 +821,36 @@
                 end if
               end do
             end do
+          end do
 !$OMP END PARALLEL DO
-          end if
-        end do
+        end if
 
-        ! --- PERTURB W ---
+        ! --- PERTURB W (GLOBAL MEAN CORRECTION) ---
+        flowarea_g = 0.0d0
+        pertb_rate_g = 0.0d0
+!$OMP PARALLEL DO PRIVATE(PTB) REDUCTION(+:FLOWAREA_G, PERTB_RATE_G)
         do k = 1, n3m
-          flowarea = 0.0d0
-          pertb_rate = 0.0d0
-!$OMP PARALLEL DO PRIVATE(PTB) REDUCTION(+:FLOWAREA, PERTB_RATE)
           do i = 1, n1m
             do j = 1, n2m
               if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
-                flowarea = flowarea + f2fx(i) * f2fy(j)
+                flowarea_g = flowarea_g + f2fx(i) * f2fy(j)
                 if ((ymp(j) .gt. .5d0) .and. (ymp(j) .lt. .99d0)) then
                   ptb = eps_ptr * sin(xmp(i)/xl*acos(-1.d0)) &
                         * abs(y(n2 - 2) - ymp(j)) * ret                &
                         * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0)
                   w(i, j, k) = w(i, j, k) + ptb
-                  pertb_rate = pertb_rate + ptb * f2fx(i) * f2fy(j)
+                  pertb_rate_g = pertb_rate_g + ptb * f2fx(i) * f2fy(j)
                 end if
               end if
             end do
           end do
+        end do
 !$OMP END PARALLEL DO
 
-          ! SUBTRACT THE MEAN PERTURBATION TO ENSURE 0 NET MASS FLUX
-          if (flowarea .gt. 0.0d0) then
-            adj = pertb_rate / flowarea
+        if (flowarea_g .gt. 0.0d0) then
+          adj = pertb_rate_g / flowarea_g
 !$OMP PARALLEL DO
+          do k = 1, n3m
             do i = 1, n1m
               do j = 1, n2m
                 if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
@@ -803,9 +858,9 @@
                 end if
               end do
             end do
+          end do
 !$OMP END PARALLEL DO
-          end if
-        end do
+        end if
 
         write (*, *) '--- ADDING SINUSOIDAL PERTURBATION'
         write (*, 201) eps_ptr * 100.
