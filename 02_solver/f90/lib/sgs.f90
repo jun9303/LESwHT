@@ -507,7 +507,23 @@
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
-              call velgrad(i, j, k, alp, str)
+              ! USE TEST-FILTERED VELOCITY GRADIENTS FROM AALP
+              alp(1) = aalp(i, j, k, 1)
+              alp(2) = aalp(i, j, k, 2)
+              alp(3) = aalp(i, j, k, 3)
+              alp(4) = aalp(i, j, k, 4)
+              alp(5) = aalp(i, j, k, 5)
+              alp(6) = aalp(i, j, k, 6)
+              alp(7) = aalp(i, j, k, 7)
+              alp(8) = aalp(i, j, k, 8)
+              alp(9) = aalp(i, j, k, 9)
+              ! COMPUTE STRAIN RATE FROM TEST-FILTERED VELOCITY GRADIENTS
+              str(1) = alp(1)
+              str(2) = 0.5 * (alp(4) + alp(2))
+              str(3) = 0.5 * (alp(7) + alp(3))
+              str(4) = alp(5)
+              str(5) = 0.5 * (alp(8) + alp(6))
+              str(6) = alp(9)
               sdxf2 = (0.5 * f2fx(i - 1) * (1.-fixiu(i)) + f2fx(i) &
                        + 0.5 * f2fx(i + 1) * (1.-fixil(i)))**2.
               sdyf2 = (0.5 * f2fy(j - 1) * (1.-fixju(j)) + f2fy(j) &
@@ -633,6 +649,7 @@
         integer(8) :: i, j, k
         integer(8) :: xfilter, yfilter, zfilter
         real(8) :: tmp(n1m, n2m, n3m)
+        real(8) :: src(n1m, n2m, n3m)
 
         if (dir .eq. 1) then
           xfilter = 1
@@ -654,13 +671,14 @@
         tmp = a0
 
         if (xfilter .eq. 1) then
+          src = tmp
           if (xprdic .ne. 1) then
             do k = 1, n3m
               do j = 1, n2m
                 do i = 2, n1m - 1
-                  tmp(i, j, k) = cfx1(i, -1) * tmp(i - 1, j, k) &
-                                 + cfx1(i, 0) * tmp(i, j, k) &
-                                 + cfx1(i, 1) * tmp(i + 1, j, k)
+                  tmp(i, j, k) = cfx1(i, -1) * src(i - 1, j, k) &
+                                 + cfx1(i, 0) * src(i, j, k) &
+                                 + cfx1(i, 1) * src(i + 1, j, k)
                 end do
               end do
             end do
@@ -668,29 +686,30 @@
             do j = 1, n2m
               do k = 1, n3m
                 do i = 2, n1m - 1
-                  tmp(i, j, k) = cfx1(i, -1) * tmp(i - 1, j, k) &
-                                 + cfx1(i, 0) * tmp(i, j, k) &
-                                 + cfx1(i, 1) * tmp(i + 1, j, k)
+                  tmp(i, j, k) = cfx1(i, -1) * src(i - 1, j, k) &
+                                 + cfx1(i, 0) * src(i, j, k) &
+                                 + cfx1(i, 1) * src(i + 1, j, k)
                 end do
-                tmp(1, j, k) = cfx1(i, -1) * tmp(n1m, j, k) &
-                               + cfx1(i, 0) * tmp(1, j, k) &
-                               + cfx1(i, 1) * tmp(2, j, k)
-                tmp(n1m, j, k) = cfx1(i, -1) * tmp(n1m - 1, j, k) &
-                                 + cfx1(i, 0) * tmp(n1m, j, k) &
-                                 + cfx1(i, 1) * tmp(1, j, k)
+                tmp(1, j, k) = cfx1(1, -1) * src(n1m, j, k) &
+                               + cfx1(1, 0) * src(1, j, k) &
+                               + cfx1(1, 1) * src(2, j, k)
+                tmp(n1m, j, k) = cfx1(n1m, -1) * src(n1m - 1, j, k) &
+                                 + cfx1(n1m, 0) * src(n1m, j, k) &
+                                 + cfx1(n1m, 1) * src(1, j, k)
               end do
             end do
           end if
         end if
 
         if (yfilter .eq. 1) then
+          src = tmp
           if (yprdic .ne. 1) then
             do k = 1, n3m
               do j = 2, n2m - 1
                 do i = 1, n1m
-                  tmp(i, j, k) = cfy1(j, -1) * tmp(i, j - 1, k) &
-                                 + cfy1(j, 0) * tmp(i, j, k) &
-                                 + cfy1(j, 1) * tmp(i, j + 1, k)
+                  tmp(i, j, k) = cfy1(j, -1) * src(i, j - 1, k) &
+                                 + cfy1(j, 0) * src(i, j, k) &
+                                 + cfy1(j, 1) * src(i, j + 1, k)
                 end do
               end do
             end do
@@ -698,29 +717,30 @@
             do k = 1, n3m
               do i = 1, n1m
                 do j = 2, n2m - 1
-                  tmp(i, j, k) = cfy1(j, -1) * tmp(i, j - 1, k) &
-                                 + cfy1(j, 0) * tmp(i, j, k) &
-                                 + cfy1(j, 1) * tmp(i, j + 1, k)
+                  tmp(i, j, k) = cfy1(j, -1) * src(i, j - 1, k) &
+                                 + cfy1(j, 0) * src(i, j, k) &
+                                 + cfy1(j, 1) * src(i, j + 1, k)
                 end do
-                tmp(i, 1, k) = cfy1(j, -1) * tmp(i, n2m, k) &
-                               + cfy1(j, 0) * tmp(i, 1, k) &
-                               + cfy1(j, 1) * tmp(i, 2, k)
-                tmp(i, n2m, k) = cfy1(j, -1) * tmp(i, n2m - 1, k) &
-                                 + cfy1(j, 0) * tmp(i, n2m, k) &
-                                 + cfy1(j, 1) * tmp(i, 1, k)
+                tmp(i, 1, k) = cfy1(1, -1) * src(i, n2m, k) &
+                               + cfy1(1, 0) * src(i, 1, k) &
+                               + cfy1(1, 1) * src(i, 2, k)
+                tmp(i, n2m, k) = cfy1(n2m, -1) * src(i, n2m - 1, k) &
+                                 + cfy1(n2m, 0) * src(i, n2m, k) &
+                                 + cfy1(n2m, 1) * src(i, 1, k)
               end do
             end do
           end if
         end if
 
         if (zfilter .eq. 1) then
+          src = tmp
           if (zprdic .ne. 1) then
             do k = 2, n3m - 1
               do j = 1, n2m
                 do i = 1, n1m
-                  tmp(i, j, k) = cfz1(k, -1) * tmp(i, j, k - 1) &
-                                 + cfz1(k, 0) * tmp(i, j, k) &
-                                 + cfz1(k, 1) * tmp(i, j, k + 1)
+                  tmp(i, j, k) = cfz1(k, -1) * src(i, j, k - 1) &
+                                 + cfz1(k, 0) * src(i, j, k) &
+                                 + cfz1(k, 1) * src(i, j, k + 1)
                 end do
               end do
             end do
@@ -728,16 +748,16 @@
             do i = 1, n1m
               do j = 1, n2m
                 do k = 2, n3m - 1
-                  tmp(i, j, k) = cfz1(k, -1) * tmp(i, j, k - 1) &
-                                 + cfz1(k, 0) * tmp(i, j, k) &
-                                 + cfz1(k, 1) * tmp(i, j, k + 1)
+                  tmp(i, j, k) = cfz1(k, -1) * src(i, j, k - 1) &
+                                 + cfz1(k, 0) * src(i, j, k) &
+                                 + cfz1(k, 1) * src(i, j, k + 1)
                 end do
-                tmp(i, j, 1) = cfz1(k, -1) * tmp(i, j, n3m) &
-                               + cfz1(k, 0) * tmp(i, j, 1) &
-                               + cfz1(k, 1) * tmp(i, j, 2)
-                tmp(i, j, n3m) = cfz1(k, -1) * tmp(i, j, n3m - 1) &
-                                 + cfz1(k, 0) * tmp(i, j, n3m) &
-                                 + cfz1(k, 1) * tmp(i, j, 1)
+                tmp(i, j, 1) = cfz1(1, -1) * src(i, j, n3m) &
+                               + cfz1(1, 0) * src(i, j, 1) &
+                               + cfz1(1, 1) * src(i, j, 2)
+                tmp(i, j, n3m) = cfz1(n3m, -1) * src(i, j, n3m - 1) &
+                                 + cfz1(n3m, 0) * src(i, j, n3m) &
+                                 + cfz1(n3m, 1) * src(i, j, 1)
               end do
             end do
           end if
@@ -1297,7 +1317,7 @@
         mjmj_v = 0.
         csgshf = 0.
 
-        allocate (aalp(n1m, n2m, n3m, 6))
+        allocate (aalp(n1m, n2m, n3m, 9))
         allocate (llij(n1m, n2m, n3m, 3))
         allocate (mmij(n1m, n2m, n3m, 3))
         allocate (uui(n1m, n2m, n3m, 3))
@@ -1327,6 +1347,17 @@
               mmij(i, j, k, 1) = alsgs(i, j, k) * alp(1)
               mmij(i, j, k, 2) = alsgs(i, j, k) * alp(2)
               mmij(i, j, k, 3) = alsgs(i, j, k) * alp(3)
+
+              ! STORE STRAIN RATE AND TEMPERATURE GRADIENT FOR TEST-FILTERING
+              aalp(i, j, k, 1) = s(1)
+              aalp(i, j, k, 2) = s(2)
+              aalp(i, j, k, 3) = s(3)
+              aalp(i, j, k, 4) = s(4)
+              aalp(i, j, k, 5) = s(5)
+              aalp(i, j, k, 6) = s(6)
+              aalp(i, j, k, 7) = alp(1)
+              aalp(i, j, k, 8) = alp(2)
+              aalp(i, j, k, 9) = alp(3)
             end do
           end do
         end do
@@ -1338,15 +1369,21 @@
         end do
 !$OMP END PARALLEL DO
 
+! TEST-FILTER STRAIN RATE (1:6) AND TEMPERATURE GRADIENT (7:9)
+!$OMP PARALLEL DO
+        do i = 1, 9
+          call test_filter(aalp(:, :, :, i), filter)
+        end do
+!$OMP END PARALLEL DO
+
 !$OMP PARALLEL DO &
-!$OMP PRIVATE(D,S,ALP) &
-!$OMP PRIVATE(DEL,SSS)
+!$OMP PRIVATE(D) &
+!$OMP PRIVATE(DEL,SSS,AMI)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
-              call velgrad(i, j, k, d, s) ! D IS DUMMY VARIABLE
-              call temgrad(i, j, k, alp)
-
+              ! USE TEST-FILTERED STRAIN RATE AND TEMPERATURE GRADIENT
+              ! aalp(:,:,:,1:6) = hat{S_ij}, aalp(:,:,:,7:9) = hat{dT/dx_k}
               d(1) = (0.5 * f2fx(i - 1) * (1.-fixiu(i)) + f2fx(i) &
                       + 0.5 * f2fx(i + 1) * (1.-fixil(i)))
               d(2) = (0.5 * f2fy(j - 1) * (1.-fixju(j)) + f2fy(j) &
@@ -1355,17 +1392,17 @@
                       + 0.5 * f2fz(k + 1) * (1.-fixkl(k)))
 
               del = (d(1) * d(2) * d(3))**(1./3.)
-              sss = s(1)**2.+2 * s(2)**2. &
-                    +2 * s(3)**2.+s(4)**2. &
-                    +2 * s(5)**2.+s(6)**2.
+              sss = aalp(i, j, k, 1)**2.+2 * aalp(i, j, k, 2)**2. &
+                    +2 * aalp(i, j, k, 3)**2.+aalp(i, j, k, 4)**2. &
+                    +2 * aalp(i, j, k, 5)**2.+aalp(i, j, k, 6)**2.
 
               sss = dmax1(sss, 1.0e-16)
 
               ami = del**2.*sqrt(2.*sss)
 
-              mmij(i, j, k, 1) = ami * alp(1) - mmij(i, j, k, 1)
-              mmij(i, j, k, 2) = ami * alp(2) - mmij(i, j, k, 2)
-              mmij(i, j, k, 3) = ami * alp(3) - mmij(i, j, k, 3)
+              mmij(i, j, k, 1) = ami * aalp(i, j, k, 7) - mmij(i, j, k, 1)
+              mmij(i, j, k, 2) = ami * aalp(i, j, k, 8) - mmij(i, j, k, 2)
+              mmij(i, j, k, 3) = ami * aalp(i, j, k, 9) - mmij(i, j, k, 3)
               uui(i, j, k, 1) = 0.5 * (u(i, j, k) + u(i + 1, j, k))
               uui(i, j, k, 2) = 0.5 * (v(i, j, k) + v(i, j + 1, k))
               uui(i, j, k, 3) = 0.5 * (w(i, j, k) + w(i, j, k + 1))
@@ -1471,14 +1508,14 @@
         tm = 0.5 * (f2fy(jminus) * t(i, j, k) + f2fy(j) * t(i, jminus, k)) * c2cyi(j) &
              * (1.-fixjl(j)) + t(i, jminus, k) * fixjl(j)
 
-        tg2 = f2fyi(i) * (tp - tm)
+        tg2 = f2fyi(j) * (tp - tm)
 
         tp = 0.5 * (f2fz(k) * t(i, j, kplus) + f2fz(kplus) * t(i, j, k)) * c2czi(kplus) &
              * (1.-fixku(k)) + t(i, j, kplus) * fixku(k)
         tm = 0.5 * (f2fz(kminus) * t(i, j, k) + f2fz(k) * t(i, j, kminus)) * c2czi(k) &
              * (1.-fixkl(k)) + t(i, j, kminus) * fixkl(k)
 
-        tg3 = f2fzi(i) * (tp - tm)
+        tg3 = f2fzi(k) * (tp - tm)
 
         a(1) = tg1
         a(2) = tg2
@@ -1723,7 +1760,7 @@
                 alsgs1(i, j, n3, 3) = 0.
               else
                 alsgs1(i, j, n3, 2) = &
-                  c2cyi(k) * 0.5 * (f2fy(j) * alsgs(i, jm, n3m) + f2fy(jm) * alsgs(i, j, n3m))
+                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(i, jm, n3m) + f2fy(jm) * alsgs(i, j, n3m))
                 alsgs1(i, j, n3, 3) = &
                   c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, j, n3m) + f2fx(im) * alsgs(i, j, n3m))
               end if
@@ -1739,7 +1776,7 @@
       subroutine rhssgs_t
 !=======================================================================
 !
-!     CALCULATE NON-LINEAR SGS HF TERMS
+!     CALCULATE NON-LINEAR SGS HF TERMS (FOR THE LINEAR EDM, ZERO)
 !
 !-----------------------------------------------------------------------
         use mod_common

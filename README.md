@@ -1,9 +1,9 @@
 # LESwHT (Large Eddy Simulation with Heat Transfer)
 
-LESwHT is a CFD workflow for incompressible turbulent flow with immersed boundaries and optional heat transfer. The repository includes:
+LESwHT is a large eddy simulation (LES) workflow for incompressible turbulent flow with immersed boundaries (IB) and heat transfer (HT). The repository includes:
 
 - Python-based grid generation and IBM pre-processing
-- Fortran solver (OpenMP)
+- Fortran LES solver (OpenMP shared-memory parallelism)
 - Post-processors for instantaneous and averaged fields
 
 ## Current Repository Layout
@@ -20,11 +20,11 @@ LESwHT is a CFD workflow for incompressible turbulent flow with immersed boundar
 
 ## Requirements
 
-- Linux
+- Linux (recommended)
 - GNU Fortran compiler (`gfortran`)
 - GNU C compiler (`gcc`) for the f2py extension build path in pre-processing
-- Python 3
-- NumPy (with `numpy.f2py`)
+- Python 3 (tested: 3.10.12)
+- NumPy (tested: 2.2.6; with `numpy.f2py`)
 - OpenMP runtime (`libgomp`)
 
 > Notes

@@ -68,6 +68,10 @@ program solver
   cdavg_int = 0.0d0
   cmfravg_dur = 0.0d0
   cmfravg_int = 0.0d0
+  hfluxavg_dur = 0.0d0
+  hfluxavg_int = 0.0d0
+  tbulkavg_dur = 0.0d0
+  tbulkavg_int = 0.0d0
 
   if ((iread .eq. 0) .and. (eps_ptr .ne. 0.0d0) .and. (ptb_tst .le. 0.0d0)) then
     call addperturb()
@@ -168,7 +172,7 @@ program solver
     if (ibmon .eq. 1) then
       call draglift()
     end if
-    if (ihtrans .eq. 1) call calc_boundary_heat_flux()
+    if (ihtrans .eq. 1) call heatflux()
 
     if (mod(ntime, nprint) .eq. 0) call writefield()
     if (iavg .eq. 1) call field_avg()

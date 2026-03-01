@@ -63,8 +63,10 @@
 !$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do k = 1, n3m
              do i = 1, n1m
-               grad_u = (u(i, 1, k) * dy2**2 - u(i, 2, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
-               tmp = tmp + grad_u * c2cx(i) * f2fz(k) / re
+               if (funcbody(x(i), ymp(1), zmp(k), time) .ge. 1.d-10) then
+                 grad_u = (u(i, 1, k) * dy2**2 - u(i, 2, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
+                 tmp = tmp + grad_u * c2cx(i) * f2fz(k) / re
+               end if
              end do
            end do
 !$OMP END PARALLEL DO
@@ -79,8 +81,10 @@
 !$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do k = 1, n3m
              do i = 1, n1m
-               grad_u = (u(i, n2m, k) * dy2**2 - u(i, n2m-1, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
-               tmp = tmp + grad_u * c2cx(i) * f2fz(k) / re
+               if (funcbody(x(i), ymp(n2m), zmp(k), time) .ge. 1.d-10) then
+                 grad_u = (u(i, n2m, k) * dy2**2 - u(i, n2m-1, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
+                 tmp = tmp + grad_u * c2cx(i) * f2fz(k) / re
+               end if
              end do
            end do
 !$OMP END PARALLEL DO
@@ -95,8 +99,10 @@
 !$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do j = 1, n2m
              do i = 1, n1m
-               grad_u = (u(i, j, 1) * dz2**2 - u(i, j, 2) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
-               tmp = tmp + grad_u * c2cx(i) * f2fy(j) / re
+               if (funcbody(x(i), ymp(j), zmp(1), time) .ge. 1.d-10) then
+                 grad_u = (u(i, j, 1) * dz2**2 - u(i, j, 2) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
+                 tmp = tmp + grad_u * c2cx(i) * f2fy(j) / re
+               end if
              end do
            end do
 !$OMP END PARALLEL DO
@@ -111,8 +117,10 @@
 !$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do j = 1, n2m
              do i = 1, n1m
-               grad_u = (u(i, j, n3m) * dz2**2 - u(i, j, n3m-1) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
-               tmp = tmp + grad_u * c2cx(i) * f2fy(j) / re
+               if (funcbody(x(i), ymp(j), zmp(n3m), time) .ge. 1.d-10) then
+                 grad_u = (u(i, j, n3m) * dz2**2 - u(i, j, n3m-1) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
+                 tmp = tmp + grad_u * c2cx(i) * f2fy(j) / re
+               end if
              end do
            end do
 !$OMP END PARALLEL DO

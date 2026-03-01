@@ -25,7 +25,7 @@
 
         open (10, file='settings.input')
         read (10, *) dummy
-        read (10, *) re, pr, gr, grdir, t_inf
+        read (10, *) re, pr, gr, grdir, tflu_i, tsol_i
         read (10, *) dummy
         read (10, *) ireset, iread, iavg, ipzero, eps_ptr, udrv_i
         read (10, *) dummy
@@ -55,6 +55,7 @@
         write (*, *) '========= SETTINGS ========='
         write (*, *) ''
         write (*, 101) re, pr, gr
+        write (*, 112) tflu_i, tsol_i
         write (*, 102) ireset, iread, iavg, ipzero, eps_ptr, udrv_i
         write (*, 103) nend, nprint, npriavg, npin
         write (*, 111) tend, ptb_tst, avg_tst
@@ -75,6 +76,7 @@
         end if
 
 101     format('  RE=', es11.3, '  PR=', es11.3, '  GR=', es11.3)
+112     format('  TFLU_I=', es13.5, '  TSOL_I=', es13.5)
 102     format('  IRESET=', i5, '  IREAD=', i5, '  IAVG=', i5, '  IPZERO=', i5, '  EPS_PTR=', f7.3, '  UDRV_I=', f7.3)
 103     format('  NEND=', i10, '  NPRINT=', i8, '  NPRIAVG=', i8, '  NPIN=', i5)
 111     format('  TEND=', es13.5, '  PTB_TST=', es13.5, '  AVG_TST=', es13.5)
@@ -417,7 +419,7 @@
                 elseif (ich .eq. 1) then
                   u(i, j, k) = 1.5d0 * udrv_i * (1.0d0 - ymp(j)**2)
                 elseif (ich .eq. 2) then
-                  u(i, j, k) = ( 1.5d0 * (1.0d0 - ymp(j)**2) ) * .75D0 ! LET INITIAL UBULK_I = .75D0
+                  u(i, j, k) = ( 1.5d0 * (1.0d0 - ymp(j)**2) ) * 12.d0 ! LET INITIAL UBULK_I = 12.D0
                 else
                   u(i, j, k) = udrv_i
                 end if
@@ -466,20 +468,15 @@
         end if
 
         if (ihtrans .eq. 1) then
-          if (t_inf .eq. 0) then
-            t_solid = -1.0d0
-            t = -1.0d0
-          else
-            t_solid = 1.0d0
-            t = 1.0d0
-          end if
+          t_solid = tsol_i
+          t = tsol_i
 
 !$OMP PARALLEL DO
           do i = 0, n1
             do j = 1, n2m
               do k = 0, n3
                 if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
-                  t(i, j, k) = 0.0d0  ! FLUID DOMAIN
+                  t(i, j, k) = tflu_i  ! FLUID DOMAIN
                 end if
               end do
             end do
@@ -493,7 +490,7 @@
               do j = 0, n2
                 ! SEPARATE SOLID VS FLUID DIRICHLETS GEOMETRICALLY
                 if (funcbody(xmp(0), ymp(j), zmp(k), time) .ge. 1.e-10) then
-                  t(0, j, k) = 0.0d0
+                  t(0, j, k) = tflu_i
                 else
                   t(0, j, k) = t_solid
                 end if
@@ -580,11 +577,7 @@
           read (12) (((w(i, j, k), i=0, n1), j=0, n2), k=1, n3)
           read (12) (((p(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
           if (ihtrans .eq. 1) then
-            if (t_inf .eq. 0) then
-              t = -1.
-            else
-              t = 1.
-            end if
+            t = tsol_i
             read (12) (((t(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
           end if
           close (12)
@@ -716,7 +709,7 @@
 !$OMP PARALLEL DO
               do i = 0, n1
                 do j = 0, n2
-                  t(i, j, 0) = w(i, j, n3m)
+                  t(i, j, 0) = t(i, j, n3m)
                   t(i, j, n3) = t(i, j, 1)
                 end do
               end do
@@ -735,7 +728,7 @@
 !=======================================================================
 !$      USE OMP_LIB
         use mod_common
-        use mod_flowarray, only: u, w
+        use mod_flowarray, only: u, v, w
         implicit none
         real(8) :: ptb, flowarea, pertb_rate, adj
         integer(8) :: i, j, k
@@ -751,7 +744,7 @@
             do k = 1, n3m
               if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
                 flowarea = flowarea + f2fy(j) * f2fz(k)
-                if (ymp(j) .gt. 2.d0/3.d0) then
+                if ((ymp(j) .gt. .5d0) .and. (ymp(j) .lt. .99d0)) then
                   ptb = eps_ptr * udrv_i * cos(zmp(k)/zl*acos(-1.d0)) &
                         * abs(y(n2 - 2) - ymp(j)) * ret                &
                         * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0 + .5d0)
@@ -787,7 +780,7 @@
             do j = 1, n2m
               if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
                 flowarea = flowarea + f2fx(i) * f2fy(j)
-                if (ymp(j) .gt. 2.d0/3.d0) then
+                if ((ymp(j) .gt. .5d0) .and. (ymp(j) .lt. .99d0)) then
                   ptb = eps_ptr * sin(xmp(i)/xl*acos(-1.d0)) &
                         * abs(y(n2 - 2) - ymp(j)) * ret                &
                         * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0)

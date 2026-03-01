@@ -1,17 +1,17 @@
-RE#     PR#     GR#     GRDIR   T_INF
-2815.   0.71    0.      2       1
+RE#     PR#     GR#     GRDIR   TFLU_I  TSOL_I
+180.    0.71    0.      2       0.      1.
 IRESET  IREAD   IAVG    IPZERO  EPS_PTR UDRV_I
-1       0       1       0       .25     1.
+1       0       1       0       6.      1.
 NEND    NPRINT  NPRIAVG NPIN
 999999  10000   50000   1
 TEND    PTB_TST AVG_TST
-3200.   64.     160.
+200.    4.      20.
 IDTOPT  DT_SIZE CFLFAC
 1       .005    1.
 RESID1  NLEV    NBLI    IOLDV   MGITR   IMGSOR  WWSOR
 1.0E-6  5       3       0       500     170     1.8
 ILES    INSMDL  ITEMDL  IDVMON  CSGSTS  CSGSHF  FILTER
-1       1       0       0       0.07    0.005   3
+1       1       0       1       0.025   0.003   3
 IBMON   MASSON  IMOVING IHTRANS
 1       1       0       1
 FILES
@@ -27,7 +27,8 @@ RE#    : Reynolds number
 PR#    : Prandtl number (* Only meaningful when IHTRANS: 1)
 GR#    : Grashof number (* Only meaningful when IHTRANS: 1)
 GRDIR  : Gravity direction (0; No gravity (eq. to GR# == 0), 1; -x, 2; -y, 3; -z)
-T_INF  : Determine whether initially the solid is cooler or hotter (0; cool, 1; hot)
+TFLU_I : Initial fluid temperature
+TSOL_I : Initial solid temperature
 
 IRESET : Reset the time to zero (0; not reset, 1; reset)
 IREAD  : Read the previous field (0; make initial field, 1; read previous field)

@@ -569,52 +569,97 @@
        end subroutine lagforce
 !=======================================================================
 !=======================================================================
-       subroutine calc_boundary_heat_flux
+       subroutine heatflux
 !=======================================================================
          use mod_common
-         use mod_flowarray, only: t, kstar
+         use mod_flowarray, only: t, u, v, w
          implicit none
-         integer(8) :: i, k
-         real(8) :: dtdy_btm, dtdy_top
-         real(8) :: q_btm, q_top, q_total
-         real(8) :: area, k_solid_btm, k_solid_top
+         integer(8) :: i, j, k
+         real(8) :: area, tface
+         real(8) :: flux_xm, flux_xp, flux_ym, flux_yp, flux_zm, flux_zp
+         real(8) :: heat_flux(3), heat_flux_avg(3)
+         real(8) :: funcbody
 
-         q_btm = 0.d0
-         q_top = 0.d0
+         flux_xm = 0.d0
+         flux_xp = 0.d0
+         flux_ym = 0.d0
+         flux_yp = 0.d0
+         flux_zm = 0.d0
+         flux_zp = 0.d0
 
-!$OMP PARALLEL DO PRIVATE(DTDY_BTM, DTDY_TOP, AREA, K_SOLID_BTM, K_SOLID_TOP) REDUCTION(+:Q_BTM, Q_TOP)
+!$OMP PARALLEL DO PRIVATE(AREA, TFACE) REDUCTION(+:FLUX_XM,FLUX_XP)
          do k = 1, n3m
-           do i = 1, n1m
-             area = f2fx(i) * f2fz(k)
-
-             ! EXTRACT THE SOLID THERMAL CONDUCTIVITY AT THE BOUNDARIES
-             k_solid_btm = kstar(i, 1, k, 4)   ! SOUTH FACE OF J=1
-             k_solid_top = kstar(i, n2m, k, 3) ! NORTH FACE OF J=N2M
-
-             ! --- BOTTOM WALL (J=0 TO J=1) ---
-             ! GRADIENT: DT/DY AT THE BOTTOM WALL
-             dtdy_btm = (t(i, 1, k) - t(i, 0, k)) * c2cyi(1)
-             ! HEAT FLOWS UP (+Y) INTO THE DOMAIN. FOURIER'S LAW: Q = -K * DT/DY
-             q_btm = q_btm - (k_solid_btm / (re * pr)) * dtdy_btm * area
-
-             ! --- TOP WALL (J=N2M TO J=N2) ---
-             ! GRADIENT: DT/DY AT THE TOP WALL
-             dtdy_top = (t(i, n2, k) - t(i, n2m, k)) * c2cyi(n2)
-             ! HEAT FLOWS DOWN (-Y) INTO THE DOMAIN, SO THE SIGN IS FLIPPED.
-             q_top = q_top + (k_solid_top / (re * pr)) * dtdy_top * area
-
+           do j = 1, n2m
+             area = f2fy(j) * f2fz(k)
+             if (funcbody(x(1), ymp(j), zmp(k), time) .ge. 1.d-10) then
+               tface = 0.5d0 * (t(1, j, k) + t(0, j, k))
+               flux_xm = flux_xm + u(1, j, k) * tface * area
+             end if
+             if (funcbody(x(n1), ymp(j), zmp(k), time) .ge. 1.d-10) then
+               tface = 0.5d0 * (t(n1m, j, k) + t(n1, j, k))
+               flux_xp = flux_xp + u(n1, j, k) * tface * area
+             end if
            end do
          end do
 !$OMP END PARALLEL DO
 
-         q_total = q_btm + q_top
+!$OMP PARALLEL DO PRIVATE(AREA, TFACE) REDUCTION(+:FLUX_YM,FLUX_YP)
+         do k = 1, n3m
+           do i = 1, n1m
+             area = f2fx(i) * f2fz(k)
+             if (funcbody(xmp(i), y(1), zmp(k), time) .ge. 1.d-10) then
+               tface = 0.5d0 * (t(i, 1, k) + t(i, 0, k))
+               flux_ym = flux_ym + v(i, 1, k) * tface * area
+             end if
+             if (funcbody(xmp(i), y(n2), zmp(k), time) .ge. 1.d-10) then
+               tface = 0.5d0 * (t(i, n2m, k) + t(i, n2, k))
+               flux_yp = flux_yp + v(i, n2, k) * tface * area
+             end if
+           end do
+         end do
+!$OMP END PARALLEL DO
 
-         ! WRITE TO THE FNUSSELT.DAT TRACKER
-         write (2002, 110) time, q_btm, q_top, q_total
-110      format(f12.5, 3es15.6)
+!$OMP PARALLEL DO PRIVATE(AREA, TFACE) REDUCTION(+:FLUX_ZM,FLUX_ZP)
+         do j = 1, n2m
+           do i = 1, n1m
+             area = f2fx(i) * f2fy(j)
+             if (funcbody(xmp(i), ymp(j), z(1), time) .ge. 1.d-10) then
+               tface = 0.5d0 * (t(i, j, 1) + t(i, j, 0))
+               flux_zm = flux_zm + w(i, j, 1) * tface * area
+             end if
+             if (funcbody(xmp(i), ymp(j), z(n3), time) .ge. 1.d-10) then
+               tface = 0.5d0 * (t(i, j, n3m) + t(i, j, n3))
+               flux_zp = flux_zp + w(i, j, n3) * tface * area
+             end if
+           end do
+         end do
+!$OMP END PARALLEL DO
+
+         heat_flux(1) = flux_xp - flux_xm
+         heat_flux(2) = flux_yp - flux_ym
+         heat_flux(3) = flux_zp - flux_zm
+
+         heat_flux_avg = 0.0d0
+         if (time .ge. avg_tst) then
+           hfluxavg_int(1) = hfluxavg_int(1) + heat_flux(1) * dt
+           hfluxavg_int(2) = hfluxavg_int(2) + heat_flux(2) * dt
+           hfluxavg_int(3) = hfluxavg_int(3) + heat_flux(3) * dt
+           hfluxavg_dur = hfluxavg_dur + dt
+           if (hfluxavg_dur .gt. 0.0d0) then
+             heat_flux_avg(1) = hfluxavg_int(1) / hfluxavg_dur
+             heat_flux_avg(2) = hfluxavg_int(2) / hfluxavg_dur
+             heat_flux_avg(3) = hfluxavg_int(3) / hfluxavg_dur
+           end if
+         end if
+
+         if (mod(ntime, npin) .eq. 0) then
+           write (2002, 110) time, heat_flux(1), heat_flux(2), heat_flux(3), &
+             heat_flux_avg(1), heat_flux_avg(2), heat_flux_avg(3)
+         end if
+110      format(f13.5, 6es15.7)
 
          return
-       end subroutine calc_boundary_heat_flux
+       end subroutine heatflux
 !=======================================================================
 !=======================================================================
        subroutine draglift
@@ -686,13 +731,15 @@
 !$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_W) REDUCTION(+:CD)
            do k = 1, n3m
              do i = 1, n1m
-               grad_u = (u(i, 1, k) * dy2**2 - u(i, 2, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
-               tmp = grad_u * c2cx(i) * f2fz(k)
-               cd(1) = cd(1) + tmp / re
+               if (funcbody(x(i), ymp(1), zmp(k), time) .ge. 1.d-10) then
+                 grad_u = (u(i, 1, k) * dy2**2 - u(i, 2, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
+                 tmp = grad_u * c2cx(i) * f2fz(k)
+                 cd(1) = cd(1) + tmp / re
 
-               grad_w = (w(i, 1, k) * dy2**2 - w(i, 2, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
-               tmp = grad_w * c2cx(i) * f2fz(k)
-               cd(3) = cd(3) + tmp / re
+                 grad_w = (w(i, 1, k) * dy2**2 - w(i, 2, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
+                 tmp = grad_w * c2cx(i) * f2fz(k)
+                 cd(3) = cd(3) + tmp / re
+               end if
              end do
            end do
 !$OMP END PARALLEL DO
@@ -701,19 +748,20 @@
          ! --- Y-TOP WALL ---
          if (bc_ytop .eq. 0) then
            tmp = 0.0d0
-           ! n2 is the top ghost cell index, n2m is the last interior cell
            dy1 = 1.0d0 / c2cyi(n2)
            dy2 = dy1 + 1.0d0 / c2cyi(n2m)
 !$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_W) REDUCTION(+:CD)
            do k = 1, n3m
              do i = 1, n1m
-               grad_u = (u(i, n2m, k) * dy2**2 - u(i, n2m-1, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
-               tmp = grad_u * c2cx(i) * f2fz(k)
-               cd(1) = cd(1) + tmp / re
+               if (funcbody(x(i), ymp(n2m), zmp(k), time) .ge. 1.d-10) then
+                 grad_u = (u(i, n2m, k) * dy2**2 - u(i, n2m-1, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
+                 tmp = grad_u * c2cx(i) * f2fz(k)
+                 cd(1) = cd(1) + tmp / re
 
-               grad_w = (w(i, n2m, k) * dy2**2 - w(i, n2m-1, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
-               tmp = grad_w * c2cx(i) * f2fz(k)
-               cd(3) = cd(3) + tmp / re
+                 grad_w = (w(i, n2m, k) * dy2**2 - w(i, n2m-1, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
+                 tmp = grad_w * c2cx(i) * f2fz(k)
+                 cd(3) = cd(3) + tmp / re
+               end if
              end do
            end do
 !$OMP END PARALLEL DO
@@ -727,13 +775,15 @@
 !$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_V) REDUCTION(+:CD)
            do j = 1, n2m
              do i = 1, n1m
-               grad_u = (u(i, j, 1) * dz2**2 - u(i, j, 2) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
-               tmp = grad_u * c2cx(i) * f2fy(j)
-               cd(1) = cd(1) + tmp / re
+               if (funcbody(x(i), ymp(j), zmp(1), time) .ge. 1.d-10) then
+                 grad_u = (u(i, j, 1) * dz2**2 - u(i, j, 2) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
+                 tmp = grad_u * c2cx(i) * f2fy(j)
+                 cd(1) = cd(1) + tmp / re
 
-               grad_v = (v(i, j, 1) * dz2**2 - v(i, j, 2) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
-               tmp = grad_v * c2cx(i) * f2fy(j)
-               cd(2) = cd(2) + tmp / re
+                 grad_v = (v(i, j, 1) * dz2**2 - v(i, j, 2) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
+                 tmp = grad_v * c2cx(i) * f2fy(j)
+                 cd(2) = cd(2) + tmp / re
+               end if
              end do
            end do
 !$OMP END PARALLEL DO
@@ -747,13 +797,15 @@
 !$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_V) REDUCTION(+:CD)
            do j = 1, n2m
              do i = 1, n1m
-               grad_u = (u(i, j, n3m) * dz2**2 - u(i, j, n3m-1) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
-               tmp = grad_u * c2cx(i) * f2fy(j)
-               cd(1) = cd(1) + tmp / re
+               if (funcbody(x(i), ymp(j), zmp(n3m), time) .ge. 1.d-10) then
+                 grad_u = (u(i, j, n3m) * dz2**2 - u(i, j, n3m-1) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
+                 tmp = grad_u * c2cx(i) * f2fy(j)
+                 cd(1) = cd(1) + tmp / re
 
-               grad_v = (v(i, j, n3m) * dz2**2 - v(i, j, n3m-1) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
-               tmp = grad_v * c2cx(i) * f2fy(j)
-               cd(2) = cd(2) + tmp / re
+                 grad_v = (v(i, j, n3m) * dz2**2 - v(i, j, n3m-1) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
+                 tmp = grad_v * c2cx(i) * f2fy(j)
+                 cd(2) = cd(2) + tmp / re
+               end if
              end do
            end do
 !$OMP END PARALLEL DO

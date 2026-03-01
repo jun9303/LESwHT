@@ -101,8 +101,6 @@
                 ! OMEGA ACTS AS A SWITCH FOR THE CONVECTIVE TERM.
                 ! FOR STATIONARY CONJUGATE HEAT TRANSFER (IMOVINGON = 0), VELOCITY INSIDE THE SOLID IS ZERO,
                 ! SO WE FORCE OMEGA = 0. TO GUARANTEE PURE CONDUCTION AND SUPPRESS NUMERICAL NOISE.
-                ! FOR A MOVING SOLID (IMOVINGON = 1), THE SOLID HAS A RIGID-BODY VELOCITY,
-                ! AND THEREFORE ADVECTS ITS OWN TEMPERATURE. WE MUST LEAVE OMEGA = 1.
                 if ((iconjg .eq. 1) .and. (nwall_dvm(i, j, k) .eq. 0) .and. (imovingon .eq. 0)) then
                   omega = 0.
                 else
@@ -276,6 +274,7 @@
           integer(8) :: i, j, k
           real(8) :: qin, qout, qratio
           real(8) :: ubar, ucoef, vwcoef
+          real(8), parameter :: eps_denom = 1.0d-14
           real(8) :: funcbody
 
           if (ich .ne. 1) then
@@ -330,7 +329,11 @@
                 qout = uout(j, k) * f2fy(j) * f2fz(k) + qout
               end do
             end do
-            qratio = qin / qout
+            if (dabs(qout) .gt. eps_denom) then
+              qratio = qin / qout
+            else
+              qratio = 1.0d0
+            end if
 
 !-----ADJUST BOUNDARY VELOCITY TO SATISFY GLOBAL MASS CONSERVATION
 !$OMP PARALLEL DO
@@ -570,17 +573,15 @@
           integer(8) :: i, j, k
           real(8) :: t_b_out, m_dot
           real(8) :: t_wall, t_b_in, ratio
+          real(8), parameter :: eps_denom = 1.0d-14
+          real(8) :: denom
           real(8) :: funcbody
 
 ! X PERIODICITY WITH DIRICHLET SCALING (RECYCLING METHOD)
           if (xprdic .eq. 1) then
 
-            if (t_inf .eq. 0) then
-              t_wall = -1.0d0
-            else
-              t_wall = 1.0d0
-            end if
-            t_b_in = 0.0d0
+            t_wall = tsol_i
+            t_b_in = tflu_i
 
             t_b_out = 0.0d0
             m_dot = 0.0d0
@@ -597,8 +598,18 @@
             end do
 !$OMP END PARALLEL DO
 
-            t_b_out = t_b_out / m_dot
-            ratio = (t_wall - t_b_in) / (t_wall - t_b_out)
+            if (dabs(m_dot) .gt. eps_denom) then
+              t_b_out = t_b_out / m_dot
+            else
+              t_b_out = t_b_in
+            end if
+
+            denom = t_wall - t_b_out
+            if (dabs(denom) .gt. eps_denom) then
+              ratio = (t_wall - t_b_in) / denom
+            else
+              ratio = 1.0d0
+            end if
 
 !$OMP PARALLEL DO
             do k = 0, n3
@@ -617,7 +628,7 @@
 ! Y PERIODICITY
           if (yprdic .eq. 1) then
 !$OMP PARALLEL DO
-            do k = 1, n3
+            do k = 0, n3
               do i = 0, n1
                 t(i, 0, k) = t(i, n2m, k)
                 t(i, n2, k) = t(i, 1, k)
@@ -629,7 +640,7 @@
           if (zprdic .eq. 1) then
 !$OMP PARALLEL DO
             do j = 0, n2
-              do i = 1, n1
+              do i = 0, n1
                 t(i, j, 0) = t(i, j, n3m)
                 t(i, j, n3) = t(i, j, 1)
               end do
@@ -649,11 +660,7 @@
           real(8) :: t_solid
           real(8) :: funcbody
 
-          if (t_inf .eq. 0) then
-            t_solid = -1.0d0
-          else
-            t_solid = 1.0d0
-          end if
+          t_solid = tsol_i
 
           if (xprdic .eq. 0) then
 !$OMP PARALLEL DO
@@ -663,7 +670,7 @@
                 if (funcbody(xmp(0), ymp(j), zmp(k), time) .le. 1.e-10) then
                   t(0, j, k) = t_solid   ! SOLID BODY
                 else
-                  t(0, j, k) = 0.0d0     ! FLUID
+                  t(0, j, k) = tflu_i    ! FLUID
                 end if
 
                 ! TOP X (I=N1): CONVECTIVE OUTLET IS ACTIVELY MAPPED BY RETRV_T.

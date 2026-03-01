@@ -10,7 +10,8 @@
            if (iread .ne. 1) then
              open (2000, file='../output/ftr/fhist.dat')
              open (2001, file='../output/ftr/fcdcl.dat')
-             open (2002, file='../output/ftr/fnusselt.dat')
+            open (2002, file='../output/ftr/fheatflux.dat')
+             open (2012, file='../output/ftr/ftemp.dat')
              if (ntrace .ne. 0) then
                open (2005, file='../output/ftr/futrace.dat')
                open (2006, file='../output/ftr/fvtrace.dat')
@@ -26,8 +27,10 @@
                    position='append')
              open (2001, file='../output/ftr/fcdcl.dat', &
                    position='append')
-             open (2002, file='../output/ftr/fnusselt.dat', &
+            open (2002, file='../output/ftr/fheatflux.dat', &
                    position='append')
+             open (2012, file='../output/ftr/ftemp.dat', &
+               position='append')
              if (ntrace .ne. 0) then
                open (2005, file='../output/ftr/futrace.dat', &
                      position='append')
@@ -49,6 +52,7 @@
            close (2000)
            close (2001)
            close (2002)
+           close (2012)
            if (ntrace .ne. 0) then
              close (2005)
              close (2006)
@@ -82,10 +86,15 @@
          implicit none
          integer(8) :: i, j, k
          real(8) :: ubulk_inst, cmfravg(3), funcbody, flowvol, qvol_u
+         real(8) :: tbulk_flu_inst, tbulk_sol_inst, tbulkavg(2)
+         real(8) :: tflu_vol, tsol_vol, tflu_int, tsol_int, cellvol
 
          qflux = 0.
          flowvol = 0.0d0
          qvol_u = 0.0d0
+         tbulk_flu_inst = 0.0d0
+         tbulk_sol_inst = 0.0d0
+         tbulkavg = 0.0d0
 
 !$OMP PARALLEL DO &
 !$OMP REDUCTION(+:QVOL_U,FLOWVOL)
@@ -126,6 +135,46 @@
 
            write (2010, 140) time, qflux, ubulk_inst, pmiavg, cmfravg(1), cmfravg(2), cmfravg(3)
 140        format(f13.5, 6es15.7)
+         end if
+
+         if (ihtrans .eq. 1) then
+           tflu_vol = 0.0d0
+           tsol_vol = 0.0d0
+           tflu_int = 0.0d0
+           tsol_int = 0.0d0
+
+!$OMP PARALLEL DO &
+!$OMP PRIVATE(CELLVOL) REDUCTION(+:TFLU_VOL,TSOL_VOL,TFLU_INT,TSOL_INT)
+           do k = 1, n3m
+             do j = 1, n2m
+               do i = 1, n1m
+                 cellvol = c2cx(i) * f2fy(j) * f2fz(k)
+                 if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                   tflu_vol = tflu_vol + cellvol
+                   tflu_int = tflu_int + t(i, j, k) * cellvol
+                 else
+                   tsol_vol = tsol_vol + cellvol
+                   tsol_int = tsol_int + t(i, j, k) * cellvol
+                 end if
+               end do
+             end do
+           end do
+
+           if (tflu_vol .gt. 0.0d0) tbulk_flu_inst = tflu_int / tflu_vol
+           if (tsol_vol .gt. 0.0d0) tbulk_sol_inst = tsol_int / tsol_vol
+
+           if (time .ge. avg_tst) then
+             tbulkavg_int(1) = tbulkavg_int(1) + tbulk_flu_inst * dt
+             tbulkavg_int(2) = tbulkavg_int(2) + tbulk_sol_inst * dt
+             tbulkavg_dur = tbulkavg_dur + dt
+             if (tbulkavg_dur .gt. 0.0d0) then
+               tbulkavg(1) = tbulkavg_int(1) / tbulkavg_dur
+               tbulkavg(2) = tbulkavg_int(2) / tbulkavg_dur
+             end if
+           end if
+
+           write (2012, 141) time, tbulk_flu_inst, tbulk_sol_inst, tbulkavg(1), tbulkavg(2)
+ 141       format(f13.5, 4es15.7)
          end if
 
          return
