@@ -508,6 +508,11 @@ def output_3d(
                     write_vtk_scalar(fh, lbl,
                                      [UIUJAVG[idx][i,j,k]
                                       for k in K_rng for j in J_rng for i in I_rng])
+                if ihtrans == 1:
+                    write_vtk_scalar(fh, 'tavg',
+                                     [avgs['TAVG'][i,j,k] for k in K_rng for j in J_rng for i in I_rng])
+                    write_vtk_scalar(fh, 't2avg',
+                                     [avgs['T2AVG'][i,j,k] for k in K_rng for j in J_rng for i in I_rng])
             print(f"  Wrote {fpath}")
 
         if params['IWXYZ'] == 1:
@@ -585,7 +590,10 @@ def output_3d_tec(
     if params['IUVWP'] == 1:
         fpath = os.path.join(outdir, tname2 + '_uvwp.tec')
         with open(fpath, 'w') as fh:
-            fh.write('VARIABLES = "X","Y","Z","U","V","W","UXUX","UXUY","UXUZ","UYUY","UYUZ","UZUZ"\n')
+            if ihtrans == 1:
+                fh.write('VARIABLES = "X","Y","Z","U","V","W","UXUX","UXUY","UXUZ","UYUY","UYUZ","UZUZ","T","T2"\n')
+            else:
+                fh.write('VARIABLES = "X","Y","Z","U","V","W","UXUX","UXUY","UXUZ","UYUY","UYUZ","UZUZ"\n')
             fh.write(npts_tag)
             for k in K_rng:
                 for j in J_rng:
@@ -594,6 +602,8 @@ def output_3d_tec(
                                f" {UC[i,j,k]:.16e} {VC[i,j,k]:.16e} {WC[i,j,k]:.16e}")
                         for n in range(6):
                             row += f" {UIUJAVG[n][i,j,k]:.16e}"
+                        if ihtrans == 1:
+                            row += f" {avgs['TAVG'][i,j,k]:.16e} {avgs['T2AVG'][i,j,k]:.16e}"
                         fh.write(row + '\n')
         print(f"  Wrote {fpath}")
 
