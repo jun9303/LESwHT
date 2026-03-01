@@ -7,8 +7,7 @@
 *.out
 *.exe
 02_solver/solver_exec
-03_post_inst_processor/postproc
-04_post_avg_processor/postavgproc
+03_post_processor/.archive/
 
 # Python Cache
 **/__pycache__/
