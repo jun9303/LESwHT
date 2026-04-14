@@ -14,8 +14,8 @@ LESwHT is a large eddy simulation (LES) workflow for incompressible turbulent fl
 	- `inst/`: instantaneous field post-processing
 	- `avg/`: averaged field post-processing
 - `geometry/`: body geometry function source (`geometry/funcbody.f90`)
-- `output/`: simulation outputs (`field`, `field_avg`, `post_inst`, `post_avg`, `grid`, `ibmpre`, `ftr`)
-- `run.sh`: full pipeline runner (reset → pre-process → solver)
+- `output/`: per-case simulation outputs and active case pointer file
+- `run.sh`: primary orchestration script for the full workflow (geometry → pre-process → solver → post-process)
 - `reset.sh`: cleanup and re-initialize output directories
 
 ## Requirements
@@ -41,16 +41,60 @@ From the project root:
 bash run.sh
 ```
 
-This executes:
+This executes the orchestrated flow in `run.sh`:
 
-1. `bash reset.sh`
-2. `01_pre_processor/run_grid.sh`
-3. `01_pre_processor/run_preprocessing.sh`
-4. `02_solver/run_solver.sh`
+1. Geometry generation via `00_dimple_generator/main.py` (`-t -d -s -x`)
+2. Grid generation via `01_pre_processor/run_grid.sh`
+3. IBM pre-processing via `01_pre_processor/run_preprocessing.sh`
+4. Automatic CFR target update in `02_solver/settings.input` (`UDRV_I`)
+5. Solver execution via `02_solver/run_solver.sh`
+6. Full post-processing via `03_post_processor/run_postprocess_all.sh`
+
+`run.sh` should be treated as the default entrypoint for end-to-end runs.
+
+## Active Running Case File
+
+The active case is tracked in `output/running_case.env`. This file is intentionally simple so you can edit it manually to point post-generation tools to any existing case folder.
+
+Current format:
+
+```bash
+LESWHT_CASE_NAME=5_0.0_1.0_1.0_20260410_121706
+LESWHT_OUTPUT_ROOT=/anvil/projects/x-phy250071/LESwHT/output/5_0.0_1.0_1.0_20260410_121706
+LESWHT_GEOMETRY_STL=/anvil/projects/x-phy250071/LESwHT/output/5_0.0_1.0_1.0_20260410_121706/geometry/dimple_slab_ascii.stl
+```
+
+How it is used:
+
+1. `00_dimple_generator/main.py` writes/updates `output/running_case.env` after geometry generation.
+2. `01_pre_processor/run_grid.sh` sources `output/running_case.env` and writes grid outputs into `${LESWHT_OUTPUT_ROOT}/grid`.
+3. `01_pre_processor/run_preprocessing.sh` sources `output/running_case.env` and writes preprocessing outputs into `${LESWHT_OUTPUT_ROOT}/ibmpre`.
+
+How to switch active case manually:
+
+1. Edit `output/running_case.env`.
+2. Set `LESWHT_OUTPUT_ROOT` and `LESWHT_GEOMETRY_STL` to an existing case directory.
+3. Re-run `run_grid.sh` and/or `run_preprocessing.sh`.
 
 ## Stage-by-Stage Run
 
-### 1) Reset
+If you are not using the orchestrated `run.sh` flow, you can run stages manually as below.
+
+### 1) Geometry Generation
+
+From `00_dimple_generator/`:
+
+```bash
+python3 main.py -t 0 -d 45.0 -s 1.0 -x 1.0 --compact
+```
+
+Outputs:
+
+- case directory under `output/<topology>_<depth>_<scale>_<stretch>_<timestamp>/`
+- geometry STL at `.../geometry/dimple_slab_ascii.stl`
+- active case file `output/running_case.env`
+
+### 2) Reset (optional)
 
 ```bash
 bash reset.sh
@@ -59,9 +103,9 @@ bash reset.sh
 Actions:
 
 - cleans build artifacts in `01_pre_processor` and `02_solver`
-- recreates `output/` subdirectories
+- recreates only the `output/` root directory (case subdirectories are created by geometry generation)
 
-### 2) Grid Generation
+### 3) Grid Generation
 
 ```bash
 cd 01_pre_processor
@@ -70,14 +114,15 @@ bash run_grid.sh
 
 Inputs:
 
-- `01_pre_processor/grid.input`
+- `output/running_case.env` (active case selection)
+- case parameters from `LESWHT_CASE_NAME` when available (fallback: `01_pre_processor/grid.input`)
 
 Outputs:
 
 - `output/grid/grid.dat`
 - optional debug files in `output/grid/` (depending on `grid.input` debug options)
 
-### 3) IBM Pre-processing
+### 4) IBM Pre-processing
 
 ```bash
 cd 01_pre_processor
@@ -86,14 +131,15 @@ bash run_preprocessing.sh
 
 Inputs:
 
+- `output/running_case.env` (active case selection)
 - `01_pre_processor/preprocessing.input`
-- `output/grid/grid.dat`
+- `${LESWHT_OUTPUT_ROOT}/grid/grid.dat`
 
 Outputs:
 
 - IBM preprocessed binaries in `output/ibmpre/`
 
-### 4) Solver
+### 5) Solver
 
 ```bash
 cd 02_solver
