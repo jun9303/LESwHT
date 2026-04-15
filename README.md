@@ -53,7 +53,7 @@ Optional parameters:
 bash run.sh -t 0 -d 45.0 -s 1.0 -x 1.0
 ```
 
-CLI meanings in `run.sh`:
+Arguments in `run.sh`:
 
 - `-t`: topology ID (`0` to `6`)
 - `-d`: dimple depth (wall units)
