@@ -8,44 +8,44 @@
 
          if (io .ne. 0) then
            if (iread .ne. 1) then
-             open (2000, file='../output/ftr/fhist.dat')
-             open (2001, file='../output/ftr/fcdcl.dat')
-            open (2002, file='../output/ftr/fheatflux.dat')
-             open (2012, file='../output/ftr/ftemp.dat')
+              open (2000, file=trim(output_dir_ftr)//'/fhist.dat')
+              open (2001, file=trim(output_dir_ftr)//'/fcdcl.dat')
+              open (2002, file=trim(output_dir_ftr)//'/fheatflux.dat')
+              open (2012, file=trim(output_dir_ftr)//'/ftemp.dat')
              if (ntrace .ne. 0) then
-               open (2005, file='../output/ftr/futrace.dat')
-               open (2006, file='../output/ftr/fvtrace.dat')
-               open (2007, file='../output/ftr/fwtrace.dat')
-               open (2008, file='../output/ftr/fptrace.dat')
+                open (2005, file=trim(output_dir_ftr)//'/futrace.dat')
+                open (2006, file=trim(output_dir_ftr)//'/fvtrace.dat')
+                open (2007, file=trim(output_dir_ftr)//'/fwtrace.dat')
+                open (2008, file=trim(output_dir_ftr)//'/fptrace.dat')
              end if
              if (ich .ne. 0) then
-               open (2010, file='../output/ftr/fcmfr.dat')
+                open (2010, file=trim(output_dir_ftr)//'/fcmfr.dat')
              end if
-             open (2011, file='../output/ftr/ftime.dat')
+              open (2011, file=trim(output_dir_ftr)//'/ftime.dat')
            else
-             open (2000, file='../output/ftr/fhist.dat', &
+              open (2000, file=trim(output_dir_ftr)//'/fhist.dat', &
                    position='append')
-             open (2001, file='../output/ftr/fcdcl.dat', &
+              open (2001, file=trim(output_dir_ftr)//'/fcdcl.dat', &
                    position='append')
-            open (2002, file='../output/ftr/fheatflux.dat', &
+              open (2002, file=trim(output_dir_ftr)//'/fheatflux.dat', &
                    position='append')
-             open (2012, file='../output/ftr/ftemp.dat', &
+              open (2012, file=trim(output_dir_ftr)//'/ftemp.dat', &
                position='append')
              if (ntrace .ne. 0) then
-               open (2005, file='../output/ftr/futrace.dat', &
+                open (2005, file=trim(output_dir_ftr)//'/futrace.dat', &
                      position='append')
-               open (2006, file='../output/ftr/fvtrace.dat', &
+                open (2006, file=trim(output_dir_ftr)//'/fvtrace.dat', &
                      position='append')
-               open (2007, file='../output/ftr/fwtrace.dat', &
+                open (2007, file=trim(output_dir_ftr)//'/fwtrace.dat', &
                      position='append')
-               open (2008, file='../output/ftr/fptrace.dat', &
+                open (2008, file=trim(output_dir_ftr)//'/fptrace.dat', &
                      position='append')
              end if
              if (ich .ne. 0) then
-               open (2010, file='../output/ftr/fcmfr.dat', &
+                open (2010, file=trim(output_dir_ftr)//'/fcmfr.dat', &
                      position='append')
              end if
-             open (2011, file='../output/ftr/ftime.dat', &
+              open (2011, file=trim(output_dir_ftr)//'/ftime.dat', &
                    position='append')
            end if
          else
@@ -224,14 +224,16 @@
          integer(8) :: i, j, k
          integer(8) :: idum
          real(8) :: dum
-         character*26 :: tname
-         character*19 :: tfn1
+          character(len=1024) :: tname
+          character(len=512) :: tfn1
+          character(len=7) :: ihstr
 
          idum = 0
          dum = 0.
 
-         tfn1 = '../output/field/fld'
-         write (tname, '(a,i7.7)') tfn1, ihist
+          tfn1 = trim(output_dir_field)//'/fld'
+          write (ihstr, '(i7.7)') ihist
+          tname = trim(tfn1)//ihstr
 
          open (nv, file=tname, form='unformatted')
          write (nv) n1, n2, n3, re, pr, gr
@@ -481,7 +483,7 @@
            write (tfn3, '(i7.7)') ihist
            tname = tfn1//tfn2//tfnh//tfn3
 
-           open (nav, file='../output/field_avg/'//tname, form='unformatted')
+            open (nav, file=trim(output_dir_field_avg)//'/'//tname, form='unformatted')
            write (nav) n1m, n2m, n3m, re
           write (nav) timeinit, timeend, dble(ihistinit), dble(ihistend)
            write (nav) (((uavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
@@ -499,7 +501,7 @@
            end if
            close (nav)
 
-           open (2999, file='../output/field_avg/fav_manifest.dat', position='append')
+            open (2999, file=trim(output_dir_field_avg)//'/fav_manifest.dat', position='append')
            write (2999, '(a)') trim(tname)
            close (2999)
 
@@ -556,7 +558,7 @@
           write (tfn3, '(i7.7)') ihist
           tname = 'fav'//tfn2//tfnh//tfn3
 
-          open (nav, file='../output/field_avg/'//tname, form='unformatted')
+           open (nav, file=trim(output_dir_field_avg)//'/'//tname, form='unformatted')
           write (nav) n1m, n2m, n3m, re
           write (nav) timeinit, time, dble(ihistinit), dble(ihistend)
           write (nav) (((uavg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
@@ -574,7 +576,7 @@
           end if
           close (nav)
 
-          open (2999, file='../output/field_avg/fav_manifest.dat', position='append')
+           open (2999, file=trim(output_dir_field_avg)//'/fav_manifest.dat', position='append')
           write (2999, '(a)') trim(tname)
           close (2999)
           nav = nav + 1
@@ -601,7 +603,7 @@
         have_data = .false.
         file_count = 0
         timeend_all = avg_tst
-        open (2998, file='../output/field_avg/fav_manifest.dat', status='old', iostat=ios)
+         open (2998, file=trim(output_dir_field_avg)//'/fav_manifest.dat', status='old', iostat=ios)
         if (ios .ne. 0) then
           deallocate (tmp3d, tmp4d3, tmp4d6)
           return
@@ -613,7 +615,7 @@
           if (len_trim(fname) .le. 0) cycle
 
           iu = 2997
-          open (iu, file='../output/field_avg/'//trim(fname), form='unformatted', status='old', iostat=ios)
+           open (iu, file=trim(output_dir_field_avg)//'/'//trim(fname), form='unformatted', status='old', iostat=ios)
           if (ios .ne. 0) cycle
 
           read (iu, iostat=ios) n1mr, n2mr, n3mr, rer
@@ -668,12 +670,12 @@
         write (tfn3, '(i7.7)') ihistend
         tname = 'fav'//tfn2//tfnh//tfn3
 
-        call execute_command_line('mkdir -p ../output/field_avg/combined', exitstat=cmdstat)
+          call execute_command_line('mkdir -p ' // trim(output_dir_field_avg)//'/combined', exitstat=cmdstat)
         if (cmdstat .ne. 0) then
-          write (*, *) 'WARNING: failed to create ../output/field_avg/combined; writing combined file in ../output/field_avg/'
-          open (nav, file='../output/field_avg/'//tname, form='unformatted')
+            write (*, *) 'WARNING: failed to create combined avg directory; writing in field_avg root.'
+            open (nav, file=trim(output_dir_field_avg)//'/'//tname, form='unformatted')
         else
-          open (nav, file='../output/field_avg/combined/'//tname, form='unformatted')
+            open (nav, file=trim(output_dir_field_avg)//'/combined/'//tname, form='unformatted')
         end if
         write (nav) n1m, n2m, n3m, re
         write (nav) timeinit, timeend_all, dble(ihistinit), dble(ihistend)

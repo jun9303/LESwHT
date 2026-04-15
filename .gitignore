@@ -14,11 +14,15 @@
 *.pyc
 
 # Simulation Output Directories & Files
+.sout/
 .output*/
 output/
 *.dat
 *.plt
+
+# Miscellaneous
 fort.*
+.venv/
 
 # System Files
 .DS_Store

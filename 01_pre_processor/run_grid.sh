@@ -1,5 +1,16 @@
 #!/bin/bash
 
+set -e
+
+if [ -f ../output/running_case.env ]; then
+    # shellcheck source=/dev/null
+    source ../output/running_case.env
+fi
+
+export LESWHT_CASE_NAME="${LESWHT_CASE_NAME:-}"
+export LESWHT_OUTPUT_ROOT="${LESWHT_OUTPUT_ROOT:-../output}"
+export LESWHT_GEOMETRY_STL="${LESWHT_GEOMETRY_STL:-}"
+
 # 1. Resource Limits
 ulimit -s unlimited
 # ulimit -v unlimited  # Let scheduler handle memory
@@ -18,7 +29,8 @@ export OMP_DYNAMIC=TRUE
 
 # 3. Clean Previous Output
 echo "Cleaning old grid files..."
-rm -rf ../output/grid/*
+mkdir -p "${LESWHT_OUTPUT_ROOT}/grid"
+rm -rf "${LESWHT_OUTPUT_ROOT}/grid"/*
 
 # 4. Execution
 echo "Running Grid Generator..."

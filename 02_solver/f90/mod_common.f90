@@ -5,10 +5,18 @@ module mod_common
   integer(8) :: ireset, iread, iavg, ipzero, nend, nprint, &
                 npriavg, npin, idtopt, nlev, mode, nbli, &
                 ioldv, mgitr, imgsor, iles, insmdl, itemdl, &
-             idvmon, filter, ibmon, masson, grdir, &
+             idvmon, filter, idelta_sgs, ibmon, masson, grdir, &
                imovingon, ihtrans, idecomp, ntrace, ntr, trpts(64, 3)
-  character*25 :: gridfile
-  character*25 :: prev_fld
+  character(len=512) :: gridfile
+  character(len=512) :: prev_fld
+  character(len=512) :: output_root
+  character(len=512) :: output_dir_grid
+  character(len=512) :: output_dir_ibmpre
+  character(len=512) :: output_dir_field
+  character(len=512) :: output_dir_field_avg
+  character(len=512) :: output_dir_ftr
+  character(len=512) :: output_dir_post_inst
+  character(len=512) :: output_dir_post_avg
 
 !!!!!!!!!!!!!!!!!!!!! BOUNDARY CONDITIONS (BOUNDARY.INPUT & IBMPRE_PRDIC.BIN)
   integer(8) :: xprdic, yprdic, zprdic, iintp
@@ -108,6 +116,55 @@ module mod_common
 !     IHISTINIT,IHISTINITZ : START AND END TIME STEP FOR AVERAGE FIELD
 
 contains
+!=======================================================================
+  subroutine init_output_paths
+!=======================================================================
+    implicit none
+    character(len=512) :: env_root
+    integer :: env_len, env_stat, n
+
+    env_root = '../output'
+    call get_environment_variable('LESWHT_OUTPUT_ROOT', env_root, length=env_len, status=env_stat)
+
+    if ((env_stat .eq. 0) .and. (env_len .gt. 0)) then
+      output_root = adjustl(env_root(1:env_len))
+    else
+      output_root = '../output'
+    end if
+
+    n = len_trim(output_root)
+    do while (n .gt. 1 .and. output_root(n:n) .eq. '/')
+      output_root(n:n) = ' '
+      n = n - 1
+    end do
+
+    output_dir_grid = trim(output_root)//'/grid'
+    output_dir_ibmpre = trim(output_root)//'/ibmpre'
+    output_dir_field = trim(output_root)//'/field'
+    output_dir_field_avg = trim(output_root)//'/field_avg'
+    output_dir_ftr = trim(output_root)//'/ftr'
+    output_dir_post_inst = trim(output_root)//'/post_inst'
+    output_dir_post_avg = trim(output_root)//'/post_avg'
+
+  end subroutine init_output_paths
+!=======================================================================
+  subroutine resolve_legacy_output_path(path)
+!=======================================================================
+    implicit none
+    character(len=*), intent(inout) :: path
+    character(len=512) :: src
+
+    src = adjustl(trim(path))
+
+    if (index(src, '../output/') .eq. 1) then
+      path = trim(output_root)//'/'//trim(src(11:))
+    else if ((index(src, 'grid/') .eq. 1) .or. (index(src, 'field/') .eq. 1) .or. &
+             (index(src, 'field_avg/') .eq. 1) .or. (index(src, 'ibmpre/') .eq. 1) .or. &
+             (index(src, 'ftr/') .eq. 1)) then
+      path = trim(output_root)//'/'//trim(src)
+    end if
+
+  end subroutine resolve_legacy_output_path
 !=======================================================================
   subroutine allo(nn1, nn2, nn3)
 !=======================================================================

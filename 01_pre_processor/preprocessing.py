@@ -6,12 +6,18 @@
 # IN-LAB USE ONLY. PLZ DO NOT DISTRIBUTE FOR COMMERCIAL USE.
 #
 import sys
+import os
 import numpy as np
 
 from lib import lib_setgrid, lib_preprocessing
 
 # Import the compiled Fortran extension (compiled by f2py)
 import lib_ibm_body
+
+OUTPUT_ROOT = os.environ.get('LESWHT_OUTPUT_ROOT', '../output')
+GRID_PATH = os.path.join(OUTPUT_ROOT, 'grid', 'grid.dat')
+IBMPRE_DIR = os.path.join(OUTPUT_ROOT, 'ibmpre')
+os.makedirs(IBMPRE_DIR, exist_ok=True)
 
 # Read the input file
 file = open('preprocessing.input', 'r')
@@ -39,7 +45,7 @@ debugopt = {'U_surf_3D' : str(inputs[0]), 'V_surf_3D' : str(inputs[1]), 'W_surf_
 del(dummyline, inputs)
 file.close()
 
-file = open('../output/ibmpre/ibmpre_prdic.bin', 'w')
+file = open(os.path.join(IBMPRE_DIR, 'ibmpre_prdic.bin'), 'w')
 
 if XPRDIC == 'ON':
     XPRDIC_ = 1
@@ -76,7 +82,7 @@ else:
     sys.exit(1)
 
 # Call the grid.dat file and define geometric variables for calculation
-grid = lib_setgrid.setgrid('../output/grid/grid.dat', XPRDIC, YPRDIC, ZPRDIC)
+grid = lib_setgrid.setgrid(GRID_PATH, XPRDIC, YPRDIC, ZPRDIC)
 # grid['N_i'] : number of gridlines in i-direction
 # grid['Cell_i'] : number of cells in i-direction = grid['N-i']-1
 # grid['L_i'] : computational domain length in i-direction
@@ -134,6 +140,12 @@ if HTRNFR == 'ON':
     INOUT.update({ 't':np.empty((N_x+1,N_y+1,N_z+1), dtype=int, order='F')})
     [NBODY['t'], INOUT['t']] = lib_ibm_body.find_inout(XM,YM,ZM,.0)
     print('# of body pts for T = %d' %(NBODY['t']))
+
+    def print_body_point_balance(label, nbody, nintp, ninner):
+        eligible = nintp + ninner
+        excluded = nbody - eligible
+        print('Body point balance [%s] : eligible = %d, excluded-by-staggered-boundary = %d' \
+            %(label, eligible, excluded))
 
 NINNER = {'u':0, 'v':0, 'w':0}                                # Number of inner pts
 FCP = {'u':np.empty([NBODY['u'],3], dtype=int, order='F'), \
@@ -218,6 +230,13 @@ if IBMINT == 'ON':
     if HTRNFR == 'ON':
         print('# of inner forcing pts for T = %d' %(NINNER['t']))
 
+    print('\nIBM body point eligibility summary ----------')
+    print_body_point_balance('U', NBODY['u'], NINTP['u'], NINNER['u'])
+    print_body_point_balance('V', NBODY['v'], NINTP['v'], NINNER['v'])
+    print_body_point_balance('W', NBODY['w'], NINTP['w'], NINNER['w'])
+    if HTRNFR == 'ON':
+        print_body_point_balance('T', NBODY['t'], NINTP['t'], NINNER['t'])
+
     XX = lib_ibm_body.geomfac_preset(X, XM, XPRDIC)
     YY = lib_ibm_body.geomfac_preset(Y, YM, YPRDIC)
     ZZ = lib_ibm_body.geomfac_preset(Z, ZM, ZPRDIC)
@@ -252,6 +271,13 @@ elif IBMINT == 'OFF':
         [NINNER['t'], FCP['t']] = lib_ibm_body.findbdy_nointp(4, NBODY['t'], INOUT['t'])
         FCP['t'] = FCP['t'][0:NINNER['t'],:].copy()    
         print('# of forcing pts for T = %d' %(NINNER['t']))
+
+    print('\nIBM body point eligibility summary ----------')
+    print_body_point_balance('U', NBODY['u'], 0, NINNER['u'])
+    print_body_point_balance('V', NBODY['v'], 0, NINNER['v'])
+    print_body_point_balance('W', NBODY['w'], 0, NINNER['w'])
+    if HTRNFR == 'ON':
+        print_body_point_balance('T', NBODY['t'], 0, NINNER['t'])
 
 else:
     print('Wrong IBMINT input(ON/OFF only). Plz check again.')

@@ -11,7 +11,7 @@ BC_T_ZBTM  BC_T_ZTOP  (Thermal Z BC: 0=Dirichlet, 1=Neumann. Ignored if ZPRDIC: 
 VAL_T_ZBTM VAL_T_ZTOP (Dirichlet: Temp, Neumann: dT/dn)
 0.0        0.0
 ICH        ICONJG
-2          1
+1          0
 
 ### For Momentum BC_XBTM & BC_XTOP
 BC_XBTM & BC_XTOP (Momentum) will be automatically set to velocity_inlet (2) & convective outlet (3)

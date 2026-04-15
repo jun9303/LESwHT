@@ -973,6 +973,10 @@ def output_3d_tec(
 
 def main():
     SEP = '=' * 68
+    output_root = os.environ.get('LESWHT_OUTPUT_ROOT', '../../output')
+    grid_path = os.path.join(output_root, 'grid', 'grid.dat')
+    field_dir = os.path.join(output_root, 'field')
+    outdir = os.path.join(output_root, 'post_inst')
 
     # --- Read input file ---
     params = read_input_inst('post_inst.input')
@@ -986,12 +990,12 @@ def main():
     if params['NFLD'] >= 1:
         try:
             XPRDIC, YPRDIC, ZPRDIC = read_periodic_flags(
-                params['FLDNAME'][0], '../../output/field')
+                params['FLDNAME'][0], field_dir)
         except Exception as e:
             print(f"  Warning: could not read periodic flags: {e}")
 
     # --- Grid geometry ---
-    g = read_grid('../../output/grid/grid.dat',
+    g = read_grid(grid_path,
                   periodic_z=(ZPRDIC == 1),
                   periodic_x=(XPRDIC == 1))
     adjust_post_bounds(g, params)
@@ -1001,7 +1005,7 @@ def main():
     if IUNIGRID == 1:
         compute_griduni(g)
 
-    OUTDIR = '../../output/post_inst'
+    OUTDIR = outdir
     os.makedirs(OUTDIR, exist_ok=True)
 
     # --- Loop over field files ---
@@ -1011,7 +1015,7 @@ def main():
         print(f" WORKING ON  {fldname}")
 
         U, V, W, P, T, Re, Pr, Gr = read_inst_field(
-            fldname, g, IHTRANS, XPRDIC, ZPRDIC)
+            fldname, g, IHTRANS, XPRDIC, ZPRDIC, field_dir)
 
         UC, VC, WC, VORX, VORY, VORZ, VLAMBDA2 = compute_vorn_lambda2(
             g, U, V, W, P, IBMON)

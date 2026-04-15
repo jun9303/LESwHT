@@ -1,12 +1,12 @@
 SGS-CALC    X-PERIODIC  Z-PERIODIC  IBM-INTERP  HTRANSFR
 ON          ON          ON          ON          ON      
 CONJHTRANS  H.CAP_RAT(f/s)  COND._RATIO(s/f)
-ON          0.000292        1880.
+OFF         0.000292        1880.
 BODY-RECOGNITION (0: DIRECT CODING FROM lib_ibm_body_init.PY / 1: POINT EXTRACTION FROM STL FILE)
 0
 Debugging Options
 U_BODY_3D    V_BODY_3D    W_BODY_3D
-ON           OFF          OFF
+ON           ON           ON
 -----
 
 Explanation -

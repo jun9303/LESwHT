@@ -2,6 +2,19 @@
 
 set -e
 
+if [ -f ../output/running_case.env ]; then
+    # shellcheck source=/dev/null
+    source ../output/running_case.env
+fi
+
+export LESWHT_OUTPUT_ROOT="${LESWHT_OUTPUT_ROOT:-../output}"
+
+mkdir -p "$LESWHT_OUTPUT_ROOT/ftr" \
+         "$LESWHT_OUTPUT_ROOT/field" \
+         "$LESWHT_OUTPUT_ROOT/field_avg" \
+         "$LESWHT_OUTPUT_ROOT/post_inst" \
+         "$LESWHT_OUTPUT_ROOT/post_avg"
+
 # 1. Resource Limits
 ulimit -s unlimited
 # ulimit -v unlimited  # Let scheduler handle memory
@@ -24,7 +37,7 @@ export CXX=g++
 if [ -n "$SLURM_CPUS_PER_TASK" ]; then
     export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 else
-    export OMP_NUM_THREADS=4
+    export OMP_NUM_THREADS=128
 fi
 
 export OMP_STACKSIZE=1G

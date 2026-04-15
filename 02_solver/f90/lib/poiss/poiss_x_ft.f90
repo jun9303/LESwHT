@@ -46,7 +46,7 @@
           end do
         end do
 
-        open (77, file='../output/ftr/mgftresiduemax.dat')
+          open (77, file=trim(output_dir_ftr)//'/mgftresiduemax.dat')
 
         return
       end subroutine poisinit

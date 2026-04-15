@@ -1,22 +1,22 @@
 RE#     PR#     GR#     GRDIR   TFLU_I  TSOL_I
-180.    0.71    0.      2       0.      0.
+2815.   0.71    0.      2       0.      0.
 IRESET  IREAD   IAVG    IPZERO  EPS_PTR UDRV_I
-1       0       1       0       6.      1.
+1       0       1       0       .5       0.9063948395
 NEND    NPRINT  NPRIAVG NPIN
 999999  10000   50000   1
 TEND    PTB_TST AVG_TST
-200.    4.      20.
+1600.   64.     160.
 IDTOPT  DT_SIZE CFLFAC
 1       .005    1.
 RESID1  NLEV    NBLI    IOLDV   MGITR   IMGSOR  WWSOR
 1.0E-6  5       3       0       500     170     1.8
-ILES    INSMDL  ITEMDL  IDVMON  CSGSTS  CSGSHF  FILTER
-1       1       0       1       0.025   0.003   3
+ILES    INSMDL  ITEMDL  IDVMON  CSGSTS  CSGSHF  FILTER  IDELTA_SGS
+1       1       0       0       1.0E-4  1.0E-5  3       1
 IBMON   MASSON  IMOVING IHTRANS IDECOMP
 1       1       0       1       1
 FILES
-"../output/grid/grid.bin"
-"../output/field/fld000000"
+"grid/grid.bin"
+"field/fld0000000"
 TRACE   NTR
 0       1
 10      10      10
@@ -65,6 +65,7 @@ IDVMON : Dynamic CSGS determination with Germano identity model (0; Off, 1; On)
 CSGSTS : SGS_TS (turbulent stress) coefficient (* Only meaningful when IDVMON: 0)
 CSGSHF : SGS_HF (heat flux) coefficient        (* Only meaningful when IDVMON: 0)
 FILTER : SGS FILTERING (1; X, 2; Z, 3; XZ)
+IDELTA_SGS : SGS delta definition for thermal eddy diffusivity (1; cube-root volume, 2; max(dx,dy,dz))
 
 IBMON  : Immersed boundary method (0; Deactivate, 1; Activate)
 MASSON : Mass source/sink correction (0; Deactivate, 1; Activate)

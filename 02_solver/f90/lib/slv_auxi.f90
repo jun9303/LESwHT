@@ -675,13 +675,17 @@
          use mod_flowarray
          implicit none
          integer(8) :: i, j, k, n, l, ii, jj, kk
-         real(8) :: cd(3), cdavg(3), vol_solid_geom, vol_cell
+         real(8) :: cd(3), cdavg(3), cd_ibm(3), cd_inr(3), cd_ws(3)
+         real(8) :: vol_solid_geom, vol_cell
          real(8) :: dti, funcbody, tmp, vol_fluid
          real(8) :: dy1, dy2, dz1, dz2, grad_u, grad_v, grad_w
 
          dti = 1.0d0 / dt
 
          cd = 0.0d0
+         cd_ibm = 0.0d0
+         cd_inr = 0.0d0
+         cd_ws = 0.0d0
          vol_solid_geom = 0.0d0
 
          ! 1. ESTIMATE SOLID VOLUME FROM THE CURRENT GEOMETRY MASK.
@@ -701,7 +705,7 @@
          if (vol_fluid .le. 0.0d0) vol_fluid = xl * yl * zl
 
          ! 2. INTEGRATE THE RAW IBM FORCING (FCVAVG) OVER THE ACTIVE IBM NODES
-!$OMP PARALLEL DO PRIVATE(N, L, II, JJ, KK, VOL_CELL) REDUCTION(-:CD)
+!$OMP PARALLEL DO PRIVATE(N, L, II, JJ, KK, VOL_CELL) REDUCTION(+:CD_IBM)
          do l = 1, 3
            do n = 1, nbody(l)
              ii = ifc(n, l)
@@ -711,7 +715,7 @@
              vol_cell = c2cx(ii) * f2fy(jj) * f2fz(kk)
 
              ! RAW IBM FORCE (TERM 1 OF EQ. 11)
-             cd(l) = cd(l) - fcvavg(n, l) * vol_cell
+             cd_ibm(l) = cd_ibm(l) - fcvavg(n, l) * vol_cell
            end do
          end do
 !$OMP END PARALLEL DO
@@ -719,9 +723,9 @@
          ! 3. ADD THE MATERIAL DERIVATIVE (TERM 2 OF EQ. 11)
          !    THESE ARE DIRECTLY SUPPLIED BY YOUR EXISTING LAGFORCE SUBROUTINE.
          !    FOR STATIONARY BODIES, DUDT ARE EFFECTIVELY ZERO, SO THIS MIGHT HAVE A NEGLIGIBLE CONTRIBUTION.
-         cd(1) = cd(1) + dudta
-         cd(2) = cd(2) + dvdta
-         cd(3) = cd(3) + dwdta
+         cd_inr(1) = dudta
+         cd_inr(2) = dvdta
+         cd_inr(3) = dwdta
 
          ! 4. ADD COMPUTATIONAL-WALL SHEAR CONTRIBUTIONS
          ! --- Y-BOTTOM WALL ---
@@ -729,17 +733,17 @@
            tmp = 0.0d0
            dy1 = 1.0d0 / c2cyi(1)
            dy2 = dy1 + 1.0d0 / c2cyi(2)
-!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_W) REDUCTION(+:CD)
+!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_W) REDUCTION(+:CD_WS)
            do k = 1, n3m
              do i = 1, n1m
                if (funcbody(x(i), ymp(1), zmp(k), time) .ge. 1.d-10) then
                  grad_u = (u(i, 1, k) * dy2**2 - u(i, 2, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
                  tmp = grad_u * c2cx(i) * f2fz(k)
-                 cd(1) = cd(1) + tmp / re
+                 cd_ws(1) = cd_ws(1) + tmp / re
 
                  grad_w = (w(i, 1, k) * dy2**2 - w(i, 2, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
                  tmp = grad_w * c2cx(i) * f2fz(k)
-                 cd(3) = cd(3) + tmp / re
+                 cd_ws(3) = cd_ws(3) + tmp / re
                end if
              end do
            end do
@@ -751,17 +755,17 @@
            tmp = 0.0d0
            dy1 = 1.0d0 / c2cyi(n2)
            dy2 = dy1 + 1.0d0 / c2cyi(n2m)
-!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_W) REDUCTION(+:CD)
+!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_W) REDUCTION(+:CD_WS)
            do k = 1, n3m
              do i = 1, n1m
                if (funcbody(x(i), ymp(n2m), zmp(k), time) .ge. 1.d-10) then
                  grad_u = (u(i, n2m, k) * dy2**2 - u(i, n2m-1, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
                  tmp = grad_u * c2cx(i) * f2fz(k)
-                 cd(1) = cd(1) + tmp / re
+                 cd_ws(1) = cd_ws(1) + tmp / re
 
                  grad_w = (w(i, n2m, k) * dy2**2 - w(i, n2m-1, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
                  tmp = grad_w * c2cx(i) * f2fz(k)
-                 cd(3) = cd(3) + tmp / re
+                 cd_ws(3) = cd_ws(3) + tmp / re
                end if
              end do
            end do
@@ -773,17 +777,17 @@
            tmp = 0.0d0
            dz1 = 1.0d0 / c2czi(1)
            dz2 = dz1 + 1.0d0 / c2czi(2)
-!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_V) REDUCTION(+:CD)
+!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_V) REDUCTION(+:CD_WS)
            do j = 1, n2m
              do i = 1, n1m
                if (funcbody(x(i), ymp(j), zmp(1), time) .ge. 1.d-10) then
                  grad_u = (u(i, j, 1) * dz2**2 - u(i, j, 2) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
                  tmp = grad_u * c2cx(i) * f2fy(j)
-                 cd(1) = cd(1) + tmp / re
+                 cd_ws(1) = cd_ws(1) + tmp / re
 
                  grad_v = (v(i, j, 1) * dz2**2 - v(i, j, 2) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
                  tmp = grad_v * c2cx(i) * f2fy(j)
-                 cd(2) = cd(2) + tmp / re
+                 cd_ws(2) = cd_ws(2) + tmp / re
                end if
              end do
            end do
@@ -795,24 +799,38 @@
            tmp = 0.0d0
            dz1 = 1.0d0 / c2czi(n3)
            dz2 = dz1 + 1.0d0 / c2czi(n3m)
-!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_V) REDUCTION(+:CD)
+!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_V) REDUCTION(+:CD_WS)
            do j = 1, n2m
              do i = 1, n1m
                if (funcbody(x(i), ymp(j), zmp(n3m), time) .ge. 1.d-10) then
                  grad_u = (u(i, j, n3m) * dz2**2 - u(i, j, n3m-1) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
                  tmp = grad_u * c2cx(i) * f2fy(j)
-                 cd(1) = cd(1) + tmp / re
+                 cd_ws(1) = cd_ws(1) + tmp / re
 
                  grad_v = (v(i, j, n3m) * dz2**2 - v(i, j, n3m-1) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
                  tmp = grad_v * c2cx(i) * f2fy(j)
-                 cd(2) = cd(2) + tmp / re
+                 cd_ws(2) = cd_ws(2) + tmp / re
                end if
              end do
            end do
 !$OMP END PARALLEL DO
          end if
 
+         cd = cd_ibm + cd_inr + cd_ws
+
          ! 5. NON-DIMENSIONALIZE TOTAL FORCE TO EVALUATE WALL SHEAR STRESS (TAU_W)
+         cd_ibm(1) = cd_ibm(1) / (xl * yl * zl)
+         cd_ibm(2) = cd_ibm(2) / (xl * yl * zl)
+         cd_ibm(3) = cd_ibm(3) / (xl * yl * zl)
+
+         cd_inr(1) = cd_inr(1) / (xl * yl * zl)
+         cd_inr(2) = cd_inr(2) / (xl * yl * zl)
+         cd_inr(3) = cd_inr(3) / (xl * yl * zl)
+
+         cd_ws(1) = cd_ws(1) / (xl * yl * zl)
+         cd_ws(2) = cd_ws(2) / (xl * yl * zl)
+         cd_ws(3) = cd_ws(3) / (xl * yl * zl)
+
          cd(1) = cd(1) / (xl * yl * zl)
          cd(2) = cd(2) / (xl * yl * zl)
          cd(3) = cd(3) / (xl * yl * zl)

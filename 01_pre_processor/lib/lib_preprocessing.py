@@ -1,4 +1,12 @@
 import numpy as np
+import os
+
+OUTPUT_ROOT = os.environ.get('LESWHT_OUTPUT_ROOT', '../output')
+GRID_DIR = os.path.join(OUTPUT_ROOT, 'grid')
+IBMPRE_DIR = os.path.join(OUTPUT_ROOT, 'ibmpre')
+
+os.makedirs(GRID_DIR, exist_ok=True)
+os.makedirs(IBMPRE_DIR, exist_ok=True)
 
 def GFIDebug(geomfac, intptype, intpindx, fcp, x, y, z):
     gfimax = [0, 0, 0]
@@ -89,7 +97,7 @@ def GFIDebug(geomfac, intptype, intpindx, fcp, x, y, z):
     print('# of intptype equals to 3           = %10d' %(type3))
 
 def surf3D(x_coord, y_coord, z_coord, INOUT, filename):
-    file = open('../output/ibmpre/surf_body_3D_%s.dat' %(filename), 'w')
+    file = open(os.path.join(IBMPRE_DIR, 'surf_body_3D_%s.dat' %(filename)), 'w')
 
     inout_ori = INOUT[1:INOUT.shape[0]-1, 1:INOUT.shape[1]-1, 1:INOUT.shape[2]-1] 
     inout_ip  = INOUT[0:INOUT.shape[0]-2, 1:INOUT.shape[1]-1, 1:INOUT.shape[2]-1]
@@ -105,12 +113,16 @@ def surf3D(x_coord, y_coord, z_coord, INOUT, filename):
         for j in range(surf.shape[1]):
             for k in range(surf.shape[2]):
                 if (INOUT[i+1][j+1][k+1] == 0) and (surf[i][j][k]):
-                    file.write('%23.15f%23.15f%23.15f\n' %(x_coord[i], y_coord[j], z_coord[k]))
+                    xp = x_coord[i+1]
+                    yp = y_coord[j+1]
+                    zp = z_coord[k+1]
+
+                    file.write('%23.15f%23.15f%23.15f\n' %(xp, yp, zp))
 
     file.close()
 
 def grid_preprocessing_data(grid):
-    file = open('../output/grid/grid.bin', 'w')
+    file = open(os.path.join(GRID_DIR, 'grid.bin'), 'w')
 
     def write_int_line(values):
         for value in values:
@@ -173,13 +185,13 @@ def write_ibmpre_placeholders(grid, lessgs='OFF', htrnfr='OFF', conjg='OFF'):
     print('\n*** WRITING PLACEHOLDER IBM-PREPROCESSING DATA (SAFE DEFAULTS) ***')
 
     # 1) IBM forcing-point file (mandatory for solver alloinit/ibmpreread)
-    with open('../output/ibmpre/ibmpre_fcpts.bin', 'w') as file:
+    with open(os.path.join(IBMPRE_DIR, 'ibmpre_fcpts.bin'), 'w') as file:
         file.write('0 0 0\n')
         file.write('0 0 0\n')
 
     # 2) Thermal IBM forcing-point file (mandatory when ihtrans==1)
     if htrnfr == 'ON':
-        with open('../output/ibmpre/ibmpre_fcpts_t.bin', 'w') as file:
+        with open(os.path.join(IBMPRE_DIR, 'ibmpre_fcpts_t.bin'), 'w') as file:
             file.write('0\n')
             file.write('0\n')
 
@@ -189,10 +201,10 @@ def write_ibmpre_placeholders(grid, lessgs='OFF', htrnfr='OFF', conjg='OFF'):
         n2m = grid['Cell_y']
         n3m = grid['Cell_z']
 
-        with open('../output/ibmpre/ibmpre_nutzero.bin', 'w') as file:
+        with open(os.path.join(IBMPRE_DIR, 'ibmpre_nutzero.bin'), 'w') as file:
             file.write('0\n\n\n\n')
 
-        with open('../output/ibmpre/ibmpre_wallfdvm.bin', 'w') as file:
+        with open(os.path.join(IBMPRE_DIR, 'ibmpre_wallfdvm.bin'), 'w') as file:
             # Fluid everywhere: wall-distance mask defaults to 1
             for _k in range(n3m):
                 for _j in range(n2m):
@@ -205,7 +217,7 @@ def write_ibmpre_placeholders(grid, lessgs='OFF', htrnfr='OFF', conjg='OFF'):
         n2m = grid['Cell_y']
         n3m = grid['Cell_z']
 
-        with open('../output/ibmpre/ibmpre_conjg.bin', 'w') as file:
+        with open(os.path.join(IBMPRE_DIR, 'ibmpre_conjg.bin'), 'w') as file:
             # cstar
             for _k in range(n3m):
                 for _j in range(n2m):
@@ -221,8 +233,8 @@ def write_ibmpre_placeholders(grid, lessgs='OFF', htrnfr='OFF', conjg='OFF'):
                             file.write(' 1.0 ')
 
 def ibm_preprocessing_data(nintp,ninner,fcp,intpindx,geomfac):
-    print('\n*** WRITING IMMERSED-BODY DATA INTO ../output/ibmpre/ibmpre_fcpts.bin ***')
-    file = open('../output/ibmpre/ibmpre_fcpts.bin', 'w')
+    print('\n*** WRITING IMMERSED-BODY DATA INTO output_root/ibmpre/ibmpre_fcpts.bin ***')
+    file = open(os.path.join(IBMPRE_DIR, 'ibmpre_fcpts.bin'), 'w')
 
     file.write('%d %d %d\n' %(nintp['u'], nintp['v'], nintp['w']))
     file.write('%d %d %d\n' %(ninner['u'], ninner['v'], ninner['w']))
@@ -277,7 +289,7 @@ def ibm_preprocessing_data(nintp,ninner,fcp,intpindx,geomfac):
     file.close()
 
 def ibm_preprocessing_data_htransfer(nintp,ninner,fcp,intpindx,geomfac):
-    file = open('../output/ibmpre/ibmpre_fcpts_t.bin', 'w')
+    file = open(os.path.join(IBMPRE_DIR, 'ibmpre_fcpts_t.bin'), 'w')
 
     file.write('%d\n' %(nintp['t']))
     file.write('%d\n' %(ninner['t']))
@@ -304,8 +316,8 @@ def ibm_preprocessing_data_htransfer(nintp,ninner,fcp,intpindx,geomfac):
 
 
 def les_preprocessing_data(nzero,iszero):
-    print('\n*** WRITING LES-SGS_ZERO DATA INTO ../output/ibmpre/ibmpre_nutzero.bin ***')
-    file = open('../output/ibmpre/ibmpre_nutzero.bin', 'w')
+    print('\n*** WRITING LES-SGS_ZERO DATA INTO output_root/ibmpre/ibmpre_nutzero.bin ***')
+    file = open(os.path.join(IBMPRE_DIR, 'ibmpre_nutzero.bin'), 'w')
 
     file.write('%d \n' %(nzero))
 
@@ -329,8 +341,8 @@ def les_preprocessing_data(nzero,iszero):
 
     file.close()
 
-    print('*** WRITING LES-SGS_ZERO DATA INTO ../output/ibmpre/ibmpre_wallfdvm.bin ***')
-    file = open('../output/ibmpre/ibmpre_wallfdvm.bin', 'w')
+    print('*** WRITING LES-SGS_ZERO DATA INTO output_root/ibmpre/ibmpre_wallfdvm.bin ***')
+    file = open(os.path.join(IBMPRE_DIR, 'ibmpre_wallfdvm.bin'), 'w')
 
     for k in range(iszero.shape[2]):
         for j in range(iszero.shape[1]):
@@ -340,8 +352,8 @@ def les_preprocessing_data(nzero,iszero):
     file.close()
 
 def conjg_preprocessing_data(cstar,kstar):
-    print('\n*** WRITING CONJUGATE_HTRANS DATA INTO ../output/ibmpre/ibmpre_conjg.bin ***')
-    file = open('../output/ibmpre/ibmpre_conjg.bin', 'w')
+    print('\n*** WRITING CONJUGATE_HTRANS DATA INTO output_root/ibmpre/ibmpre_conjg.bin ***')
+    file = open(os.path.join(IBMPRE_DIR, 'ibmpre_conjg.bin'), 'w')
 
     for k in range(cstar.shape[2]):
         for j in range(cstar.shape[1]):
@@ -359,8 +371,8 @@ def conjg_preprocessing_data(cstar,kstar):
     file.close()
 
 def omega_preprocessing_data(omask):
-    print('\n*** WRITING OMEGA MASK DATA INTO ../output/ibmpre/ibmpre_omega.bin ***')
-    file = open('../output/ibmpre/ibmpre_omega.bin', 'w')
+    print('\n*** WRITING OMEGA MASK DATA INTO output_root/ibmpre/ibmpre_omega.bin ***')
+    file = open(os.path.join(IBMPRE_DIR, 'ibmpre_omega.bin'), 'w')
 
     for k in range(omask.shape[2]):
         for j in range(omask.shape[1]):

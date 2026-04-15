@@ -26,6 +26,7 @@ program solver
   call print_real_time()                   ! AT MISC_INIT LIBRARY
 
   total_time_b = omp_get_wtime()           ! INTRINSIC SUBROUTINE
+  call init_output_paths()
   call readsettings()                      ! AT MISC_INIT LIBRARY
   call readbcs()                           ! AT MISC_INIT LIBRARY
   call readgeom()                          ! AT MISC_INIT LIBRARY

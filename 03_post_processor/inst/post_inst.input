@@ -16,7 +16,7 @@ Z_position
 ITOT
 1
 ILD2    IUVWP    IWXYZ    IALL
-0       1        0        0
+1       1        0        0
 ISKIP   JSKIP    KSKIP
 1       1        1
 ISTART  IEND

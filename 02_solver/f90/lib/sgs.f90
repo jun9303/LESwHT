@@ -1277,7 +1277,11 @@
             d(2) = f2fy(j)
             d(3) = f2fz(k)
       
-            del=(d(1)*d(2)*d(3))**(1./3.)
+            if (idelta_sgs .eq. 2) then
+              del = dmax1(d(1), dmax1(d(2), d(3)))
+            else
+              del = (d(1) * d(2) * d(3))**(1./3.)
+            end if
          
             sss=s(1)**2.+2.*s(2)**2.      &
                +2.*s(3)**2.+s(4)**2.      &
@@ -1335,7 +1339,11 @@
               d(2) = f2fy(j)
               d(3) = f2fz(k)
 
-              del = (d(1) * d(2) * d(3))**(1./3.)
+              if (idelta_sgs .eq. 2) then
+                del = dmax1(d(1), dmax1(d(2), d(3)))
+              else
+                del = (d(1) * d(2) * d(3))**(1./3.)
+              end if
               sss = s(1)**2.+2 * s(2)**2. &
                     +2 * s(3)**2.+s(4)**2. &
                     +2 * s(5)**2.+s(6)**2.
@@ -1391,7 +1399,11 @@
               d(3) = (0.5 * f2fz(k - 1) * (1.-fixku(k)) + f2fz(k) &
                       + 0.5 * f2fz(k + 1) * (1.-fixkl(k)))
 
-              del = (d(1) * d(2) * d(3))**(1./3.)
+              if (idelta_sgs .eq. 2) then
+                del = dmax1(d(1), dmax1(d(2), d(3)))
+              else
+                del = (d(1) * d(2) * d(3))**(1./3.)
+              end if
               sss = aalp(i, j, k, 1)**2.+2 * aalp(i, j, k, 2)**2. &
                     +2 * aalp(i, j, k, 3)**2.+aalp(i, j, k, 4)**2. &
                     +2 * aalp(i, j, k, 5)**2.+aalp(i, j, k, 6)**2.

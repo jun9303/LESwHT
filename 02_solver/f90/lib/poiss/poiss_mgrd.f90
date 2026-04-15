@@ -707,8 +707,8 @@
           af(k) = (1.0_8 - fixku(k)) * c2czi(kp) * f2fzi(k)
         end do
 
-        open (77, file='../output/ftr/poiss_itr.dat')
-        open (78, file='../output/ftr/ftrpoittr.dat')
+         open (77, file=trim(output_dir_ftr)//'/poiss_itr.dat')
+         open (78, file=trim(output_dir_ftr)//'/ftrpoittr.dat')
 
         call mgcoef
 

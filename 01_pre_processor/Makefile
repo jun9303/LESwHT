@@ -30,7 +30,7 @@ flib:
 	@echo "----------------------------------------------------------"
 	@echo "Building $(OUTPUT_NAME) using $(FCOMPILER) via f2py..."
 	@echo "----------------------------------------------------------"
-	CC=$(CC) CXX=$(CXX) FC=$(FC) F77=$(FC) F90=$(FC) LDFLAGS="$(LDFLAGS)" LDSHARED="$(FC) -shared" $(F2PY) -c $(SRCS) \
+	SETUPTOOLS_USE_DISTUTILS=stdlib CC=$(CC) CXX=$(CXX) FC=$(FC) F77=$(FC) F90=$(FC) LDFLAGS="$(LDFLAGS)" LDSHARED="$(FC) -shared" $(F2PY) -c $(SRCS) \
 		-m $(OUTPUT_NAME) \
 		--compiler=$(COMPILER) \
 		--fcompiler=$(FCOMPILER) \
@@ -42,5 +42,5 @@ flib:
 
 clean:
 	@echo "Cleaning up build artifacts..."
-	rm -f *.o *.mod *.so
+	rm -f *.o *.mod *.so fort.*
 	rm -f $(OUTPUT_NAME).*.so

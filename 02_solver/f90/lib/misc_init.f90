@@ -22,6 +22,8 @@
         implicit none
         integer(8) :: n
         character*10 :: dummy
+        character(len=256) :: sgsline
+        integer :: ios
 
         open (10, file='settings.input')
         read (10, *) dummy
@@ -37,12 +39,20 @@
         read (10, *) dummy
         read (10, *) resid1, nlev, nbli, ioldv, mgitr, imgsor, wwsor
         read (10, *) dummy
-        read (10, *) iles, insmdl, itemdl, idvmon, csgsts, csgshf, filter
+        read (10, '(A)') sgsline
+        ios = 0
+        read (sgsline, *, iostat=ios) iles, insmdl, itemdl, idvmon, csgsts, csgshf, filter, idelta_sgs
+        if (ios .ne. 0) then
+          read (sgsline, *, iostat=ios) iles, insmdl, itemdl, idvmon, csgsts, csgshf, filter
+          idelta_sgs = 1
+        end if
         read (10, *) dummy
         read (10, *) ibmon, masson, imovingon, ihtrans, idecomp
         read (10, *) dummy
         read (10, *) gridfile
         read (10, *) prev_fld
+          call resolve_legacy_output_path(gridfile)
+          call resolve_legacy_output_path(prev_fld)
         read (10, *) dummy
         read (10, *) ntrace, ntr
         if (ntrace .gt. 0) then
@@ -61,7 +71,7 @@
         write (*, 111) tend, ptb_tst, avg_tst
         write (*, 104) idtopt, dt, cflfac
         write (*, 105) resid1, nlev, nbli, ioldv, mgitr, imgsor, wwsor
-        write (*, 106) iles, insmdl, itemdl, idvmon, csgsts, csgshf, filter
+        write (*, 106) iles, insmdl, itemdl, idvmon, csgsts, csgshf, filter, idelta_sgs
         write (*, 107) ibmon, masson, imovingon, ihtrans, idecomp
         write (*, 108) gridfile
         write (*, 109) prev_fld
@@ -82,10 +92,10 @@
 111     format('  TEND=', es13.5, '  PTB_TST=', es13.5, '  AVG_TST=', es13.5)
 104     format('  IDTOPT=', i5, '  DT=', es13.5, '  CFLFAC=', f11.3)
 105     format('  RESID=', es12.4, '  NLEV=', i5, '  NBLI=', i5, '  IOLDV=', i5, '  MGITR=', i5, '  IMGSOR=', i5, '  WWSOR=', f7.3)
-106     format('  ILES=', i2, '  INSMDL=', i2, '  ITEMDL=', i2, '  IDVMON=', i2, '  CSGSTS='f12.4, '  CSGSHF=', f12.4, '  IFILTER=', i5)
+106     format('  ILES=', i2, '  INSMDL=', i2, '  ITEMDL=', i2, '  IDVMON=', i2, '  CSGSTS='f12.4, '  CSGSHF=', f12.4, '  IFILTER=', i5, '  IDELTA_SGS=', i3)
 107     format('  IBMON=', i2, '  MASSON=', i2, '  IMOVINGON=', i2, '  IHTRANS=', i2, '  IDECOMP=', i2)
-108     format('  GRIDFILE=', a25)
-109     format('  PREV_FLD=', a25)
+  108     format('  GRIDFILE=', a)
+  109     format('  PREV_FLD=', a)
 110     format(i5, 3i6)
 
         return
@@ -115,7 +125,7 @@
         read (10, *) ich, iconjg
         close (10)
 
-        open (11, file='../output/ibmpre/ibmpre_prdic.bin')
+          open (11, file=trim(output_dir_ibmpre)//'/ibmpre_prdic.bin')
         read (11, *) xprdic, yprdic, zprdic, iintp
         close (11)
 
@@ -258,7 +268,7 @@
         implicit none
         integer(8) :: n
 
-        open (11, file='../output/ibmpre/ibmpre_fcpts.bin')
+          open (11, file=trim(output_dir_ibmpre)//'/ibmpre_fcpts.bin')
         read (11, *) nintp(1), nintp(2), nintp(3)
         read (11, *) nbody(1), nbody(2), nbody(3)
         do n = 1, 3
@@ -266,12 +276,12 @@
         end do
         close (11)
 
-        open (11, file='../output/ibmpre/ibmpre_nutzero.bin')
+          open (11, file=trim(output_dir_ibmpre)//'/ibmpre_nutzero.bin')
         read (11, *) nzero
         close (11)
 
         if (ihtrans .eq. 1) then
-          open (11, file='../output/ibmpre/ibmpre_fcpts_t.bin')
+            open (11, file=trim(output_dir_ibmpre)//'/ibmpre_fcpts_t.bin')
           read (11, *) nintp(4)
           read (11, *) nbody(4)
           nbody(4) = nbody(4) + nintp(4)
@@ -299,7 +309,9 @@
           if (ihtrans .eq. 1) call les_thermal_allo()
         end if
 
-        if (iconjg .eq. 1) then
+        if (ihtrans .eq. 1) then
+          ! cstar/kstar/omega_dvm are used by thermal solver paths even when ICONJG=0.
+          ! Keep default unity properties unless ICONJG=1 explicitly loads ibmpre_conjg.bin.
           call conjg_allo()
         end if
 
@@ -317,7 +329,7 @@
         integer(8) :: n, l, dummy
         integer(8) :: i, j, k, itmp
 
-        open (11, file='../output/ibmpre/ibmpre_fcpts.bin')
+          open (11, file=trim(output_dir_ibmpre)//'/ibmpre_fcpts.bin')
         read (11, *) dummy ! NINTP, ALREADY READ IN ALLOINIT SUBROUTINE
         read (11, *) dummy ! NBODY, ALREADY READ IN ALLOINIT SUBROUTINE
         do n = 1, nbody(1)
@@ -350,7 +362,7 @@
         close (11)
 
         if (ihtrans .eq. 1) then
-          open (11, file='../output/ibmpre/ibmpre_fcpts_t.bin')
+            open (11, file=trim(output_dir_ibmpre)//'/ibmpre_fcpts_t.bin')
           read (11, *) dummy ! NINTP, ALREADY READ IN ALLOINIT SUBROUTINE
           read (11, *) dummy ! NBODY, ALREADY READ IN ALLOINIT SUBROUTINE
           do n = 1, nbody(4)
@@ -386,7 +398,7 @@
         integer(8) :: i, j, k
         integer(8) :: n
 
-        open (14, file='../output/ibmpre/ibmpre_nutzero.bin')
+          open (14, file=trim(output_dir_ibmpre)//'/ibmpre_nutzero.bin')
         read (14, *) nzero
         if (nzero .gt. 0) then
           read (14, *) (inz(n), n=1, nzero)
@@ -395,7 +407,7 @@
         end if
         close (14)
 
-        open (15, file='../output/ibmpre/ibmpre_wallfdvm.bin')
+          open (15, file=trim(output_dir_ibmpre)//'/ibmpre_wallfdvm.bin')
         read (15, *) (((nwall_dvm(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
         close (15)
 
@@ -418,14 +430,14 @@
         integer(8) :: l
         logical :: has_omega_mask
 
-        open (15, file='../output/ibmpre/ibmpre_conjg.bin')
+          open (15, file=trim(output_dir_ibmpre)//'/ibmpre_conjg.bin')
         read (15, *) (((cstar(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
         read (15, *) ((((kstar(i, j, k, l), i=1, n1m), j=1, n2m), k=1, n3m), l=1, 6)
         close (15)
 
-        inquire (file='../output/ibmpre/ibmpre_omega.bin', exist=has_omega_mask)
+          inquire (file=trim(output_dir_ibmpre)//'/ibmpre_omega.bin', exist=has_omega_mask)
         if (has_omega_mask) then
-          open (16, file='../output/ibmpre/ibmpre_omega.bin')
+            open (16, file=trim(output_dir_ibmpre)//'/ibmpre_omega.bin')
           read (16, *) (((omega_dvm(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
           close (16)
         else
@@ -449,6 +461,8 @@
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8) :: flowarea(n1), fl, fl_s, adj
+        real(8) :: y_center, y_half, eta_y, poiseuille_shape
+        real(8), parameter :: ubulk_init_cpg = 12.0d0
         real(8), parameter :: eps_pr = 1.0d-12
 
         ihist = 0
@@ -460,6 +474,9 @@
         p = 0.
 
         flowarea = 0.
+        y_center = 0.5d0 * (y(1) + y(n2))
+        y_half = 0.5d0 * (y(n2) - y(1))
+        if (dabs(y_half) .le. 1.0d-12) y_half = 1.0d0
 
         write (*, *) '========= MAKING INITIAL FIELD ========='
         write (*, *) ''
@@ -470,12 +487,14 @@
             do k = 0, n3
               ! APPLY PROFILE ONLY IN THE FLUID DOMAIN
               if (funcbody(x(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                  eta_y = (ymp(j) - y_center) / y_half
+                  poiseuille_shape = dmax1(0.0d0, 1.0d0 - eta_y**2)
                 if (ich .eq. 0) then
                   u(i, j, k) = udrv_i
                 elseif (ich .eq. 1) then
-                  u(i, j, k) = 1.5d0 * udrv_i * (1.0d0 - ymp(j)**2)
+                    u(i, j, k) = 1.5d0 * udrv_i * poiseuille_shape
                 elseif (ich .eq. 2) then
-                  u(i, j, k) = ( 1.5d0 * (1.0d0 - ymp(j)**2) ) * 12.d0 ! LET INITIAL UBULK_I = 12.D0
+                    u(i, j, k) = 1.5d0 * ubulk_init_cpg * poiseuille_shape ! INITIAL UBULK_I = 12.D0
                 else
                   u(i, j, k) = udrv_i
                 end if
@@ -653,7 +672,7 @@
           write (*, 102) nn1, nn2, nn3
           write (*, 103) ihist, m, time, dt
           write (*, *) ''
-100       format(' PREVIOUS FIELD LOCATION : ', a25)
+  100       format(' PREVIOUS FIELD LOCATION : ', a)
 101       format(' RE = ', es12.3, ' PR = ', es12.3, ' GR = ', es12.3)
 102       format(' N1 = ', i12, ' N2 = ', i12, ' N3 = ', i12)
 103       format(' IHIST = ', i9, ' M = ', i9, ' TIME = ', f10.5, ' DT = ', f12.8)
@@ -794,24 +813,31 @@
         implicit none
         real(8) :: ptb, flowarea, pertb_rate, adj
         real(8) :: flowarea_g, pertb_rate_g
+        real(8) :: y_center, y_half, eta_y, wall_dist
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8), parameter :: ret = 180.0d0
+
+        y_center = 0.5d0 * (y(1) + y(n2))
+        y_half = 0.5d0 * (y(n2) - y(1))
+        if (dabs(y_half) .le. 1.0d-12) y_half = 1.0d0
 
         ! --- PERTURB U (GLOBAL MEAN CORRECTION) ---
         flowarea_g = 0.0d0
         pertb_rate_g = 0.0d0
 
-!$OMP PARALLEL DO PRIVATE(PTB) REDUCTION(+:FLOWAREA_G, PERTB_RATE_G)
+ !$OMP PARALLEL DO PRIVATE(PTB,ETA_Y,WALL_DIST) REDUCTION(+:FLOWAREA_G, PERTB_RATE_G)
         do i = 1, n1m
           do j = 1, n2m
             do k = 1, n3m
               if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
                 flowarea_g = flowarea_g + f2fy(j) * f2fz(k)
-                if ((ymp(j) .gt. .5d0) .and. (ymp(j) .lt. .99d0)) then
+                eta_y = (ymp(j) - y_center) / y_half
+                if ((eta_y .gt. .5d0) .and. (eta_y .lt. .99d0)) then
+                  wall_dist = dabs((y(n2 - 2) - ymp(j)) / y_half)
                   ptb = eps_ptr * udrv_i * cos(zmp(k)/zl*acos(-1.d0)) &
-                        * abs(y(n2 - 2) - ymp(j)) * ret                &
-                        * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0 + .5d0)
+                        * wall_dist * ret                               &
+                        * exp(-.01d0*(wall_dist * ret)**2.d0 + .5d0)
                   u(i, j, k) = u(i, j, k) + ptb
                   pertb_rate_g = pertb_rate_g + ptb * f2fy(j) * f2fz(k)
                 end if
@@ -839,16 +865,18 @@
         ! --- PERTURB W (GLOBAL MEAN CORRECTION) ---
         flowarea_g = 0.0d0
         pertb_rate_g = 0.0d0
-!$OMP PARALLEL DO PRIVATE(PTB) REDUCTION(+:FLOWAREA_G, PERTB_RATE_G)
+ !$OMP PARALLEL DO PRIVATE(PTB,ETA_Y,WALL_DIST) REDUCTION(+:FLOWAREA_G, PERTB_RATE_G)
         do k = 1, n3m
           do i = 1, n1m
             do j = 1, n2m
               if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
                 flowarea_g = flowarea_g + f2fx(i) * f2fy(j)
-                if ((ymp(j) .gt. .5d0) .and. (ymp(j) .lt. .99d0)) then
+                eta_y = (ymp(j) - y_center) / y_half
+                if ((eta_y .gt. .5d0) .and. (eta_y .lt. .99d0)) then
+                  wall_dist = dabs((y(n2 - 2) - ymp(j)) / y_half)
                   ptb = eps_ptr * sin(xmp(i)/xl*acos(-1.d0)) &
-                        * abs(y(n2 - 2) - ymp(j)) * ret                &
-                        * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0)
+                        * wall_dist * ret                               &
+                        * exp(-.01d0*(wall_dist * ret)**2.d0)
                   w(i, j, k) = w(i, j, k) + ptb
                   pertb_rate_g = pertb_rate_g + ptb * f2fx(i) * f2fy(j)
                 end if
@@ -1019,7 +1047,7 @@
           avg_started = .false.
           ihistavg_start = ihist
           if (iread .ne. 1) then
-            open (2999, file='../output/field_avg/fav_manifest.dat', status='replace')
+              open (2999, file=trim(output_dir_field_avg)//'/fav_manifest.dat', status='replace')
             close (2999)
           end if
         end if
@@ -1120,7 +1148,7 @@
           if (ihtrans .eq. 1) call les_thermal_deallo()
         end if
 
-        if (iconjg .eq. 1) call conjg_deallo()
+        if (allocated(cstar)) call conjg_deallo()
 
         if (iavg .eq. 1) call avg_deallo()
 

@@ -643,6 +643,10 @@ def output_3d_tec(
 
 def main():
     SEP = '=' * 68
+    output_root = os.environ.get('LESWHT_OUTPUT_ROOT', '../../output')
+    grid_path = os.path.join(output_root, 'grid', 'grid.dat')
+    field_avg_dir = os.path.join(output_root, 'field_avg')
+    outdir = os.path.join(output_root, 'post_avg')
 
     params   = read_input_avg('post_avg.input')
     IBMON    = params['IBMON']
@@ -650,13 +654,13 @@ def main():
     IOUTFMT  = params['IOUTFMT']
     IUNIGRID = params['IUNIGRID']
 
-    g = read_grid('../../output/grid/grid.dat')
+    g = read_grid(grid_path)
     adjust_post_bounds(g, params)
     IP, JP, KP = find_ip_jp_kp(g, params)
     if IUNIGRID == 1:
         compute_griduni(g)
 
-    OUTDIR = '../../output/post_avg'
+    OUTDIR = outdir
     os.makedirs(OUTDIR, exist_ok=True)
 
     for L, fldname in enumerate(params['FLDNAME']):
@@ -664,7 +668,7 @@ def main():
         print(SEP)
         print(f" WORKING ON  {fldname}")
 
-        avgs = read_avg_field(fldname, g, IHTRANS)
+        avgs = read_avg_field(fldname, g, IHTRANS, field_avg_dir)
         datainit(g, avgs, IBMON)
 
         # Direct mapping from averaged velocity fields to output cell centres
