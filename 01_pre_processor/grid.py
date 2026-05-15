@@ -149,7 +149,7 @@ def _build_case_gridlines(params):
 
     # Streamwise domain: half upstream pattern + full middle pattern + half downstream pattern.
     # This is equivalent to [-pattern_len_x, +pattern_len_x] with total length 2*pattern_len_x.
-    pattern_len_x = _streamwise_spacing(topo) * stretch * scale
+    pattern_len_x = _streamwise_spacing(topo) * stretch
     x_min = -1.0 * pattern_len_x
     x_max = 1.0 * pattern_len_x
 

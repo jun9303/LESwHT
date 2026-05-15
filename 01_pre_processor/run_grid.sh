@@ -16,16 +16,19 @@ ulimit -s unlimited
 # ulimit -v unlimited  # Let scheduler handle memory
 
 # 2. OpenMP Settings
-#    If running via Slurm, use $SLURM_CPUS_PER_TASK, otherwise default to 4.
+#    If running via Slurm, use $SLURM_CPUS_PER_TASK, otherwise default to 64.
 if [ -n "$SLURM_CPUS_PER_TASK" ]; then
     export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 else
-    export OMP_NUM_THREADS=4
+    export OMP_NUM_THREADS=64
 fi
 
+export OMP_PROC_BIND=spread
+export OMP_PLACES=cores
 export OMP_STACKSIZE=1G
 export OMP_SCHEDULE="dynamic"
-export OMP_DYNAMIC=TRUE
+export OMP_DYNAMIC=FALSE
+echo "OpenMP config: OMP_NUM_THREADS=${OMP_NUM_THREADS}, OMP_DYNAMIC=${OMP_DYNAMIC}, OMP_PROC_BIND=${OMP_PROC_BIND}, OMP_PLACES=${OMP_PLACES}"
 
 # 3. Clean Previous Output
 echo "Cleaning old grid files..."

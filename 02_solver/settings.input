@@ -1,17 +1,17 @@
-RE#     PR#     GR#     GRDIR   TFLU_I  TSOL_I
-2815.   0.71    0.      2       0.      0.
-IRESET  IREAD   IAVG    IPZERO  EPS_PTR UDRV_I
-1       0       1       0       .5       0.9063948395
+RE#     PR#     GR#     GRDIR   TFLU_I   TSOL_I
+2845.   0.71    0.      2       0.       0.
+IRESET  IREAD   IAVG    IPZERO  EPS_PTR  UDRV_I
+1       0       1       0       .5       0.9616454570
 NEND    NPRINT  NPRIAVG NPIN
 999999  10000   50000   1
 TEND    PTB_TST AVG_TST
 1600.   64.     160.
 IDTOPT  DT_SIZE CFLFAC
-1       .005    1.
+1       .001    1.
 RESID1  NLEV    NBLI    IOLDV   MGITR   IMGSOR  WWSOR
 1.0E-6  5       3       0       500     170     1.8
 ILES    INSMDL  ITEMDL  IDVMON  CSGSTS  CSGSHF  FILTER  IDELTA_SGS
-1       1       0       0       1.0E-4  1.0E-5  3       1
+1       1       0       0       0.025   0.      3       1
 IBMON   MASSON  IMOVING IHTRANS IDECOMP
 1       1       0       1       1
 FILES

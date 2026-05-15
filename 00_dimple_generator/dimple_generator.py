@@ -74,7 +74,7 @@ class DimplePatternGenerator:
     def _create_cylindrical_baseline(self, target_depth, scale_val, segments=128):
         """Construct a tapered circular dimple surface with top boundary at y=0."""
         top_radius = 2.45 * scale_val
-        bottom_radius = 0.95 * top_radius
+        bottom_radius = 0.0930039771142 * top_radius # to match the dimple volume of the circular topology (case 1)
         angles = np.linspace(0.0, 2.0 * math.pi, segments, endpoint=False)
 
         x_top = top_radius * np.cos(angles)

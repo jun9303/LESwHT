@@ -4,7 +4,7 @@
          use mod_common
          use mod_flowarray
          implicit none
-         real(8) :: dtcfl, dt_evt, eps_t
+         real(8) :: dtcfl, dt_evt, eps_t, cfl_tol, cfl_safety, cfl_target, dt_growth_max
          integer(8) :: icfl, jcfl, kcfl
 
          ntime = ntime + 1
@@ -14,11 +14,24 @@
 
          if (idtopt .eq. 0) dt = dt_size
 
+         ! CFL controller knobs:
+         ! cfl_tol    : warning threshold multiplier (1.00 = strict)
+         ! cfl_safety : target ratio to stay below CFLFAC (e.g. 0.99)
+         ! dt_growth_max : max multiplicative dt growth per step in CFL mode
+         cfl_tol = 1.1d0
+         cfl_safety = 1.0d0
+         dt_growth_max = 1.01d0
+         cfl_target = cflfac * cfl_safety
+
          call cfl(cflmax, icfl, jcfl, kcfl)         ! CALCULATE CFL NUMBER
 
-         if (idtopt .ne. 0 .and. cflmax .ne. 0.) then
-           dtcfl = dmin1(dt * cflfac / cflmax, dt * (0.80 + 0.20 * cflfac / cflmax))
-           if (idtopt .eq. 1) dt = dtcfl
+         if (idtopt .eq. 1 .and. cflmax .gt. 1.0d-14) then
+           dtcfl = dt * cfl_target / cflmax
+           if (dtcfl .gt. dt) then
+             dt = dmin1(dtcfl, dt * dt_growth_max)
+           else
+             dt = dtcfl
+           end if
          end if
 
          eps_t = 1.0d-12 * dmax1(1.0d0, dabs(time))
@@ -36,7 +49,7 @@
 
          if (dt_evt .lt. dt) dt = dt_evt
 
-         if (cflmax .gt. (cflfac * 1.1)) then
+         if (cflmax .gt. (cflfac * cfl_tol)) then
            print *, ' '
            write (*, 310) ntime, cflmax, time
          else

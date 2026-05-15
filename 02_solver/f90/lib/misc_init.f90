@@ -492,9 +492,9 @@
                 if (ich .eq. 0) then
                   u(i, j, k) = udrv_i
                 elseif (ich .eq. 1) then
-                    u(i, j, k) = 1.5d0 * udrv_i * poiseuille_shape
+                    u(i, j, k) = 1.d-12 ! 1.5d0 * udrv_i * poiseuille_shape
                 elseif (ich .eq. 2) then
-                    u(i, j, k) = 1.5d0 * ubulk_init_cpg * poiseuille_shape ! INITIAL UBULK_I = 12.D0
+                    u(i, j, k) = 1.d-12 ! 1.5d0 * ubulk_init_cpg * poiseuille_shape ! INITIAL UBULK_I = 12.D0
                 else
                   u(i, j, k) = udrv_i
                 end if
