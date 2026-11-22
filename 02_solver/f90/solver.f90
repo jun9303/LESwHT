@@ -49,6 +49,10 @@ program solver
     call prefld()                        ! AT MISC_INIT LIBRARY
   else
     call makefld()                       ! AT MISC_INIT LIBRARY
+    ! MAKEFLD SETS THE GHOST PLANES FROM FUNCBODY; IN A PERIODIC DIRECTION THEY MUST BE COPIES OF THE
+    ! OPPOSITE INTERIOR PLANES BEFORE THE FIRST STEP
+    call prdic_adj_uvw(0)                ! AT SLV_MMTM LIBRARY
+    if (ihtrans .eq. 1) call prdic_adj_t ! AT SLV_ENGY LIBRARY
     call writefield()
   end if
 
