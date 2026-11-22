@@ -456,6 +456,7 @@
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8) :: flowarea(n1), fl, fl_s, adj
+        real(8) :: xi
         real(8), parameter :: eps_pr = 1.0d-12
 
         ihist = 0
@@ -471,12 +472,18 @@
         write (*, *) '========= MAKING INITIAL FIELD ========='
         write (*, *) ''
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO PRIVATE(XI)
         do i = 0, n1    ! START FROM 0 TO COVER THE INLET GHOST CELL
+          ! X IS ALLOCATED 1:N1, SO THE GHOST FACE I = 0 IS PLACED ONE CELL BEFORE X(1)
+          if (i .eq. 0) then
+            xi = 2.0d0 * x(1) - x(2)
+          else
+            xi = x(i)
+          end if
           do j = 0, n2
             do k = 0, n3
               ! APPLY PROFILE ONLY IN THE FLUID DOMAIN
-              if (funcbody(x(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+              if (funcbody(xi, ymp(j), zmp(k), time) .ge. 1.e-10) then
                 if (ich .eq. 0) then
                   u(i, j, k) = udrv_i
                 elseif (ich .eq. 1) then
