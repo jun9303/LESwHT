@@ -1153,9 +1153,9 @@
                 nusgs1(1, j, k, 3) = 0.
               else
                 nusgs1(1, j, k, 2) = &
-                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(2, j, km) + f2fz(km) * nusgs(2, j, k))
+                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(1, j, km) + f2fz(km) * nusgs(1, j, k))
                 nusgs1(1, j, k, 3) = &
-                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(2, jm, k) + f2fy(jm) * nusgs(2, j, k))
+                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(1, jm, k) + f2fy(jm) * nusgs(1, j, k))
               end if
               if (bc_xtop .eq. 0) then
                 nusgs1(n1, j, k, 1) = 0.
@@ -1188,9 +1188,9 @@
                 nusgs1(i, 1, k, 3) = 0.
               else
                 nusgs1(i, 1, k, 2) = &
-                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(i, 2, km) + f2fz(km) * nusgs(i, 2, k))
+                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(i, 1, km) + f2fz(km) * nusgs(i, 1, k))
                 nusgs1(i, 1, k, 3) = &
-                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, 2, k) + f2fx(im) * nusgs(i, 2, k))
+                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, 1, k) + f2fx(im) * nusgs(i, 1, k))
               end if
               if (bc_ytop .eq. 0) then
                 nusgs1(i, n2, k, 1) = 0.
@@ -1223,9 +1223,9 @@
                 nusgs1(i, j, 1, 3) = 0.
               else
                 nusgs1(i, j, 1, 2) = &
-                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(i, jm, 2) + f2fy(jm) * nusgs(i, j, 2))
+                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(i, jm, 1) + f2fy(jm) * nusgs(i, j, 1))
                 nusgs1(i, j, 1, 3) = &
-                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, j, 2) + f2fx(im) * nusgs(i, j, 2))
+                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, j, 1) + f2fx(im) * nusgs(i, j, 1))
               end if
               if (bc_ztop .eq. 0) then
                 nusgs1(i, j, n3, 1) = 0.
@@ -1833,9 +1833,9 @@
                 alsgs1(1, j, k, 3) = 0.
               else
                 alsgs1(1, j, k, 2) = &
-                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(2, j, km) + f2fz(km) * alsgs(2, j, k))
+                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(1, j, km) + f2fz(km) * alsgs(1, j, k))
                 alsgs1(1, j, k, 3) = &
-                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(2, jm, k) + f2fy(jm) * alsgs(2, j, k))
+                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(1, jm, k) + f2fy(jm) * alsgs(1, j, k))
               end if
               if (bc_xtop .eq. 0) then
                 alsgs1(n1, j, k, 1) = 0.
@@ -1868,9 +1868,9 @@
                 alsgs1(i, 1, k, 3) = 0.
               else
                 alsgs1(i, 1, k, 2) = &
-                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(i, 2, km) + f2fz(km) * alsgs(i, 2, k))
+                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(i, 1, km) + f2fz(km) * alsgs(i, 1, k))
                 alsgs1(i, 1, k, 3) = &
-                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, 2, k) + f2fx(im) * alsgs(i, 2, k))
+                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, 1, k) + f2fx(im) * alsgs(i, 1, k))
               end if
               if (bc_ytop .eq. 0) then
                 alsgs1(i, n2, k, 1) = 0.
@@ -1903,9 +1903,9 @@
                 alsgs1(i, j, 1, 3) = 0.
               else
                 alsgs1(i, j, 1, 2) = &
-                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(i, jm, 2) + f2fy(jm) * alsgs(i, j, 2))
+                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(i, jm, 1) + f2fy(jm) * alsgs(i, j, 1))
                 alsgs1(i, j, 1, 3) = &
-                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, j, 2) + f2fx(im) * alsgs(i, j, 2))
+                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, j, 1) + f2fx(im) * alsgs(i, j, 1))
               end if
               if (bc_ztop .eq. 0) then
                 alsgs1(i, j, n3, 1) = 0.
