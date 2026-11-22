@@ -148,11 +148,11 @@ if HTRNFR == 'ON':
     [NBODY['t'], INOUT['t']] = lib_ibm_body.find_inout(XM,YM,ZM,.0)
     print('# of body pts for T = %d' %(NBODY['t']))
 
-    def print_body_point_balance(label, nbody, nintp, ninner):
-        eligible = nintp + ninner
-        excluded = nbody - eligible
-        print('Body point balance [%s] : eligible = %d, excluded-by-staggered-boundary = %d' \
-            %(label, eligible, excluded))
+def print_body_point_balance(label, nbody, nintp, ninner):
+    eligible = nintp + ninner
+    excluded = nbody - eligible
+    print('Body point balance [%s] : eligible = %d, excluded-by-staggered-boundary = %d' \
+        %(label, eligible, excluded))
 
 NINNER = {'u':0, 'v':0, 'w':0}                                # Number of inner pts
 FCP = {'u':np.empty([NBODY['u'],3], dtype=int, order='F'), \
