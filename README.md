@@ -101,6 +101,8 @@ Topologies: 0 cylinder, 1 spherical, 2 teardrop down, 3 teardrop up, 4 diamond, 
    solver stops with a message if it cannot read the STL named there. The thread count is `SLURM_CPUS_PER_TASK` under Slurm and 64
    otherwise (set `OMP_NUM_THREADS` in the script to change it). `POISS=poiss_fd bash run_solver.sh` builds
    with another Poisson solver; the default `poiss_ftft` fits the x- and z-periodic slab.
+   The solver stops with a message and a nonzero exit code if the solution blows up (a velocity that is not
+   finite, or a CFL number above 100); the `master` README explains the `NLEV` rule for the multigrid solvers.
 
 5. **Post-process.**
 

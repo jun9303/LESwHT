@@ -23,6 +23,20 @@
         integer(8) :: i, j, k, ilev
         integer(8) :: nlev0
 
+!     THE MULTIGRID HALVES THE X CELLS NLEV TIMES, SO N1M MUST BE A MULTIPLE OF 2**NLEV: OTHERWISE THE
+!     COARSE LEVELS DO NOT COVER THE GRID AND THE SOLVE GIVES NAN. USE THE LARGEST NLEV THAT FITS AND SAY SO
+!     (AT LEAST ONE LEVEL BELOW THE GRID IS NEEDED, SO N1M MUST BE EVEN).
+        if (mod(n1m, 2_8) .ne. 0) then
+          write (*, '(A,I8,A)') ' POISINIT: N1M =', n1m, ' IS ODD; THIS POISSON SOLVER NEEDS AN EVEN N1M'
+          error stop 'POISINIT: N1M MUST BE EVEN (MULTIGRID IN X)'
+        end if
+        nlev0 = nlev
+        do while (nlev .gt. 1 .and. mod(n1m, 2_8**nlev) .ne. 0)
+          nlev = nlev - 1
+        end do
+        if (nlev .ne. nlev0) write (*, '(A,I3,A,I3,A,I8,A)') ' POISINIT: NLEV', nlev0, ' ->', nlev, &
+          ' (N1M =', n1m, ' MUST BE A MULTIPLE OF 2**NLEV)'
+
 !     A NON-PERIODIC X NEEDS AT LEAST TWO CELLS ON THE COARSEST MULTIGRID LEVEL: WITH ONE, THE MODE-1
 !     Y LINE THERE HAS NO X COUPLING AND IS SINGULAR (DIVISION BY ZERO BELOW). USE FEWER LEVELS.
         nlev0 = nlev

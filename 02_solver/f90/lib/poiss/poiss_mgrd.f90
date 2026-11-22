@@ -34,6 +34,9 @@
         real(8) :: rho_cg, rho_ol, alp_cg, w_cg, bet_cg, rv_tmp, acc
         real(8) :: rho_cg_k, rho_cg_pln(n3m), rv_tmp_k, rv_tmp_pln(n3m), uppp_k, uppp_pln(n3m), bttt_k, bttt_pln(n3m)
         real(8) :: phiref, resm_cg, bttt, uppp
+        real(8) :: resm_best
+        logical :: brk
+        real(8), dimension(n1, n2, n3) :: phib
 
         real(8), dimension(0:n1, 0:n2, 0:n3) :: phi
         real(8), dimension(0:n1, 0:n2, 0:n3) :: divgsum
@@ -104,6 +107,26 @@
         rho_ol = 1.0_8
         alp_cg = 1.0_8
         w_cg = 1.0_8
+        resm_best = huge(1.0_8)
+        brk = .false.
+
+!       THE START VALUE ALREADY MEETS THE TOLERANCE (A ZERO RIGHT-HAND SIDE, FOR EXAMPLE): NOTHING TO DO
+        resm_cg = 0.0_8
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I) REDUCTION(MAX:RESM_CG)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              resm_cg = max(resm_cg, abs(res_cg(i, j, k)))
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+        if (resm_cg < test1) then
+          i_cg = 0
+          write (*, 300) i_cg, resm_cg * dtconst
+          goto 1000
+        end if
+        resm_cg = huge(1.0_8)
 
         do i_cg = 1, mgitr
 
@@ -121,6 +144,10 @@
           do k = 1, n3m
             rho_cg = rho_cg + rho_cg_pln(k)
           end do
+
+!         BREAKDOWN (ZERO OR NON-FINITE RHO): STOP ITERATING; THE BEST ITERATE IS KEPT BELOW
+          brk = (rho_cg .eq. 0.0_8) .or. .not. (abs(rho_cg) .le. huge(1.0_8))
+          if (brk) exit
 
           bet_cg = rho_cg / rho_ol * alp_cg / w_cg
 
@@ -164,6 +191,8 @@
           end do
 
           alp_cg = rho_cg / rv_tmp
+          brk = .not. (abs(alp_cg) .le. huge(1.0_8))
+          if (brk) exit
 
 !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J)
           do k = 1, n3m
@@ -209,6 +238,8 @@
             bttt = bttt + bttt_pln(k)
           end do
           w_cg = uppp / bttt
+          brk = (w_cg .eq. 0.0_8) .or. .not. (abs(w_cg) .le. huge(1.0_8))
+          if (brk) exit
 
 !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J)
           do k = 1, n3m
@@ -256,6 +287,19 @@
 !$OMP END PARALLEL
           rho_ol = rho_cg
 
+          if (resm_cg .lt. resm_best) then
+            resm_best = resm_cg
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I)
+            do k = 1, n3m
+              do j = 1, n2m
+                do i = 1, n1m
+                  phib(i, j, k) = phi(i, j, k)
+                end do
+              end do
+            end do
+!$OMP END PARALLEL DO
+          end if
+
           write (77, 102) i_cg, resm_cg * dtconst, imax, jmax, kmax
 102       format(i4, es15.7, 3i4)
 
@@ -266,7 +310,24 @@
 
         end do
 
-        print *, '=== MUTLGRID : NOT CONVERGED ==='
+        if (brk) then
+          print *, '=== MUTLGRID : BICGSTAB BREAKDOWN (ZERO OR NON-FINITE STEP) ==='
+        else
+          print *, '=== MUTLGRID : NOT CONVERGED ==='
+        end if
+!       RETURN THE ITERATE WITH THE SMALLEST RESIDUAL, NOT THE LAST ONE (BICGSTAB CAN WANDER AND GROW)
+        if (resm_best .lt. huge(1.0_8) .and. (brk .or. resm_best .lt. resm_cg)) then
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                phi(i, j, k) = phib(i, j, k)
+              end do
+            end do
+          end do
+!$OMP END PARALLEL DO
+          resm_cg = resm_best
+        end if
         write (*, 300) i_cg, resm_cg * dtconst
 300     format('ICYC=', i10, '  RESMAX=', es25.12)
 
@@ -348,103 +409,30 @@
 !======================================================================
       subroutine toplevel(gi, resid, rhs, resm, iold)   ! ZEBRA VERSION
 !======================================================================
-!       SOLVE THE POISSON EQUATION WITH ZEBRA GS AT THE TOP LEVEL
-!       WITH ONLY 1 ITERATION
-!       IOLD = 0 (GODOWN), 1 (GOUP)
+!       ONE ZEBRA LINE GAUSS-SEIDEL ITERATION ON THE FINEST LEVEL (RELAX), THEN THE RESIDUAL, RESTRICTED TO
+!       THE NEXT LEVEL. IOLD = 0 (GODOWN: GI STARTS FROM ZERO), 1 (GOUP)
         use mod_common
         use mod_poiss
         implicit none
         integer(8) :: i, j, k
-        integer(8) :: istart, iold
+        integer(8) :: iold
         real(8) :: rhs(0:n1, 0:n2, 0:n3)
         real(8) :: resid(n1md, n2m, n3md), gi(0:n1md, 0:n2, 0:n3md)
         real(8) :: acc, resm
 
-!------ MAKE RHS OF ZEBRA GS (ODD LINE)
-!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I)
         do k = 1, n3m
-          istart = 1 + mod(kpm(k), 2_8)
           do j = 1, n2m
-            do i = istart, n1m, 2
-              gi(i, j, k) = rhs(i, j, k) - iold * &
-                            (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
-                             + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
+            do i = 1, n1m
+              resid(i, j, k) = rhs(i, j, k)
             end do
           end do
         end do
+!$OMP END PARALLEL DO
 
-!------ SOLVE TDMA
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = 1, n3m
-          istart = 1 + mod(kpm(k), 2_8)
-          do i = istart, n1m, 2
-            gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
-          end do
-        end do
+        call relax(gi, resid, nlev, 1_8, iold)
 
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = 1, n3m
-          istart = 1 + mod(kpm(k), 2_8)
-          do j = 2, n2m
-            do i = istart, n1m, 2
-              gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
-            end do
-          end do
-        end do
-
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = 1, n3m
-          istart = 1 + mod(kpm(k), 2_8)
-          do j = n2m - 1, 1, -1
-            do i = istart, n1m, 2
-              gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
-            end do
-          end do
-        end do
-
-!------ MAKE RHS OF ZEBRA GS (EVEN LINE)
-!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
-        do k = 1, n3m
-          istart = 1 + mod(k, 2_8)
-          do j = 1, n2m
-            do i = istart, n1m, 2
-              gi(i, j, k) = rhs(i, j, k) &
-                            - (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
-                               + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
-            end do
-          end do
-        end do
-
-!------ SOLVE TDMA
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = 1, n3m
-          istart = 1 + mod(k, 2_8)
-          do i = istart, n1m, 2
-            gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
-          end do
-        end do
-
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = 1, n3m
-          istart = 1 + mod(k, 2_8)
-          do j = 2, n2m
-            do i = istart, n1m, 2
-              gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
-            end do
-          end do
-        end do
-
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = 1, n3m
-          istart = 1 + mod(k, 2_8)
-          do j = n2m - 1, 1, -1
-            do i = istart, n1m, 2
-              gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
-            end do
-          end do
-        end do
-
-!------ CALCULATE RESIDUAL
+!------ CALCULATE RESIDUAL (RESID HOLDS THE RIGHT-HAND SIDE)
 
         resm = 0.0_8
 !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J, ACC) REDUCTION(MAX:RESM)
@@ -452,7 +440,7 @@
           do j = 1, n2m
             do i = 1, n1m
               acc = -1.0_8 * (aw(i) + ae(i) + as(j) + an(j) + ab(k) + af(k))
-              resid(i, j, k) = rhs(i, j, k) - acc * gi(i, j, k) &
+              resid(i, j, k) = resid(i, j, k) - acc * gi(i, j, k) &
                                - aw(i) * gi(imm(i), j, k) - ae(i) * gi(ipm(i), j, k) &
                                - as(j) * gi(i, j - 1, k) - an(j) * gi(i, j + 1, k) &
                                - ab(k) * gi(i, j, kmm(k)) - af(k) * gi(i, j, kpm(k))
@@ -462,8 +450,6 @@
         end do
 
         if (nlev == 0) goto 97
-
-101     format(es15.8, 3i6)
 
 !------ RESTRICT RESIDUAL TO A LOWER LEVEL
 !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J)
@@ -566,191 +552,91 @@
 !======================================================================
       subroutine relax(gi, resid, ilev, iter, iold)   ! ZEBRA VERSION
 !======================================================================
-!       SOLVE THE POISSON EQUATION WITH ZEBRA GS
-!       IOLD = 0 (GODOWN), 1 (GOUP)
+!       ITER ZEBRA LINE GAUSS-SEIDEL ITERATIONS AT LEVEL ILEV (Y LINES, TDMA), EACH IN TWO HALF-SWEEPS OVER THE
+!       (I, K) LINES OF ONE PARITY: ISTART = IBG + MOD(K + 1, 2), THEN IBG + MOD(K, 2), SO EVERY LINE IS RELAXED
+!       ONCE PER ITERATION. IOLD = 0: GI STARTS FROM ZERO (THE FIRST HALF-SWEEP SKIPS THE NEIGHBOURS), 1: GI
+!       HOLDS A START VALUE.
         use mod_common
         use mod_poiss
         implicit none
-        integer(8) :: i, j, k
-        integer(8) :: ilev, iter, iold, istart, ii
+        integer(8) :: ilev, iter, iold, ii
         real(8) :: resid(n1md, n2m, n3md), gi(0:n1md, 0:n2, 0:n3md)
 
-!====== 1ST ITERATION
-!------ MAKE RHS OF ZEBRA GS (ODD LINE)
-!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
-        do k = kkmg(ilev, 1), kkmg(ilev, 2)
-          istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
-          do j = 1, n2m
-            do i = istart, iimg(ilev, 2), 2
-              gi(i, j, k) = resid(i, j, k) - iold * &
-                            (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
-                             + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
-            end do
-          end do
-        end do
-
-!------ SOLVE TDMA
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = kkmg(ilev, 1), kkmg(ilev, 2)
-          istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
-          do i = istart, iimg(ilev, 2), 2
-            gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
-          end do
-        end do
-
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = kkmg(ilev, 1), kkmg(ilev, 2)
-          istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
-          do j = 2, n2m
-            do i = istart, iimg(ilev, 2), 2
-              gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
-            end do
-          end do
-        end do
-
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = kkmg(ilev, 1), kkmg(ilev, 2)
-          istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
-          do j = n2m - 1, 1, -1
-            do i = istart, iimg(ilev, 2), 2
-              gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
-            end do
-          end do
-        end do
-
-!------ MAKE RHS OF ZEBRA GS (EVEN LINE)
-!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
-        do k = kkmg(ilev, 1), kkmg(ilev, 2)
-          istart = iimg(ilev, 1) + mod(k, 2_8)
-          do j = 1, n2m
-            do i = istart, iimg(ilev, 2), 2
-              gi(i, j, k) = resid(i, j, k) &
-                            - (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
-                               + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
-            end do
-          end do
-        end do
-
-!------ SOLVE TDMA
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = kkmg(ilev, 1), kkmg(ilev, 2)
-          istart = iimg(ilev, 1) + mod(k, 2_8)
-          do i = istart, iimg(ilev, 2), 2
-            gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
-          end do
-        end do
-
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = kkmg(ilev, 1), kkmg(ilev, 2)
-          istart = iimg(ilev, 1) + mod(k, 2_8)
-          do j = 2, n2m
-            do i = istart, iimg(ilev, 2), 2
-              gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
-            end do
-          end do
-        end do
-
-!$OMP PARALLEL DO PRIVATE(ISTART)
-        do k = kkmg(ilev, 1), kkmg(ilev, 2)
-          istart = iimg(ilev, 1) + mod(k, 2_8)
-          do j = n2m - 1, 1, -1
-            do i = istart, iimg(ilev, 2), 2
-              gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
-            end do
-          end do
-        end do
-
-!====== REPEAT PREVIOUS PROCEDURES
-        do ii = 1, iter - 1
-
-!------ MAKE RHS OF ZEBRA GS (ODD LINE)
-!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
-          do k = kkmg(ilev, 1), kkmg(ilev, 2)
-            istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
-            do j = 1, n2m
-              do i = istart, iimg(ilev, 2), 2
-                gi(i, j, k) = resid(i, j, k) &
-                              - (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
-                                 + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
-              end do
-            end do
-          end do
-
-!------ SOLVE TDMA
-!$OMP PARALLEL DO PRIVATE(ISTART)
-          do k = kkmg(ilev, 1), kkmg(ilev, 2)
-            istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
-            do i = istart, iimg(ilev, 2), 2
-              gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
-            end do
-          end do
-
-!$OMP PARALLEL DO PRIVATE(ISTART)
-          do k = kkmg(ilev, 1), kkmg(ilev, 2)
-            istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
-            do j = 2, n2m
-              do i = istart, iimg(ilev, 2), 2
-                gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
-              end do
-            end do
-          end do
-
-!$OMP PARALLEL DO PRIVATE(ISTART)
-          do k = kkmg(ilev, 1), kkmg(ilev, 2)
-            istart = iimg(ilev, 1) + mod(kpm(k), 2_8)
-            do j = n2m - 1, 1, -1
-              do i = istart, iimg(ilev, 2), 2
-                gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
-              end do
-            end do
-          end do
-
-!------ MAKE RHS OF ZEBRA GS (EVEN LINE)
-!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
-          do k = kkmg(ilev, 1), kkmg(ilev, 2)
-            istart = iimg(ilev, 1) + mod(k, 2_8)
-            do j = 1, n2m
-              do i = istart, iimg(ilev, 2), 2
-                gi(i, j, k) = resid(i, j, k) &
-                              - (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
-                                 + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
-              end do
-            end do
-          end do
-
-!------ SOLVE TDMA
-!$OMP PARALLEL DO PRIVATE(ISTART)
-          do k = kkmg(ilev, 1), kkmg(ilev, 2)
-            istart = iimg(ilev, 1) + mod(k, 2_8)
-            do i = istart, iimg(ilev, 2), 2
-              gi(i, 1, k) = gi(i, 1, k) * bet(i, 1, k)
-            end do
-          end do
-
-!$OMP PARALLEL DO PRIVATE(ISTART)
-          do k = kkmg(ilev, 1), kkmg(ilev, 2)
-            istart = iimg(ilev, 1) + mod(k, 2_8)
-            do j = 2, n2m
-              do i = istart, iimg(ilev, 2), 2
-                gi(i, j, k) = (gi(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
-              end do
-            end do
-          end do
-
-!$OMP PARALLEL DO PRIVATE(ISTART)
-          do k = kkmg(ilev, 1), kkmg(ilev, 2)
-            istart = iimg(ilev, 1) + mod(k, 2_8)
-            do j = n2m - 1, 1, -1
-              do i = istart, iimg(ilev, 2), 2
-                gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
-              end do
-            end do
-          end do
-
+        do ii = 1, iter
+          call halfsweep(gi, resid, ilev, 1_8, (ii .gt. 1) .or. (iold .ne. 0))
+          call halfsweep(gi, resid, ilev, 0_8, .true.)
         end do
 
         return
       end subroutine relax
+
+!======================================================================
+      subroutine halfsweep(gi, resid, ilev, ks, nb)
+!======================================================================
+!       ONE HALF-SWEEP AT LEVEL ILEV: THE LINES WITH ISTART = IBG + MOD(K + KS, 2). NB: USE THE NEIGHBOUR VALUES.
+!       THE LINE RIGHT-HAND SIDES ARE BUILT IN THE WORK ARRAY RW BEFORE ANY LINE IS SOLVED, SO EVERY LINE READS
+!       ITS NEIGHBOURS AS THEY WERE BEFORE THE HALF-SWEEP. WITH AN EVEN NUMBER OF CELLS THE NEIGHBOURS ARE OF THE
+!       OTHER PARITY AND THIS IS THE ZEBRA SCHEME. ON A PERIODIC LEVEL WITH AN ODD NUMBER OF CELLS THE FIRST AND
+!       LAST LINES ARE NEIGHBOURS OF THE SAME PARITY: BUILDING THE RIGHT-HAND SIDES IN GI ITSELF MADE THEM READ A
+!       HALF-BUILT VALUE (FROM ANOTHER THREAD IN Z), SO THE PRECONDITIONER CHANGED FROM CALL TO CALL AND BICGSTAB
+!       FAILED WITH SEVERAL THREADS.
+        use mod_common
+        use mod_poiss
+        implicit none
+        integer(8) :: ilev, ks
+        logical :: nb
+        real(8) :: resid(n1md, n2m, n3md), gi(0:n1md, 0:n2, 0:n3md)
+        integer(8) :: i, j, k, istart
+        real(8), allocatable, save :: rw(:, :, :)
+
+        if (.not. allocated(rw)) allocate (rw(n1md, n2m, n3md))
+
+!------ RIGHT-HAND SIDES OF THE Y LINES
+        if (nb) then
+!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            istart = iimg(ilev, 1) + mod(k + ks, 2_8)
+            do j = 1, n2m
+              do i = istart, iimg(ilev, 2), 2
+                rw(i, j, k) = resid(i, j, k) &
+                              - (aw(i) * gi(imm(i), j, k) + ae(i) * gi(ipm(i), j, k) &
+                                 + ab(k) * gi(i, j, kmm(k)) + af(k) * gi(i, j, kpm(k)))
+              end do
+            end do
+          end do
+        else
+!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
+          do k = kkmg(ilev, 1), kkmg(ilev, 2)
+            istart = iimg(ilev, 1) + mod(k + ks, 2_8)
+            do j = 1, n2m
+              do i = istart, iimg(ilev, 2), 2
+                rw(i, j, k) = resid(i, j, k)
+              end do
+            end do
+          end do
+        end if
+
+!------ SOLVE THE Y LINES (TDMA)
+!$OMP PARALLEL DO PRIVATE(ISTART, I, J)
+        do k = kkmg(ilev, 1), kkmg(ilev, 2)
+          istart = iimg(ilev, 1) + mod(k + ks, 2_8)
+          do i = istart, iimg(ilev, 2), 2
+            gi(i, 1, k) = rw(i, 1, k) * bet(i, 1, k)
+          end do
+          do j = 2, n2m
+            do i = istart, iimg(ilev, 2), 2
+              gi(i, j, k) = (rw(i, j, k) - as(j) * gi(i, j - 1, k)) * bet(i, j, k)
+            end do
+          end do
+          do j = n2m - 1, 1, -1
+            do i = istart, iimg(ilev, 2), 2
+              gi(i, j, k) = gi(i, j, k) - gam(i, j + 1, k) * gi(i, j + 1, k)
+            end do
+          end do
+        end do
+
+        return
+      end subroutine halfsweep
 
 !======================================================================
       subroutine poisinit  ! CALCULATE COEFS FOR POISSON EQ.
@@ -760,6 +646,26 @@
         implicit none
         integer(8) :: i, j, k
         integer(8) :: ip, jp, kp
+        integer(8) :: nlev0
+
+!     THE MULTIGRID HALVES THE X AND Z CELLS NLEV TIMES, SO N1M AND N3M MUST BOTH BE MULTIPLES OF 2**NLEV:
+!     OTHERWISE THE COARSE LEVELS DO NOT COVER THE GRID AND BICGSTAB DIVERGES. USE THE LARGEST NLEV THAT FITS
+!     AND SAY SO (NLEV = 0 RUNS WITHOUT COARSE LEVELS, WHICH IS SLOW).
+        nlev0 = nlev
+        do while (nlev .gt. 0 .and. (mod(n1m, 2_8**nlev) .ne. 0 .or. mod(n3m, 2_8**nlev) .ne. 0))
+          nlev = nlev - 1
+        end do
+        if (nlev .ne. nlev0) write (*, '(A,I3,A,I3,A,I8,A,I8,A)') ' POISINIT: NLEV', nlev0, ' ->', nlev, &
+          ' (N1M =', n1m, ' AND N3M =', n3m, ' MUST BE MULTIPLES OF 2**NLEV)'
+
+!     A COARSEST LEVEL OF ONE CELL IN BOTH X AND Z LEAVES Y LINES WITHOUT X OR Z COUPLING, WHOSE TRIDIAGONAL
+!     SYSTEM IS SINGULAR (DIVISION BY ZERO IN TRIDCOEF). KEEP AT LEAST TWO CELLS IN X OR Z ON THE COARSEST LEVEL.
+        nlev0 = nlev
+        do while (nlev .gt. 0 .and. n1m / (2**nlev) .lt. 2 .and. n3m / (2**nlev) .lt. 2)
+          nlev = nlev - 1
+        end do
+        if (nlev .ne. nlev0) write (*, '(A,I3,A,I3,A)') ' POISINIT: NLEV', nlev0, ' ->', nlev, &
+          ' (AT LEAST TWO CELLS IN X OR Z ON THE COARSEST LEVEL)'
 
         call mgrd_allo
 

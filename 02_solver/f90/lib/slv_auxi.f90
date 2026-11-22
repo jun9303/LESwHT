@@ -6,6 +6,8 @@
          implicit none
          real(8) :: dtcfl, dt_evt, eps_t, cfl_tol, cfl_safety, cfl_target, dt_growth_max
          integer(8) :: icfl, jcfl, kcfl
+         logical :: nonfin
+         real(8), parameter :: cfl_blowup = 100.0d0
 
          ntime = ntime + 1
          m = ntime
@@ -23,7 +25,23 @@
          dt_growth_max = 1.01d0
          cfl_target = cflfac * cfl_safety
 
-         call cfl(cflmax, icfl, jcfl, kcfl)         ! CALCULATE CFL NUMBER
+         call cfl(cflmax, icfl, jcfl, kcfl, nonfin) ! CALCULATE CFL NUMBER
+
+!        STOP AFTER A BLOW-UP: A NON-FINITE VELOCITY, OR A CFL NUMBER ABOVE CFL_BLOWUP WITH THE LAST TIME STEP.
+!        WITHOUT THIS THE CFL CONTROL SHRINKS DT TOWARD ZERO AND THE RUN GOES ON UNTIL NEND.
+         if (nonfin .or. cflmax .gt. cfl_blowup) then
+           write (*, *) ''
+           if (nonfin) then
+             write (*, '(A,I10,A,F12.5)') ' SOLUTION DIVERGED: NON-FINITE VELOCITY AFTER STEP', ntime - 1, &
+               ', TIME', time
+           else
+             write (*, '(A,ES11.3,A,I10,A,F12.5,A,3I6)') ' SOLUTION DIVERGED: CFL =', cflmax, ' AFTER STEP', &
+               ntime - 1, ', TIME', time, ', CELL', icfl, jcfl, kcfl
+           end if
+           write (*, *) 'CHECK DT_SIZE / CFLFAC, THE BOUNDARY CONDITIONS AND THE POISSON SOLVER OUTPUT ABOVE.'
+           flush (6)
+           error stop 'SOLUTION DIVERGED'
+         end if
 
          if (idtopt .eq. 1 .and. cflmax .gt. 1.0d-14) then
            dtcfl = dt * cfl_target / cflmax
@@ -63,7 +81,7 @@
        end subroutine stepinit
 !=======================================================================
 !=======================================================================
-       subroutine cfl(cflm, icfl, jcfl, kcfl)
+       subroutine cfl(cflm, icfl, jcfl, kcfl, nonfin)
 !=======================================================================
 !
 !     CALCULATE THE MAXIMUM CFL NUMBER OF FLOW FIELD
@@ -72,6 +90,7 @@
 !     CFL#=U_I*DT/DX_I
 !     CFLI=(UC/DX+VC/DY+WC/DZ)*DT  (C FOR CELL CENTER)
 !     CFLMPT: INDEX WHERE THE CFL# IS MAXIMUM
+!     NONFIN: .TRUE. IF A CELL HAS A NON-FINITE (NAN OR INFINITE) CFL NUMBER, I.E. VELOCITY
 !
 !-----------------------------------------------------------------------
          use mod_common
@@ -80,6 +99,7 @@
          real(8) :: cflm
          real(8) :: cfli(0:3)
          integer(8) :: icfl, jcfl, kcfl
+         logical :: nonfin
          integer(8) :: i, j, k
          real(8) :: cflt
          integer(8) :: it, jt, kt
@@ -88,6 +108,7 @@
          icfl = 1
          jcfl = 1
          kcfl = 1
+         nonfin = .false.
 
 !     EACH THREAD FINDS THE MAXIMUM OF ITS CELLS; THE MERGE KEEPS THE SERIAL PICK
 !     (LARGEST VALUE, AND THE LAST CELL IN K-J-I ORDER AMONG EQUAL VALUES).
@@ -96,7 +117,7 @@
          it = 1
          jt = 1
          kt = 1
-!$OMP DO COLLAPSE(2)
+!$OMP DO COLLAPSE(2) REDUCTION(.OR.:NONFIN)
          do k = 1, n3m
            do j = 1, n2m
              do i = 1, n1m
@@ -104,6 +125,7 @@
                cfli(2) = abs(v(i, j, k) + v(i, j + 1, k)) * 0.5 * f2fyi(j)
                cfli(3) = abs(w(i, j, k) + w(i, j, k + 1)) * 0.5 * f2fzi(k)
                cfli(0) = (cfli(1) + cfli(2) + cfli(3)) * dt
+               if (.not. (cfli(0) .le. huge(1.0d0))) nonfin = .true.
                if (cfli(0) .ge. cflt) then
                  cflt = cfli(0)
                  it = i

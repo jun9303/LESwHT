@@ -23,6 +23,20 @@
         integer(8) :: i, j, k, ilev
         integer(8) :: nlev0
 
+!     THE MULTIGRID HALVES THE Z CELLS NLEV TIMES, SO N3M MUST BE A MULTIPLE OF 2**NLEV: OTHERWISE THE
+!     COARSE LEVELS DO NOT COVER THE GRID AND THE SOLVE GIVES NAN. USE THE LARGEST NLEV THAT FITS AND SAY SO
+!     (AT LEAST ONE LEVEL BELOW THE GRID IS NEEDED, SO N3M MUST BE EVEN).
+        if (mod(n3m, 2_8) .ne. 0) then
+          write (*, '(A,I8,A)') ' POISINIT: N3M =', n3m, ' IS ODD; THIS POISSON SOLVER NEEDS AN EVEN N3M'
+          error stop 'POISINIT: N3M MUST BE EVEN (MULTIGRID IN Z)'
+        end if
+        nlev0 = nlev
+        do while (nlev .gt. 1 .and. mod(n3m, 2_8**nlev) .ne. 0)
+          nlev = nlev - 1
+        end do
+        if (nlev .ne. nlev0) write (*, '(A,I3,A,I3,A,I8,A)') ' POISINIT: NLEV', nlev0, ' ->', nlev, &
+          ' (N3M =', n3m, ' MUST BE A MULTIPLE OF 2**NLEV)'
+
 !     A NON-PERIODIC Z NEEDS AT LEAST TWO CELLS ON THE COARSEST MULTIGRID LEVEL: WITH ONE, THE MODE-1
 !     Y LINE THERE HAS NO Z COUPLING AND IS SINGULAR (DIVISION BY ZERO BELOW). USE FEWER LEVELS.
         nlev0 = nlev

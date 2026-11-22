@@ -274,8 +274,6 @@
          if (ihtrans .eq. 1) write (nv) (((t(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
          close (nv)
 
-         nv = nv + 1
-
          return
        end subroutine writefield
 !=======================================================================
@@ -531,7 +529,6 @@
            write (2999, '(a)') trim(tname)
            close (2999)
 
-           nav = nav + 1
            uavg = 0.
            vavg = 0.
            wavg = 0.
@@ -605,7 +602,6 @@
            open (2999, file=trim(output_dir_field_avg)//'/fav_manifest.dat', position='append')
           write (2999, '(a)') trim(tname)
           close (2999)
-          nav = nav + 1
         end if
 
         uavg = 0.
@@ -719,7 +715,6 @@
           write (nav) (((t2avg(i, j, k), i=1, n1m), j=1, n2m), k=1, n3m)
         end if
         close (nav)
-        nav = nav + 1
 
         return
       end subroutine field_avg_finalize
