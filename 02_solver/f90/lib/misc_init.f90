@@ -144,6 +144,34 @@
           bc_ztop = 4
         end if
 
+!       FAR FIELD (BC = 1): NO FLOW THROUGH THE BOUNDARY AND ZERO GRADIENT OF THE TANGENTIAL VELOCITY.
+!       THESE FLAGS SWITCH THE TANGENTIAL GHOSTS (UCALC) AND THE BOUNDARY TERMS OF RHS AND LHSU/V/W
+!       TO ZERO GRADIENT; WITHOUT THEM THE GHOSTS KEPT THEIR INITIAL VALUES.
+        jub = 0
+        jwb = 0
+        jut = 0
+        jwt = 0
+        kub = 0
+        kvb = 0
+        kut = 0
+        kvt = 0
+        if (bc_ybtm .eq. 1) then
+          jub = 1
+          jwb = 1
+        end if
+        if (bc_ytop .eq. 1) then
+          jut = 1
+          jwt = 1
+        end if
+        if (bc_zbtm .eq. 1) then
+          kub = 1
+          kvb = 1
+        end if
+        if (bc_ztop .eq. 1) then
+          kut = 1
+          kvt = 1
+        end if
+
         call check_idecomp_input
 
         write (*, *) '========= BOUNDARY CONDITIONS ========='
