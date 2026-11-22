@@ -150,6 +150,10 @@ allow `NLEV` up to 5 (352 = 11 x 2^5). Otherwise the solver lowers `NLEV` at sta
 it uses; `poiss_z_ft` and `poiss_x_ft` stop if the count is odd. Cell counts with more factors of 2 give
 more levels and faster convergence.
 
+`poiss_mgrd` returns the iterate with the smallest residual when BiCGSTAB does not converge within `MGITR`
+iterations or breaks down, and its line relaxation gives the same result for any thread count, also when a
+periodic level has an odd number of cells.
+
 `poiss_fd` diagonalizes x and z with the eigenvectors of their 1D operators and solves one tridiagonal
 system in y for each (x-mode, z-mode) combination, so every line is independent. Its cost rises as
 `n1m^2` and `n3m^2`, so it suits moderate x and z sizes.
