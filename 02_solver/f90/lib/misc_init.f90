@@ -172,6 +172,13 @@
           kvt = 1
         end if
 
+!       CONSTANT FLOW RATE NEEDS A PERIODIC X: WITH AN INLET THE INLET VELOCITY SETS THE FLOW RATE, AND
+!       CONVBC CLOSES THE OUTLET FOR ICH = 1 (NO SOLUTION OF THE PRESSURE EQUATION).
+        if ((ich .eq. 1) .and. (xprdic .eq. 0)) then
+          write (*, *) ' --- ICH=1 (CONSTANT FLOW RATE) REQUIRES X PERIODICITY. WITH AN INLET, USE ICH=0.'
+          stop
+        end if
+
         call check_idecomp_input
 
         write (*, *) '========= BOUNDARY CONDITIONS ========='
@@ -301,9 +308,12 @@
         end do
         close (11)
 
-        open (11, file='../output/ibmpre/ibmpre_nutzero.bin')
-        read (11, *) nzero
-        close (11)
+        nzero = 0
+        if (iles .eq. 1) then
+          open (11, file='../output/ibmpre/ibmpre_nutzero.bin')
+          read (11, *) nzero
+          close (11)
+        end if
 
         if (ihtrans .eq. 1) then
           open (11, file='../output/ibmpre/ibmpre_fcpts_t.bin')
@@ -332,9 +342,18 @@
         if (iles .eq. 1) then
           call les_allo()
           if (ihtrans .eq. 1) call les_thermal_allo()
+        else
+!         DNS: THE MOMENTUM AND ENERGY SOLVERS STILL READ THE EDDY VISCOSITY AND DIFFUSIVITY (MULTIPLIED
+!         BY ZERO), SO THEY ARE ALLOCATED AND SET TO ZERO
+          allocate (nusgs(0:n1, 0:n2, 0:n3), nusgs1(0:n1, 0:n2, 0:n3, 3))
+          nusgs = 0.
+          nusgs1 = 0.
+          if (ihtrans .eq. 1) call les_thermal_allo()
         end if
 
-        if (iconjg .eq. 1) then
+!       WITHOUT CONJUGATE HEAT TRANSFER CSTAR = KSTAR = 1 (SET IN CONJG_ALLO); THE TEMPERATURE VOLUME
+!       SUMS FOR ICH = 1 READ CSTAR
+        if ((iconjg .eq. 1) .or. (ihtrans .eq. 1)) then
           call conjg_allo()
         end if
 
@@ -1240,9 +1259,12 @@
         if (iles .eq. 1) then
           call les_deallo()
           if (ihtrans .eq. 1) call les_thermal_deallo()
+        else
+          deallocate (nusgs, nusgs1)
+          if (ihtrans .eq. 1) call les_thermal_deallo()
         end if
 
-        if (iconjg .eq. 1) call conjg_deallo()
+        if ((iconjg .eq. 1) .or. (ihtrans .eq. 1)) call conjg_deallo()
 
         if (iavg .eq. 1) call avg_deallo()
 
