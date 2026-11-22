@@ -996,11 +996,9 @@
 !$OMP PARALLEL DO
            do k = 1, n3m
              do j = 1, n2m
-               ! ONLY SCALE THE FLUID PHASE BY THE MASS FLUX ERROR
+               ! ONLY SCALE THE FLUID PHASE BY THE MASS FLUX ERROR; ONLY U CARRIES FLUX THROUGH THE OUTLET
                if (fbody_c(n1m, j, k) .gt. 1.e-10) then
                  uout(j, k) = uout(j, k) * qratio
-                 vout(j, k) = vout(j, k) * qratio
-                 wout(j, k) = wout(j, k) * qratio
                end if
                duout(j, k) = uout(j, k) - u(n1, j, k)
                dvout(j, k) = vout(j, k) - v(n1, j, k)
