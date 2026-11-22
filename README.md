@@ -172,8 +172,6 @@ zero-eddy-viscosity cells one index off; the solver only detects the out-of-rang
 - `ICH = 1` (constant flow rate) needs a periodic x; with an inlet use `ICH = 0`.
 - A y-periodic domain is not available.
 - LES with one z-plane: `FILTER = 3` runs as `FILTER = 1`, and `FILTER = 2` stops.
-- The IBM preprocessing with `IBM-INTERP OFF` does not add the faces at a periodic boundary as forcing
-  points (`IBM-INTERP ON` does).
 
 ## Post-processing
 
