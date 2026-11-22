@@ -315,7 +315,8 @@ def les_preprocessing_data(nzero,iszero):
         for j in range(iszero.shape[1]):
             for k in range(iszero.shape[2]):
                 if iszero[i][j][k] == 0:
-                    indices.append([i,j,k])
+                    # the solver reads Fortran cell indices (1..N-1); iszero is indexed from 0 here
+                    indices.append([i+1,j+1,k+1])
 
     for index in indices:
         file.write(' %d ' %(index[0]))
