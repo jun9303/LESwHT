@@ -914,7 +914,9 @@
          implicit none
          integer(8) :: i, j, k
          real(8) :: qin, qout, qratio
-         real(8) :: ubar, ucoef, vwcoef
+         real(8) :: ubar, ucoef, vwcoef, afluid
+         real(8), parameter :: eps_denom = 1.0d-14
+         integer(8) :: nsolid
          real(8) :: funcbody
 
          if (ich .ne. 1) then
@@ -939,14 +941,28 @@
              end do
            end do
 
-!-----CALCULATE CONVECTIVE VELOCITY UC
+!-----CALCULATE CONVECTIVE VELOCITY UC (MEAN OVER THE FLUID PART OF THE OUTLET; A BODY THAT
+!     CROSSES THE OUTLET WOULD OTHERWISE LOWER IT BY THE SOLID FRACTION)
            ubar = 0.
+           afluid = 0.
+           nsolid = 0
            do k = 1, n3m
              do j = 1, n2m
-               ubar = u(n1, j, k) * f2fy(j) * f2fz(k) + ubar
+               if (fbody_c(n1m, j, k) .gt. 1.e-10 .or. imovingon .eq. 1) then
+                 ubar = u(n1, j, k) * f2fy(j) * f2fz(k) + ubar
+                 afluid = f2fy(j) * f2fz(k) + afluid
+               else
+                 nsolid = nsolid + 1
+               end if
              end do
            end do
-           ubar = ubar / (yl * zl)
+           if (nsolid .eq. 0) then
+             ubar = ubar / (yl * zl)
+           else if (afluid .gt. eps_denom) then
+             ubar = ubar / afluid
+           else
+             ubar = 0.
+           end if
            ucoef = ubar * dtconst * f2fxi(n1m)
            vwcoef = ubar * dtconst * c2cxi(n1)
 
@@ -954,10 +970,12 @@
            do k = 1, n3m
              do j = 1, n2m
                if (fbody_c(n1m, j, k) .le. 1.e-10 .and. imovingon .eq. 0) then
-                 ! SOLID PHASE: ZERO-GRADIENT (PRESERVES SOLID VELOCITY = 0)
-                 uout(j, k) = u(n1m, j, k)
-                 vout(j, k) = v(n1m, j, k)
-                 wout(j, k) = w(n1m, j, k)
+                 ! SOLID PHASE: THE GHOST TAKES THE BODY VELOCITY (ZERO), AS AT THE INLET. A ZERO GRADIENT
+                 ! WOULD COPY THE IBM VALUES OF THE FORCING POINTS NEXT TO THE FLUID, SO FLUX WOULD CROSS
+                 ! THE SOLID PART OF THE OUTLET AND THE FLUID SCALING BELOW WOULD MISS QIN.
+                 uout(j, k) = 0.
+                 vout(j, k) = 0.
+                 wout(j, k) = 0.
                else
                  ! FLUID PHASE: CONVECTIVE ADVECTION
                  uout(j, k) = u(n1, j, k) - ucoef * (u(n1, j, k) - u(n1m, j, k))
@@ -968,7 +986,11 @@
                qout = uout(j, k) * f2fy(j) * f2fz(k) + qout
              end do
            end do
-           qratio = qin / qout
+           if (dabs(qout) .gt. eps_denom) then
+             qratio = qin / qout
+           else
+             qratio = 1.0d0
+           end if
 
 !-----ADJUST BOUNDARY VELOCITY TO SATISFY GLOBAL MASS CONSERVATION
 !$OMP PARALLEL DO
