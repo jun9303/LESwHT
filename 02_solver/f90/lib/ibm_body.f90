@@ -354,10 +354,11 @@ subroutine geomfac_intp(nx, ny, nz, xpre, ypre, zpre, nintp, &
 end subroutine geomfac_intp
 
 !=======================================================================
-subroutine findbdy_nointp(dir, nx, ny, nz, nbody, inout, ninner, fcp)
+subroutine findbdy_nointp(dir, nx, ny, nz, nbody, inout, xprd, zprd, ninner, fcp)
   implicit none
   integer(8), intent(in) :: dir, nx, ny, nz, nbody
   integer(8), intent(in) :: inout(0:nx, 0:ny, 0:nz)
+  integer(8), intent(in) :: xprd, zprd           ! 1 FOR A PERIODIC X / Z
   integer(8), intent(out) :: ninner
   integer(8), intent(out) :: fcp(nbody, 3)
 
@@ -367,6 +368,9 @@ subroutine findbdy_nointp(dir, nx, ny, nz, nbody, inout, ninner, fcp)
   if (dir .eq. 1) istart = 2
   if (dir .eq. 2) jstart = 2
   if (dir .eq. 3) kstart = 2
+  ! IN A PERIODIC DIRECTION THE FACE AT INDEX 1 IS SOLVED FOR (IT IS ALSO THE FACE AT N), AS IN FINDBDY_INTP
+  if ((dir .eq. 1) .and. (xprd .eq. 1) .and. (nx .gt. 2)) istart = 1
+  if ((dir .eq. 3) .and. (zprd .eq. 1) .and. (nz .gt. 2)) kstart = 1
 
   ninner = 0
 

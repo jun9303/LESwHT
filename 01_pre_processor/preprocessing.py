@@ -243,9 +243,11 @@ elif IBMINT == 'OFF':
     # interpolation scheme is off
     print('\n*** INTERPOLATION MODE OFF ***')
 
-    [NINNER['u'], FCP['u']] = lib_ibm_body.findbdy_nointp(1, NBODY['u'], INOUT['u'])
-    [NINNER['v'], FCP['v']] = lib_ibm_body.findbdy_nointp(2, NBODY['v'], INOUT['v'])
-    [NINNER['w'], FCP['w']] = lib_ibm_body.findbdy_nointp(3, NBODY['w'], INOUT['w'])
+    XPRD = 1 if XPRDIC == 'ON' else 0
+    ZPRD = 1 if ZPRDIC == 'ON' else 0
+    [NINNER['u'], FCP['u']] = lib_ibm_body.findbdy_nointp(1, NBODY['u'], INOUT['u'], XPRD, ZPRD)
+    [NINNER['v'], FCP['v']] = lib_ibm_body.findbdy_nointp(2, NBODY['v'], INOUT['v'], XPRD, ZPRD)
+    [NINNER['w'], FCP['w']] = lib_ibm_body.findbdy_nointp(3, NBODY['w'], INOUT['w'], XPRD, ZPRD)
 
     FCP['u'] = FCP['u'][0:NINNER['u'],:].copy()
     FCP['v'] = FCP['v'][0:NINNER['v'],:].copy()
@@ -256,7 +258,7 @@ elif IBMINT == 'OFF':
     print('# of forcing pts for W = %d' %(NINNER['w']))
 
     if HTRNFR == 'ON':
-        [NINNER['t'], FCP['t']] = lib_ibm_body.findbdy_nointp(4, NBODY['t'], INOUT['t'])
+        [NINNER['t'], FCP['t']] = lib_ibm_body.findbdy_nointp(4, NBODY['t'], INOUT['t'], XPRD, ZPRD)
         FCP['t'] = FCP['t'][0:NINNER['t'],:].copy()    
         print('# of forcing pts for T = %d' %(NINNER['t']))
 
