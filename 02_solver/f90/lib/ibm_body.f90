@@ -99,6 +99,22 @@ subroutine findbdy_intp(dir, nx, ny, nz, nbody, inout, ufix_x, &
           intpindx(nintp, 1) = inout(ip, j, k) - inout(im, j, k)
           intpindx(nintp, 2) = inout(i, jp, k) - inout(i, jm, k)
           intpindx(nintp, 3) = inout(i, j, kp) - inout(i, j, km)
+          ! IN A NON-PERIODIC DIRECTION (LFIX = 1 AT ITS FIRST CELL) THE SOLVER HAS INTERPOLATION
+          ! VALUES AT INDICES 1 .. N-1 ONLY. A STENCIL THAT WOULD LEAVE THEM (A BODY TANGENT TO, OR
+          ! WITHIN TWO CELLS OF, A DOMAIN END) DROPS THAT DIRECTION; THE OTHER DIRECTIONS STILL
+          ! INTERPOLATE. A PERIODIC DIRECTION WRAPS IN THE SOLVER.
+          if (lfix_x(1) .eq. 1) then
+            if ((i + 2 * intpindx(nintp, 1) .lt. 1) .or. (i + 2 * intpindx(nintp, 1) .gt. nx - 1)) &
+              intpindx(nintp, 1) = 0
+          end if
+          if (lfix_y(1) .eq. 1) then
+            if ((j + 2 * intpindx(nintp, 2) .lt. 1) .or. (j + 2 * intpindx(nintp, 2) .gt. ny - 1)) &
+              intpindx(nintp, 2) = 0
+          end if
+          if (lfix_z(1) .eq. 1) then
+            if ((k + 2 * intpindx(nintp, 3) .lt. 1) .or. (k + 2 * intpindx(nintp, 3) .gt. nz - 1)) &
+              intpindx(nintp, 3) = 0
+          end if
         else if ((inout(i, j, k) .eq. 0) .and. (inout_sum .eq. 0)) then
           ninner = ninner + 1
           fcp_temp(ninner, 1) = i

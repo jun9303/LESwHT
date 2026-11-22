@@ -263,8 +263,8 @@
             jpp = jfc(n, 4) + intpindx(n, 4, 2) * 2
             kpp = kfc(n, 4) + intpindx(n, 4, 3) * 2
 
-            if ((ipp .ge. n1) .or. (ipp .le. 0)) call reindex_i(ip, ipp) ! AT SLV_MMTM LIB
-            if ((kpp .ge. n3) .or. (kpp .le. 0)) call reindex_k(kp, kpp) ! AT SLV_MMTM LIB
+            if ((xprdic .eq. 1) .and. ((ipp .ge. n1) .or. (ipp .le. 0))) call reindex_i(ip, ipp) ! AT SLV_MMTM LIB
+            if ((zprdic .eq. 1) .and. ((kpp .ge. n3) .or. (kpp .le. 0))) call reindex_k(kp, kpp) ! AT SLV_MMTM LIB
             ttarg = geomfac(n, 4, 0, 0, 0) * tbody &
                     + geomfac(n, 4, 0, 0, 1) * (t(ii, jj, kp) + rhstmp(ii, jj, kp)) &
                     + geomfac(n, 4, 0, 0, 2) * (t(ii, jj, kpp) + rhstmp(ii, jj, kpp)) &

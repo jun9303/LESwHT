@@ -381,8 +381,44 @@
 36      format('  NBODY_U :', i12, '  NBODY_V :', i12, '  NBODY_W :', i12)
 37      format('  NINTP_T :', i12, '  NBODY_T :', i12)
 
+        call check_stencils()
+
         return
       end subroutine ibmpreread
+!=======================================================================
+!=======================================================================
+      subroutine check_stencils
+!=======================================================================
+!       AN INTERPOLATION STENCIL MUST STAY INSIDE A NON-PERIODIC DIRECTION (INDICES 1 .. N-1), OR THE
+!       IBM FORCING READS OUTSIDE THE ARRAYS. FILES FROM AN OLDER PREPROCESSOR CAN HOLD SUCH STENCILS
+!       WHEN A BODY IS TANGENT TO, OR WITHIN TWO CELLS OF, A DOMAIN END. STOP AND ASK FOR A RERUN.
+        use mod_common
+        use mod_flowarray, only: ifc, jfc, kfc, intpindx
+        implicit none
+        integer(8) :: n, l, lmax, nbad, ipp, jpp, kpp
+
+        lmax = 3
+        if (ihtrans .eq. 1) lmax = 4
+        nbad = 0
+        do l = 1, lmax
+          do n = 1, nintp(l)
+            ipp = ifc(n, l) + 2 * intpindx(n, l, 1)
+            jpp = jfc(n, l) + 2 * intpindx(n, l, 2)
+            kpp = kfc(n, l) + 2 * intpindx(n, l, 3)
+            if ((xprdic .eq. 0) .and. ((ipp .lt. 1) .or. (ipp .gt. n1m))) nbad = nbad + 1
+            if ((yprdic .eq. 0) .and. ((jpp .lt. 1) .or. (jpp .gt. n2m))) nbad = nbad + 1
+            if ((zprdic .eq. 0) .and. ((kpp .lt. 1) .or. (kpp .gt. n3m))) nbad = nbad + 1
+          end do
+        end do
+
+        if (nbad .gt. 0) then
+          write (*, '(A,I10,A)') ' IBM DATA: ', nbad, ' INTERPOLATION STENCILS LEAVE A NON-PERIODIC DIRECTION.'
+          write (*, *) ' RERUN 01_PRE_PROCESSOR (PREPROCESSING.PY) WITH THIS VERSION OF IBM_BODY.F90.'
+          stop
+        end if
+
+        return
+      end subroutine check_stencils
 !=======================================================================
 !=======================================================================
       subroutine nutzeroread

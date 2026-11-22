@@ -658,8 +658,8 @@
            jpp = jfc(n, 1) + intpindx(n, 1, 2) * 2
            kpp = kfc(n, 1) + intpindx(n, 1, 3) * 2
 
-           if ((ipp .ge. n1) .or. (ipp .le. 0)) call reindex_i(ip, ipp)
-           if ((kpp .ge. n3) .or. (kpp .le. 0)) call reindex_k(kp, kpp)
+           if ((xprdic .eq. 1) .and. ((ipp .ge. n1) .or. (ipp .le. 0))) call reindex_i(ip, ipp)
+           if ((zprdic .eq. 1) .and. ((kpp .ge. n3) .or. (kpp .le. 0))) call reindex_k(kp, kpp)
            ! IF (IMOVINGON.EQ.1) UBODY=UBD(X(II),YMP(JJ),ZMP(KK))
 
            utarg = geomfac(n, 1, 0, 0, 0) * ubody &
@@ -707,8 +707,8 @@
            jpp = jfc(n, 2) + intpindx(n, 2, 2) * 2
            kpp = kfc(n, 2) + intpindx(n, 2, 3) * 2
 
-           if ((ipp .ge. n1) .or. (ipp .le. 0)) call reindex_i(ip, ipp)
-           if ((kpp .ge. n3) .or. (kpp .le. 0)) call reindex_k(kp, kpp)
+           if ((xprdic .eq. 1) .and. ((ipp .ge. n1) .or. (ipp .le. 0))) call reindex_i(ip, ipp)
+           if ((zprdic .eq. 1) .and. ((kpp .ge. n3) .or. (kpp .le. 0))) call reindex_k(kp, kpp)
            ! IF (IMOVINGON.EQ.1) VBODY=VBD(XMP(II),Y(JJ),ZMP(KK))
 
            vtarg = geomfac(n, 2, 0, 0, 0) * vbody &
@@ -756,8 +756,8 @@
            jpp = jfc(n, 3) + intpindx(n, 3, 2) * 2
            kpp = kfc(n, 3) + intpindx(n, 3, 3) * 2
 
-           if ((ipp .ge. n1) .or. (ipp .le. 0)) call reindex_i(ip, ipp)
-           if ((kpp .ge. n3) .or. (kpp .le. 0)) call reindex_k(kp, kpp)
+           if ((xprdic .eq. 1) .and. ((ipp .ge. n1) .or. (ipp .le. 0))) call reindex_i(ip, ipp)
+           if ((zprdic .eq. 1) .and. ((kpp .ge. n3) .or. (kpp .le. 0))) call reindex_k(kp, kpp)
            ! IF (IMOVINGON.EQ.1) WBODY=WBD(XMP(II),YMP(JJ),Z(KK))
 
            wtarg = geomfac(n, 3, 0, 0, 0) * wbody &
