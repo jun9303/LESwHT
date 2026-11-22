@@ -75,7 +75,7 @@ subroutine findbdy_intp(dir, nx, ny, nz, nbody, inout, ufix_x, &
   if (dir .eq. 2) jstart = 2
   if (dir .eq. 3) kstart = 2
   ! IN A PERIODIC DIRECTION (LFIX = 0 AT ITS FIRST CELL) THE FACE AT INDEX 1 IS SOLVED FOR (IT IS ALSO
-  ! THE FACE AT INDEX N), SO IT IS SEARCHED TOO. WITH ONE CELL (2D) THAT DIRECTION HAS NOTHING TO SOLVE.
+  ! THE FACE AT INDEX N), SO IT IS SEARCHED TOO. WITH ONE CELL (2D) THAT DIRECTION IS NOT SOLVED.
   if ((dir .eq. 1) .and. (lfix_x(1) .eq. 0) .and. (nx .gt. 2)) istart = 1
   if ((dir .eq. 3) .and. (lfix_z(1) .eq. 0) .and. (nz .gt. 2)) kstart = 1
 
@@ -105,7 +105,7 @@ subroutine findbdy_intp(dir, nx, ny, nz, nbody, inout, ufix_x, &
           intpindx(nintp, 3) = inout(i, j, kp) - inout(i, j, km)
           ! IN A NON-PERIODIC DIRECTION (LFIX = 1 AT ITS FIRST CELL) THE SOLVER HAS INTERPOLATION
           ! VALUES AT INDICES 1 .. N-1 ONLY. A STENCIL THAT WOULD LEAVE THEM (A BODY TANGENT TO, OR
-          ! WITHIN TWO CELLS OF, A DOMAIN END) DROPS THAT DIRECTION; THE OTHER DIRECTIONS STILL
+          ! WITHIN TWO CELLS OF, A DOMAIN END) SKIPS THAT DIRECTION; THE OTHER DIRECTIONS STILL
           ! INTERPOLATE. A PERIODIC DIRECTION WRAPS IN THE SOLVER.
           if (lfix_x(1) .eq. 1) then
             if ((i + 2 * intpindx(nintp, 1) .lt. 1) .or. (i + 2 * intpindx(nintp, 1) .gt. nx - 1)) &

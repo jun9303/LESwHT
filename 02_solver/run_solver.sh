@@ -28,16 +28,31 @@ else
 fi
 
 export OMP_STACKSIZE=1G
-export OMP_SCHEDULE="dynamic"
-export OMP_DYNAMIC=TRUE
+export OMP_DYNAMIC=FALSE        # keep the requested number of threads
+export OMP_PLACES=cores         # one thread per core, threads kept close to each other
+export OMP_PROC_BIND=close
+
+# glibc: serve the work arrays that the solver allocates and frees at every call (ADI planes,
+# SGS arrays) from the heap instead of mmap/munmap, which page-faults on every call
+export MALLOC_MMAP_THRESHOLD_=33554432
+export MALLOC_TRIM_THRESHOLD_=68719476736
+export MALLOC_MMAP_MAX_=0
 
 # 4. Compilation
-echo "Compiling Solver (make new)..."
-make new
+#    POISS selects the Poisson solver (see Makefile), e.g. POISS=poiss_z_ft bash run_solver.sh
+POISS=${POISS:-poiss_ftft}
+echo "Compiling Solver (make new POISS=$POISS)..."
+make new POISS=$POISS
 
 # 5. Execution
-echo "Running Solver..."
+#    On a node with several NUMA domains, numactl --interleave=all spreads the arrays over all
+#    memory channels (the arrays are first written by one thread). Used when numactl is available.
+RUN="./solver_exec"
+if command -v numactl > /dev/null 2>&1 && numactl --interleave=all true > /dev/null 2>&1; then
+    RUN="numactl --interleave=all ./solver_exec"
+fi
+echo "Running Solver ($RUN, $OMP_NUM_THREADS threads)..."
 rm -f *.o *.mod *.e core coredir.* fort.*
-./solver_exec
+$RUN
 
 echo "Solver finished."
