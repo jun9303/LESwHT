@@ -238,7 +238,11 @@
           real(8) :: rhstmp(n1m, n2m, n3m)
 
 !---- COMPUTE TARGET VELOCITIES & FORCING VALUES AT FORCING POINTS
-          tbody = 0.
+          ! WITHOUT CONJUGATE HEAT TRANSFER THE BODY IS HELD AT TSOL_I, AS IN THE INITIAL FIELD, THE INLET
+          ! SOLID GHOST (WALLBC_T) AND THE PERIODIC RESCALING. WITH IDECOMP = 1, T IS THE PART THAT VANISHES
+          ! AT THE WALLS, SO THE BODY TARGET IS 0.
+          tbody = tsol_i
+          if (idecomp .eq. 1) tbody = 0.
           dti = 1./dt
 
 !$OMP PARALLEL DO COLLAPSE(2)
