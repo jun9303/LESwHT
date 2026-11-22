@@ -144,6 +144,12 @@ Choose the Poisson solver at build time with `POISS` (`make new POISS=poiss_z_ft
 | `poiss_mgrd` | any | 3D multigrid with BiCGSTAB |
 | `poiss_fd` | any, y non-periodic | direct solver (no iterations); a periodic direction must be uniform |
 
+The multigrid solvers halve the cell count `NLEV` times (`settings.input`): x for `poiss_z_ft`, z for
+`poiss_x_ft`, x and z for `poiss_mgrd`. That count must be a multiple of `2**NLEV`, for example 352 cells
+allow `NLEV` up to 5 (352 = 11 x 2^5). Otherwise the solver lowers `NLEV` at start-up and prints the value
+it uses; `poiss_z_ft` and `poiss_x_ft` stop if the count is odd. Cell counts with more factors of 2 give
+more levels and faster convergence.
+
 `poiss_fd` diagonalizes x and z with the eigenvectors of their 1D operators and solves one tridiagonal
 system in y for each (x-mode, z-mode) combination, so every line is independent. Its cost rises as
 `n1m^2` and `n3m^2`, so it suits moderate x and z sizes.

@@ -51,7 +51,9 @@ DT_SIZE: Time step size (* Only meaningful when IDTOPT: 0)
 CFLFAC : Maximum CFL# criterion (* Only meaningful when IDTOPT: 1)
 
 RESID1 : Residue criteria for solving Poisson eqn. of the pseudo-pressure(PHI) by iterative method
-NLEV   : # of multigrid level for poisson eq.
+NLEV   : # of multigrid level for poisson eq. The multigrid halves the cell count NLEV times (x for poiss_z_ft,
+         z for poiss_x_ft, x and z for poiss_mgrd), so that count must be a multiple of 2**NLEV;
+         otherwise the solver lowers NLEV at start-up and prints the value it uses
 NBLI   : # of iteration at the lowest multigrid level
 MGITR  : Maximum iteration # to solve Poisson eqn.
 IOLDV  : Initial PHI setting (0; Initialize PHI, 1; Use the previous solution)

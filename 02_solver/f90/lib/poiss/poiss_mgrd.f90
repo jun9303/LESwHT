@@ -760,6 +760,26 @@
         implicit none
         integer(8) :: i, j, k
         integer(8) :: ip, jp, kp
+        integer(8) :: nlev0
+
+!     THE MULTIGRID HALVES THE X AND Z CELLS NLEV TIMES, SO N1M AND N3M MUST BOTH BE MULTIPLES OF 2**NLEV:
+!     OTHERWISE THE COARSE LEVELS DO NOT COVER THE GRID AND BICGSTAB DIVERGES. USE THE LARGEST NLEV THAT FITS
+!     AND SAY SO (NLEV = 0 RUNS WITHOUT COARSE LEVELS, WHICH IS SLOW).
+        nlev0 = nlev
+        do while (nlev .gt. 0 .and. (mod(n1m, 2_8**nlev) .ne. 0 .or. mod(n3m, 2_8**nlev) .ne. 0))
+          nlev = nlev - 1
+        end do
+        if (nlev .ne. nlev0) write (*, '(A,I3,A,I3,A,I8,A,I8,A)') ' POISINIT: NLEV', nlev0, ' ->', nlev, &
+          ' (N1M =', n1m, ' AND N3M =', n3m, ' MUST BE MULTIPLES OF 2**NLEV)'
+
+!     A COARSEST LEVEL OF ONE CELL IN BOTH X AND Z LEAVES Y LINES WITHOUT X OR Z COUPLING, WHOSE TRIDIAGONAL
+!     SYSTEM IS SINGULAR (DIVISION BY ZERO IN TRIDCOEF). KEEP AT LEAST TWO CELLS IN X OR Z ON THE COARSEST LEVEL.
+        nlev0 = nlev
+        do while (nlev .gt. 0 .and. n1m / (2**nlev) .lt. 2 .and. n3m / (2**nlev) .lt. 2)
+          nlev = nlev - 1
+        end do
+        if (nlev .ne. nlev0) write (*, '(A,I3,A,I3,A)') ' POISINIT: NLEV', nlev0, ' ->', nlev, &
+          ' (AT LEAST TWO CELLS IN X OR Z ON THE COARSEST LEVEL)'
 
         call mgrd_allo
 
