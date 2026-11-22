@@ -353,7 +353,7 @@
         real(8) :: a(9), b(6)
         real(8) :: aaa, bbb
 
-!$OMP PARALLEL DO PRIVATE(UP,UM,VP,VM,WP,WM) &
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(UP,UM,VP,VM,WP,WM) &
 !$OMP PRIVATE(A,B,AAA,BBB)
         do k = 1, n3m
           do j = 1, n2m
@@ -419,6 +419,7 @@
         implicit none
         integer(8) :: i, j, k
         real(8) :: ljmj_v, mjmj_v
+        real(8) :: ljmj_v_k, ljmj_v_pln(n3m), mjmj_v_k, mjmj_v_pln(n3m)
         real(8) :: sdxf2, sdyf2, sdzf2, aaa, bbb, ami, volume
         real(8) :: b(6), str(6), alp(9)
 
@@ -431,7 +432,7 @@
         allocate (mmij(n1m, n2m, n3m, 6))
         allocate (uui(n1m, n2m, n3m, 3))
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(B,STR,ALP) &
 !$OMP PRIVATE(SDXF2,SDYF2,SDZF2,AAA,BBB)
         do k = 1, n3m
@@ -490,18 +491,14 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO
         do i = 1, 6
           call test_filter(mmij(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
         do j = 1, 9
           call test_filter(aalp(:, :, :, j), filter)
         end do
-!$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(B,STR,ALP) &
 !$OMP PRIVATE(SDXF2,SDYF2,SDZF2,AAA,BBB,AMI)
         do k = 1, n3m
@@ -579,20 +576,18 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO
         do i = 1, 3
           call test_filter(uui(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
         do j = 1, 6
           call test_filter(llij(:, :, :, j), filter)
         end do
-!$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO &
-!$OMP REDUCTION(+:LJMJ_V,MJMJ_V)
+!$OMP PRIVATE(VOLUME, LJMJ_V_K, MJMJ_V_K)
         do k = 1, n3m
+          ljmj_v_k = 0.0d0
+          mjmj_v_k = 0.0d0
           do j = 1, n2m
             do i = 1, n1m
               volume = f2fx(i) * f2fy(j) * f2fz(k)
@@ -602,20 +597,26 @@
               llij(i, j, k, 4) = llij(i, j, k, 4) - uui(i, j, k, 2) * uui(i, j, k, 2)
               llij(i, j, k, 5) = llij(i, j, k, 5) - uui(i, j, k, 2) * uui(i, j, k, 3)
               llij(i, j, k, 6) = llij(i, j, k, 6) - uui(i, j, k, 3) * uui(i, j, k, 3)
-              ljmj_v = ljmj_v &
+              ljmj_v_k = ljmj_v_k &
                        + (2.*llij(i, j, k, 2) * mmij(i, j, k, 2) + llij(i, j, k, 1) * mmij(i, j, k, 1) &
                           + 2.*llij(i, j, k, 3) * mmij(i, j, k, 3) + llij(i, j, k, 4) * mmij(i, j, k, 4) &
                           + 2.*llij(i, j, k, 5) * mmij(i, j, k, 5) + llij(i, j, k, 6) * mmij(i, j, k, 6)) &
                        * float(nwall_dvm(i, j, k)) * volume
-              mjmj_v = mjmj_v &
+              mjmj_v_k = mjmj_v_k &
                        + (2.*mmij(i, j, k, 2)**2.+mmij(i, j, k, 1)**2. &
                           +2.*mmij(i, j, k, 3)**2.+mmij(i, j, k, 4)**2. &
                           +2.*mmij(i, j, k, 5)**2.+mmij(i, j, k, 6)**2.) &
                        * float(nwall_dvm(i, j, k)) * volume
             end do
           end do
+          ljmj_v_pln(k) = ljmj_v_k
+          mjmj_v_pln(k) = mjmj_v_k
         end do
 !$OMP END PARALLEL DO
+        do k = 1, n3m
+          ljmj_v = ljmj_v + ljmj_v_pln(k)
+          mjmj_v = mjmj_v + mjmj_v_pln(k)
+        end do
 
         deallocate (aalp)
         deallocate (llij)
@@ -624,7 +625,7 @@
 
         csgsts = dmax1(0., -0.5 * ljmj_v / mjmj_v)
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -668,11 +669,29 @@
           stop
         end if
 
-        tmp = a0
+!     THE CALLERS FILTER ONE COMPONENT AT A TIME; EACH PASS BELOW RUNS ON ALL THREADS.
+!$OMP PARALLEL DO COLLAPSE(2)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              tmp(i, j, k) = a0(i, j, k)
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
 
         if (xfilter .eq. 1) then
-          src = tmp
+!$OMP PARALLEL DO COLLAPSE(2)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                src(i, j, k) = tmp(i, j, k)
+              end do
+            end do
+          end do
+!$OMP END PARALLEL DO
           if (xprdic .ne. 1) then
+!$OMP PARALLEL DO COLLAPSE(2)
             do k = 1, n3m
               do j = 1, n2m
                 do i = 2, n1m - 1
@@ -682,7 +701,9 @@
                 end do
               end do
             end do
+!$OMP END PARALLEL DO
           else
+!$OMP PARALLEL DO COLLAPSE(2)
             do j = 1, n2m
               do k = 1, n3m
                 do i = 2, n1m - 1
@@ -698,12 +719,22 @@
                                  + cfx1(n1m, 1) * src(1, j, k)
               end do
             end do
+!$OMP END PARALLEL DO
           end if
         end if
 
         if (yfilter .eq. 1) then
-          src = tmp
+!$OMP PARALLEL DO COLLAPSE(2)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                src(i, j, k) = tmp(i, j, k)
+              end do
+            end do
+          end do
+!$OMP END PARALLEL DO
           if (yprdic .ne. 1) then
+!$OMP PARALLEL DO COLLAPSE(2)
             do k = 1, n3m
               do j = 2, n2m - 1
                 do i = 1, n1m
@@ -713,7 +744,9 @@
                 end do
               end do
             end do
+!$OMP END PARALLEL DO
           else
+!$OMP PARALLEL DO COLLAPSE(2)
             do k = 1, n3m
               do i = 1, n1m
                 do j = 2, n2m - 1
@@ -729,12 +762,22 @@
                                  + cfy1(n2m, 1) * src(i, 1, k)
               end do
             end do
+!$OMP END PARALLEL DO
           end if
         end if
 
         if (zfilter .eq. 1) then
-          src = tmp
+!$OMP PARALLEL DO COLLAPSE(2)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                src(i, j, k) = tmp(i, j, k)
+              end do
+            end do
+          end do
+!$OMP END PARALLEL DO
           if (zprdic .ne. 1) then
+!$OMP PARALLEL DO COLLAPSE(2)
             do k = 2, n3m - 1
               do j = 1, n2m
                 do i = 1, n1m
@@ -744,14 +787,23 @@
                 end do
               end do
             end do
+!$OMP END PARALLEL DO
           else
-            do i = 1, n1m
+!     INTERIOR PLANES, THEN THE TWO PERIODIC END PLANES
+!$OMP PARALLEL DO COLLAPSE(2)
+            do k = 2, n3m - 1
               do j = 1, n2m
-                do k = 2, n3m - 1
+                do i = 1, n1m
                   tmp(i, j, k) = cfz1(k, -1) * src(i, j, k - 1) &
                                  + cfz1(k, 0) * src(i, j, k) &
                                  + cfz1(k, 1) * src(i, j, k + 1)
                 end do
+              end do
+            end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
+            do j = 1, n2m
+              do i = 1, n1m
                 tmp(i, j, 1) = cfz1(1, -1) * src(i, j, n3m) &
                                + cfz1(1, 0) * src(i, j, 1) &
                                + cfz1(1, 1) * src(i, j, 2)
@@ -760,10 +812,19 @@
                                  + cfz1(n3m, 1) * src(i, j, 1)
               end do
             end do
+!$OMP END PARALLEL DO
           end if
         end if
 
-        a0 = tmp
+!$OMP PARALLEL DO COLLAPSE(2)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              a0(i, j, k) = tmp(i, j, k)
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
 
         return
       end subroutine test_filter
@@ -895,17 +956,18 @@
         end do
 !$OMP END PARALLEL DO
 
+        call body_values()
         nusgsavg = 0.
         area = 0.
         nusgsmax = 0.
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP REDUCTION(+:NUSGSAVG, AREA) &
 !$OMP REDUCTION(MAX:NUSGSMAX)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
-              if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+              if (fbody_c(i, j, k) .ge. 1.e-10) then
                 nusgsavg = nusgsavg + nusgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
                 area = area + f2fx(i) * f2fy(j) * f2fz(k)
                 if (nusgs(i, j, k) .gt. nusgsmax) then
@@ -955,7 +1017,17 @@
         implicit none
         integer(8) :: i, j, k, im, jm, km
 
-        nusgs1 = 0.
+!$OMP PARALLEL DO COLLAPSE(2)
+        do k = 0, n3
+          do j = 0, n2
+            do i = 0, n1
+              nusgs1(i, j, k, 1) = 0.
+              nusgs1(i, j, k, 2) = 0.
+              nusgs1(i, j, k, 3) = 0.
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
 
         if (xprdic .eq. 1) then
 !$OMP PARALLEL DO
@@ -990,7 +1062,7 @@
 !$OMP END PARALLEL DO
         end if
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = k_bgpz, n3m
           do j = j_bgpy, n2m
             do i = 1, n1m
@@ -1001,7 +1073,7 @@
           end do
         end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = k_bgpz, n3m
           do j = 1, n2m
             do i = i_bgpx, n1m
@@ -1012,7 +1084,7 @@
           end do
         end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = j_bgpy, n2m
             do i = i_bgpx, n1m
@@ -1145,7 +1217,7 @@
         integer(8) :: i, j, k
         real(8) :: rhsu2, rhsu3, rhsv1, rhsv3, rhsw1, rhsw2
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(RHSU2,RHSU3)
         do k = 1, n3m
           do j = 1, n2m
@@ -1162,7 +1234,7 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(RHSV1,RHSV3)
         do k = 1, n3m
           do j = j_bgpy, n2m
@@ -1179,7 +1251,7 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(RHSW1,RHSW2)
         do k = k_bgpz, n3m
           do j = 1, n2m
@@ -1266,7 +1338,7 @@
       real(8)    :: d(9),s(6)
       real(8)    :: del,sss
 
-!$OMP PARALLEL DO private(D,S,DEL,SSS)
+!$OMP PARALLEL DO COLLAPSE(2) private(D,S,DEL,SSS)
       do k=1,n3m
         do j=1,n2m
           do i=1,n1m
@@ -1310,6 +1382,7 @@
         implicit none
         integer(8) :: i, j, k
         real(8) :: ljmj_v, mjmj_v
+        real(8) :: ljmj_v_k, ljmj_v_pln(n3m), mjmj_v_k, mjmj_v_pln(n3m)
         real(8) :: del, sss, ami, volume
         real(8) :: d(9), s(6), alp(3)
 
@@ -1322,7 +1395,7 @@
         allocate (mmij(n1m, n2m, n3m, 3))
         allocate (uui(n1m, n2m, n3m, 3))
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(D,S,ALP) &
 !$OMP PRIVATE(DEL,SSS)
         do k = 1, n3m
@@ -1363,20 +1436,16 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO
         do i = 1, 3
           call test_filter(mmij(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
 
 ! TEST-FILTER STRAIN RATE (1:6) AND TEMPERATURE GRADIENT (7:9)
-!$OMP PARALLEL DO
         do i = 1, 9
           call test_filter(aalp(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(D) &
 !$OMP PRIVATE(DEL,SSS,AMI)
         do k = 1, n3m
@@ -1417,45 +1486,47 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO
         do i = 1, 3
           call test_filter(uui(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
         do i = 1, 3
           call test_filter(aalp(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
         do j = 1, 3
           call test_filter(llij(:, :, :, j), filter)
         end do
-!$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO &
-!$OMP REDUCTION(+:LJMJ_V,MJMJ_V)
+!$OMP PRIVATE(VOLUME, LJMJ_V_K, MJMJ_V_K)
         do k = 1, n3m
+          ljmj_v_k = 0.0d0
+          mjmj_v_k = 0.0d0
           do j = 1, n2m
             do i = 1, n1m
               volume = f2fx(i) * f2fy(j) * f2fz(k)
               llij(i, j, k, 1) = llij(i, j, k, 1) - uui(i, j, k, 1) * aalp(i, j, k, 1)
               llij(i, j, k, 2) = llij(i, j, k, 2) - uui(i, j, k, 2) * aalp(i, j, k, 2)
               llij(i, j, k, 3) = llij(i, j, k, 3) - uui(i, j, k, 3) * aalp(i, j, k, 3)
-              ljmj_v = ljmj_v &
+              ljmj_v_k = ljmj_v_k &
                        + (llij(i, j, k, 1) * mmij(i, j, k, 1) &
                           + llij(i, j, k, 2) * mmij(i, j, k, 2) &
                           + llij(i, j, k, 3) * mmij(i, j, k, 3)) &
                        * float(nwall_dvm(i, j, k)) * volume
-              mjmj_v = mjmj_v &
+              mjmj_v_k = mjmj_v_k &
                        + (mmij(i, j, k, 1) * mmij(i, j, k, 1) &
                           + mmij(i, j, k, 2) * mmij(i, j, k, 2) &
                           + mmij(i, j, k, 3) * mmij(i, j, k, 3)) &
                        * float(nwall_dvm(i, j, k)) * volume
             end do
           end do
+          ljmj_v_pln(k) = ljmj_v_k
+          mjmj_v_pln(k) = mjmj_v_k
         end do
 !$OMP END PARALLEL DO
+        do k = 1, n3m
+          ljmj_v = ljmj_v + ljmj_v_pln(k)
+          mjmj_v = mjmj_v + mjmj_v_pln(k)
+        end do
 
         deallocate (aalp)
         deallocate (llij)
@@ -1464,7 +1535,7 @@
 
         csgshf = dmax1(0., -ljmj_v / mjmj_v)
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -1545,17 +1616,18 @@
         end do
 !$OMP END PARALLEL DO
 
+        call body_values()
         alsgsavg = 0.
         area = 0.
         alsgsmax = 0.
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP REDUCTION(+:ALSGSAVG, AREA) &
 !$OMP REDUCTION(MAX:ALSGSMAX)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
-              if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+              if (fbody_c(i, j, k) .ge. 1.e-10) then
                 alsgsavg = alsgsavg + alsgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
                 area = area + f2fx(i) * f2fy(j) * f2fz(k)
                 if (alsgs(i, j, k) .gt. alsgsmax) then
@@ -1595,7 +1667,17 @@
         implicit none
         integer(8) :: i, j, k, im, jm, km
 
-        alsgs1 = 0.
+!$OMP PARALLEL DO COLLAPSE(2)
+        do k = 0, n3
+          do j = 0, n2
+            do i = 0, n1
+              alsgs1(i, j, k, 1) = 0.
+              alsgs1(i, j, k, 2) = 0.
+              alsgs1(i, j, k, 3) = 0.
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
 
         if (xprdic .eq. 1) then
 !$OMP PARALLEL DO
@@ -1630,7 +1712,7 @@
 !$OMP END PARALLEL DO
         end if
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -1641,7 +1723,7 @@
           end do
         end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -1652,7 +1734,7 @@
           end do
         end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -1785,7 +1867,7 @@
         integer(8) :: i, j, k
         real(8) :: rhst1, rhst2, rhst3
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(RHST1,RHST2,RHST3)
         do k = 1, n3m
           do j = 1, n2m

@@ -56,6 +56,9 @@ module mod_common
   real(8) :: ro(3)
   real(8) :: alpha
   real(8) :: dtconst, dtconsti, test1, acoef, acoefi
+  ! funcbody at the cell centres (xmp, ymp, zmp) and at the u faces (x, ymp, zmp), stored by
+  ! body_values; read by the flow-volume, monitor and SGS loops instead of calling funcbody.
+  real(8), allocatable :: fbody_c(:, :, :), fbody_u(:, :, :)
   real(8), dimension(:), allocatable :: aiu, ciu, aivw, civw, &
                                         ajv, cjv, ajuw, cjuw, &
                                         akw, ckw, akuv, ckuv

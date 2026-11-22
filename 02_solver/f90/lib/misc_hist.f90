@@ -89,6 +89,7 @@
          real(8) :: tbulk_flu_inst, tbulk_sol_inst, tbulkavg(2)
          real(8) :: tflu_vol, tsol_vol, tflu_int, tsol_int, cellvol
 
+         call body_values()
          qflux = 0.
          flowvol = 0.0d0
          qvol_u = 0.0d0
@@ -101,7 +102,7 @@
          do k = 1, n3m
            do j = 1, n2m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+               if (fbody_u(i, j, k) .ge. 1.e-10) then
                  qvol_u = qvol_u + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
                  flowvol = flowvol + c2cx(i) * f2fy(j) * f2fz(k)
                end if
@@ -149,7 +150,7 @@
              do j = 1, n2m
                do i = 1, n1m
                  cellvol = c2cx(i) * f2fy(j) * f2fz(k)
-                 if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
+                 if (fbody_c(i, j, k) .ge. 1.e-10) then
                    tflu_vol = tflu_vol + cellvol
                    tflu_int = tflu_int + t(i, j, k) * cellvol
                  else
@@ -340,7 +341,7 @@
            ssavg = 0.
          end if
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(UCC,VCC,WCC)
          do k = 1, n3m
            do j = 1, n2m
@@ -367,7 +368,7 @@
            end do
          end do
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(VG11,VG12,VG13,VG21,VG22,VG23,VG31,VG32,VG33) &
 !$OMP PRIVATE(UP,UM,VP,VM,WP,WM,SR,SRSR) &
 !$OMP PRIVATE(WX,WY,WZ)

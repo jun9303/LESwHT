@@ -68,12 +68,22 @@
          real(8) :: cfli(0:3)
          integer(8) :: icfl, jcfl, kcfl
          integer(8) :: i, j, k
+         real(8) :: cflt
+         integer(8) :: it, jt, kt
 
          cflm = 0.
          icfl = 1
          jcfl = 1
          kcfl = 1
 
+!     EACH THREAD FINDS THE MAXIMUM OF ITS CELLS; THE MERGE KEEPS THE SERIAL PICK
+!     (LARGEST VALUE, AND THE LAST CELL IN K-J-I ORDER AMONG EQUAL VALUES).
+!$OMP PARALLEL PRIVATE(CFLI, CFLT, IT, JT, KT)
+         cflt = 0.
+         it = 1
+         jt = 1
+         kt = 1
+!$OMP DO COLLAPSE(2)
          do k = 1, n3m
            do j = 1, n2m
              do i = 1, n1m
@@ -81,15 +91,25 @@
                cfli(2) = abs(v(i, j, k) + v(i, j + 1, k)) * 0.5 * f2fyi(j)
                cfli(3) = abs(w(i, j, k) + w(i, j, k + 1)) * 0.5 * f2fzi(k)
                cfli(0) = (cfli(1) + cfli(2) + cfli(3)) * dt
-               if (cfli(0) .ge. cflm) then
-                 cflm = cfli(0)
-                 icfl = i
-                 jcfl = j
-                 kcfl = k
+               if (cfli(0) .ge. cflt) then
+                 cflt = cfli(0)
+                 it = i
+                 jt = j
+                 kt = k
                end if
              end do
            end do
          end do
+!$OMP END DO
+!$OMP CRITICAL(CFL_MAX)
+         if (cflt .gt. cflm .or. (cflt .eq. cflm .and. ((kt - kcfl) * n2m + (jt - jcfl)) * n1m + (it - icfl) .gt. 0)) then
+           cflm = cflt
+           icfl = it
+           jcfl = jt
+           kcfl = kt
+         end if
+!$OMP END CRITICAL(CFL_MAX)
+!$OMP END PARALLEL
 
          cflmax = cflm
 
@@ -129,21 +149,28 @@
          use mod_flowarray, only: u
          implicit none
          real(8) :: qq, funcbody
+         real(8) :: qq_k, qq_pln(n3m)
          integer(8) :: i, j, k
 
+         call body_values()
          qq = 0.
 
-!$OMP PARALLEL DO REDUCTION(+:QQ)
+!$OMP PARALLEL DO PRIVATE(QQ_K)
          do k = 1, n3m
+           qq_k = 0.0d0
            do j = 1, n2m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
-                 qq = qq + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
+               if (fbody_u(i, j, k) .ge. 1.e-10) then
+                 qq_k = qq_k + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
                end if
              end do
            end do
+           qq_pln(k) = qq_k
          end do
 !$OMP END PARALLEL DO
+         do k = 1, n3m
+           qq = qq + qq_pln(k)
+         end do
 
          return
        end subroutine qvolcalc
@@ -155,19 +182,25 @@
          use mod_flowarray, only: t, cstar
          implicit none
          real(8) :: qq, funcbody
+         real(8) :: qq_k, qq_pln(n3m)
          integer(8) :: i, j, k
 
          qq = 0.
 
-!$OMP PARALLEL DO REDUCTION(+:QQ)
+!$OMP PARALLEL DO PRIVATE(QQ_K)
          do k = 1, n3m
+           qq_k = 0.0d0
            do j = 1, n2m
              do i = 1, n1m
-               qq = qq + t(i, j, k) / cstar(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
+               qq_k = qq_k + t(i, j, k) / cstar(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
              end do
            end do
+           qq_pln(k) = qq_k
          end do
 !$OMP END PARALLEL DO
+         do k = 1, n3m
+           qq = qq + qq_pln(k)
+         end do
 
          return
        end subroutine tvolcalc
@@ -209,20 +242,26 @@
          use mod_flowarray
          implicit none
          real(8) :: cvol
+         real(8) :: cvol_k, cvol_pln(n3m)
          integer(8) :: i, j, k
 
          thcap = 0.
          cvol = 0.
 
-!$OMP PARALLEL DO REDUCTION(+:CVOL)
+!$OMP PARALLEL DO PRIVATE(CVOL_K)
          do k = 1, n3m
+           cvol_k = 0.0d0
            do j = 1, n2m
              do i = 1, n1m
-               cvol = cvol + 1./cstar(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
+               cvol_k = cvol_k + 1./cstar(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
              end do
            end do
+           cvol_pln(k) = cvol_k
          end do
 !$OMP END PARALLEL DO
+         do k = 1, n3m
+           cvol = cvol + cvol_pln(k)
+         end do
 
          thcap = (tvol(2) - tvol(1)) / cvol
 
@@ -251,7 +290,7 @@
          integer(8) :: im, km
          real(8) :: phi(0:n1, 0:n2, 0:n3), flxcr
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(IM)
          do k = 1, n3m
            do j = 1, n2m
@@ -269,7 +308,7 @@
            end do
          end do
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
          do k = 1, n3m
            do j = 2, n2m                       ! J=1,N2 => BOUNDARY
              do i = 1, n1m
@@ -278,11 +317,11 @@
            end do
          end do
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(KM)
          do k = k_bgpz, n3m                  ! K=0,N3 => BOUNDARY
-           km = kmv(k)
            do j = 1, n2m
+             km = kmv(k)
              do i = 1, n1m
                w(i, j, k) = w(i, j, k) - dtconst * (phi(i, j, k) - phi(i, j, km)) * c2czi(k)
              end do
@@ -438,7 +477,7 @@
          real(8) :: phi(0:n1, 0:n2, 0:n3), divgsum(0:n1, 0:n2, 0:n3)
          real(8) :: funcbody
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
          do k = 1, n3m
            do j = 1, n2m
              do i = 1, n1m
@@ -449,8 +488,6 @@
 
 !     SET THE AVERAGE PHI AT THE UPPER WALL TO BE ZERO.
          phiref = 0.
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:PHIREF)
          do k = 1, n3m
            do j = 1, n2m
              phiref = phi(n1m, j, k) * f2fy(j) * f2fz(k) + phiref
@@ -458,7 +495,7 @@
          end do
          phiref = phiref / (yl * zl)
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
          do k = 1, n3m
            do j = 1, n2m
              do i = 1, n1m
@@ -502,7 +539,7 @@
          real(8) :: funcbody, hflux, ttemp
 
          if ((ich .eq. 1) .and. (xprdic .eq. 0)) then
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
            do k = 1, n3m
              do j = 1, n2m
                do i = 1, n1m
@@ -538,7 +575,9 @@
          use mod_flowarray, only: rk3xo, rk3yo, rk3zo, dudtr &
                                   , rk3xoo, rk3yoo, rk3zoo, ifc, jfc, kfc
          implicit none
-         integer(8) :: i, j, k, n, l, ii, jj, kk
+         integer(8) :: i, j, k, n, l, ii, jj, kk, ib, nb
+         integer(8), parameter :: lblk = 1024
+         real(8) :: dsum, dsum_b(3, (max(nbody(1), nbody(2), nbody(3)) + lblk - 1) / lblk)
 
          if (msub .eq. 1) then
            dudta = 0.
@@ -546,25 +585,36 @@
            dwdta = 0.
          end if
 
-!$OMP PARALLEL DO PRIVATE(II,JJ,KK) REDUCTION(+:DUDTA,DVDTA,DWDTA)
+!     FIXED BLOCKS OF LBLK POINTS, SO THE SUMS DO NOT DEPEND ON THE NUMBER OF THREADS
+         nb = (max(nbody(1), nbody(2), nbody(3)) + lblk - 1) / lblk
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(II,JJ,KK,N,DSUM)
          do l = 1, 3
-           do n = 1, nbody(l)
-             ii = ifc(n, l)
-             jj = jfc(n, l)
-             kk = kfc(n, l)
-             if (l .eq. 1) then
-               dudta = dudta + c2cx(ii) * f2fy(jj) * f2fz(kk) * (dudtr(n, l) - &
+           do ib = 1, nb
+             dsum = 0.
+             do n = (ib - 1) * lblk + 1, min(ib * lblk, nbody(l))
+               ii = ifc(n, l)
+               jj = jfc(n, l)
+               kk = kfc(n, l)
+               if (l .eq. 1) then
+                 dsum = dsum + c2cx(ii) * f2fy(jj) * f2fz(kk) * (dudtr(n, l) - &
                                                                  (gamma(msub) * rk3xo(ii, jj, kk) + ro(msub) * rk3xoo(ii, jj, kk)))
-             elseif (l .eq. 2) then
-               dvdta = dvdta + f2fx(ii) * c2cy(jj) * f2fz(kk) * (dudtr(n, l) - &
+               elseif (l .eq. 2) then
+                 dsum = dsum + f2fx(ii) * c2cy(jj) * f2fz(kk) * (dudtr(n, l) - &
                                                                  (gamma(msub) * rk3yo(ii, jj, kk) + ro(msub) * rk3yoo(ii, jj, kk)))
-             elseif (l .eq. 3) then
-               dwdta = dwdta + f2fx(ii) * f2fy(jj) * c2cz(kk) * (dudtr(n, l) - &
+               elseif (l .eq. 3) then
+                 dsum = dsum + f2fx(ii) * f2fy(jj) * c2cz(kk) * (dudtr(n, l) - &
                                                                  (gamma(msub) * rk3zo(ii, jj, kk) + ro(msub) * rk3zoo(ii, jj, kk)))
-             end if
+               end if
+             end do
+             dsum_b(l, ib) = dsum
            end do
          end do
 !$OMP END PARALLEL DO
+         do ib = 1, nb
+           dudta = dudta + dsum_b(1, ib)
+           dvdta = dvdta + dsum_b(2, ib)
+           dwdta = dwdta + dsum_b(3, ib)
+         end do
 
          return
        end subroutine lagforce
@@ -580,6 +630,27 @@
          real(8) :: flux_xm, flux_xp, flux_ym, flux_yp, flux_zm, flux_zp
          real(8) :: heat_flux(3), heat_flux_avg(3)
          real(8) :: funcbody
+         ! funcbody on the y and z boundary faces, stored once for a static geometry
+         real(8), allocatable, save :: fby(:, :, :), fbz(:, :, :)
+
+         call body_values()
+         if (.not. allocated(fby) .or. imovingon .eq. 1) then
+           if (.not. allocated(fby)) allocate (fby(1:n1m, 1:n3m, 2), fbz(1:n1m, 1:n2m, 2))
+!$OMP PARALLEL DO COLLAPSE(2)
+           do k = 1, n3m
+             do i = 1, n1m
+               fby(i, k, 1) = funcbody(xmp(i), y(1), zmp(k), time)
+               fby(i, k, 2) = funcbody(xmp(i), y(n2), zmp(k), time)
+             end do
+           end do
+!$OMP PARALLEL DO COLLAPSE(2)
+           do j = 1, n2m
+             do i = 1, n1m
+               fbz(i, j, 1) = funcbody(xmp(i), ymp(j), z(1), time)
+               fbz(i, j, 2) = funcbody(xmp(i), ymp(j), z(n3), time)
+             end do
+           end do
+         end if
 
          flux_xm = 0.d0
          flux_xp = 0.d0
@@ -592,11 +663,11 @@
          do k = 1, n3m
            do j = 1, n2m
              area = f2fy(j) * f2fz(k)
-             if (funcbody(x(1), ymp(j), zmp(k), time) .ge. 1.d-10) then
+             if (fbody_u(1, j, k) .ge. 1.d-10) then
                tface = 0.5d0 * (t(1, j, k) + t(0, j, k))
                flux_xm = flux_xm + u(1, j, k) * tface * area
              end if
-             if (funcbody(x(n1), ymp(j), zmp(k), time) .ge. 1.d-10) then
+             if (fbody_u(n1, j, k) .ge. 1.d-10) then
                tface = 0.5d0 * (t(n1m, j, k) + t(n1, j, k))
                flux_xp = flux_xp + u(n1, j, k) * tface * area
              end if
@@ -608,11 +679,11 @@
          do k = 1, n3m
            do i = 1, n1m
              area = f2fx(i) * f2fz(k)
-             if (funcbody(xmp(i), y(1), zmp(k), time) .ge. 1.d-10) then
+             if (fby(i, k, 1) .ge. 1.d-10) then
                tface = 0.5d0 * (t(i, 1, k) + t(i, 0, k))
                flux_ym = flux_ym + v(i, 1, k) * tface * area
              end if
-             if (funcbody(xmp(i), y(n2), zmp(k), time) .ge. 1.d-10) then
+             if (fby(i, k, 2) .ge. 1.d-10) then
                tface = 0.5d0 * (t(i, n2m, k) + t(i, n2, k))
                flux_yp = flux_yp + v(i, n2, k) * tface * area
              end if
@@ -624,11 +695,11 @@
          do j = 1, n2m
            do i = 1, n1m
              area = f2fx(i) * f2fy(j)
-             if (funcbody(xmp(i), ymp(j), z(1), time) .ge. 1.d-10) then
+             if (fbz(i, j, 1) .ge. 1.d-10) then
                tface = 0.5d0 * (t(i, j, 1) + t(i, j, 0))
                flux_zm = flux_zm + w(i, j, 1) * tface * area
              end if
-             if (funcbody(xmp(i), ymp(j), z(n3), time) .ge. 1.d-10) then
+             if (fbz(i, j, 2) .ge. 1.d-10) then
                tface = 0.5d0 * (t(i, j, n3m) + t(i, j, n3))
                flux_zp = flux_zp + w(i, j, n3) * tface * area
              end if
@@ -680,16 +751,17 @@
          real(8) :: dy1, dy2, dz1, dz2, grad_u, grad_v, grad_w
 
          dti = 1.0d0 / dt
+         call body_values()
 
          cd = 0.0d0
          vol_solid_geom = 0.0d0
 
          ! 1. ESTIMATE SOLID VOLUME FROM THE CURRENT GEOMETRY MASK.
-!$OMP PARALLEL DO REDUCTION(+:VOL_SOLID_GEOM)
+!$OMP PARALLEL DO COLLAPSE(2) REDUCTION(+:VOL_SOLID_GEOM)
          do k = 1, n3m
            do j = 1, n2m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(j), zmp(k), time) .lt. 1.d-10) then
+               if (fbody_u(i, j, k) .lt. 1.d-10) then
                  vol_solid_geom = vol_solid_geom + c2cx(i) * f2fy(j) * f2fz(k)
                end if
              end do
@@ -732,7 +804,7 @@
 !$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_W) REDUCTION(+:CD)
            do k = 1, n3m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(1), zmp(k), time) .ge. 1.d-10) then
+               if (fbody_u(i, 1, k) .ge. 1.d-10) then
                  grad_u = (u(i, 1, k) * dy2**2 - u(i, 2, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
                  tmp = grad_u * c2cx(i) * f2fz(k)
                  cd(1) = cd(1) + tmp / re
@@ -754,7 +826,7 @@
 !$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_W) REDUCTION(+:CD)
            do k = 1, n3m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(n2m), zmp(k), time) .ge. 1.d-10) then
+               if (fbody_u(i, n2m, k) .ge. 1.d-10) then
                  grad_u = (u(i, n2m, k) * dy2**2 - u(i, n2m-1, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
                  tmp = grad_u * c2cx(i) * f2fz(k)
                  cd(1) = cd(1) + tmp / re
@@ -776,7 +848,7 @@
 !$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_V) REDUCTION(+:CD)
            do j = 1, n2m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(j), zmp(1), time) .ge. 1.d-10) then
+               if (fbody_u(i, j, 1) .ge. 1.d-10) then
                  grad_u = (u(i, j, 1) * dz2**2 - u(i, j, 2) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
                  tmp = grad_u * c2cx(i) * f2fy(j)
                  cd(1) = cd(1) + tmp / re
@@ -798,7 +870,7 @@
 !$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_V) REDUCTION(+:CD)
            do j = 1, n2m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(j), zmp(n3m), time) .ge. 1.d-10) then
+               if (fbody_u(i, j, n3m) .ge. 1.d-10) then
                  grad_u = (u(i, j, n3m) * dz2**2 - u(i, j, n3m-1) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
                  tmp = grad_u * c2cx(i) * f2fy(j)
                  cd(1) = cd(1) + tmp / re

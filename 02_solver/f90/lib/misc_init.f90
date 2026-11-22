@@ -794,6 +794,8 @@
         implicit none
         real(8) :: ptb, flowarea, pertb_rate, adj
         real(8) :: flowarea_g, pertb_rate_g
+        real(8) :: flowarea_g_k, pertb_rate_g_k
+        real(8) :: flowarea_g_pln(max(n1m, n2m, n3m)), pertb_rate_g_pln(max(n1m, n2m, n3m))
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8), parameter :: ret = 180.0d0
@@ -802,24 +804,32 @@
         flowarea_g = 0.0d0
         pertb_rate_g = 0.0d0
 
-!$OMP PARALLEL DO PRIVATE(PTB) REDUCTION(+:FLOWAREA_G, PERTB_RATE_G)
+!$OMP PARALLEL DO PRIVATE(PTB, FLOWAREA_G_K, PERTB_RATE_G_K)
         do i = 1, n1m
+          flowarea_g_k = 0.0d0
+          pertb_rate_g_k = 0.0d0
           do j = 1, n2m
             do k = 1, n3m
               if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
-                flowarea_g = flowarea_g + f2fy(j) * f2fz(k)
+                flowarea_g_k = flowarea_g_k + f2fy(j) * f2fz(k)
                 if ((ymp(j) .gt. .5d0) .and. (ymp(j) .lt. .99d0)) then
                   ptb = eps_ptr * udrv_i * cos(zmp(k)/zl*acos(-1.d0)) &
                         * abs(y(n2 - 2) - ymp(j)) * ret                &
                         * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0 + .5d0)
                   u(i, j, k) = u(i, j, k) + ptb
-                  pertb_rate_g = pertb_rate_g + ptb * f2fy(j) * f2fz(k)
+                  pertb_rate_g_k = pertb_rate_g_k + ptb * f2fy(j) * f2fz(k)
                 end if
               end if
             end do
           end do
+          flowarea_g_pln(i) = flowarea_g_k
+          pertb_rate_g_pln(i) = pertb_rate_g_k
         end do
 !$OMP END PARALLEL DO
+        do i = 1, n1m
+          flowarea_g = flowarea_g + flowarea_g_pln(i)
+          pertb_rate_g = pertb_rate_g + pertb_rate_g_pln(i)
+        end do
 
         if (flowarea_g .gt. 0.0d0) then
           adj = pertb_rate_g / flowarea_g
@@ -839,24 +849,32 @@
         ! --- PERTURB W (GLOBAL MEAN CORRECTION) ---
         flowarea_g = 0.0d0
         pertb_rate_g = 0.0d0
-!$OMP PARALLEL DO PRIVATE(PTB) REDUCTION(+:FLOWAREA_G, PERTB_RATE_G)
+!$OMP PARALLEL DO PRIVATE(PTB, FLOWAREA_G_K, PERTB_RATE_G_K)
         do k = 1, n3m
+          flowarea_g_k = 0.0d0
+          pertb_rate_g_k = 0.0d0
           do i = 1, n1m
             do j = 1, n2m
               if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
-                flowarea_g = flowarea_g + f2fx(i) * f2fy(j)
+                flowarea_g_k = flowarea_g_k + f2fx(i) * f2fy(j)
                 if ((ymp(j) .gt. .5d0) .and. (ymp(j) .lt. .99d0)) then
                   ptb = eps_ptr * sin(xmp(i)/xl*acos(-1.d0)) &
                         * abs(y(n2 - 2) - ymp(j)) * ret                &
                         * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0)
                   w(i, j, k) = w(i, j, k) + ptb
-                  pertb_rate_g = pertb_rate_g + ptb * f2fx(i) * f2fy(j)
+                  pertb_rate_g_k = pertb_rate_g_k + ptb * f2fx(i) * f2fy(j)
                 end if
               end if
             end do
           end do
+          flowarea_g_pln(k) = flowarea_g_k
+          pertb_rate_g_pln(k) = pertb_rate_g_k
         end do
 !$OMP END PARALLEL DO
+        do k = 1, n3m
+          flowarea_g = flowarea_g + flowarea_g_pln(k)
+          pertb_rate_g = pertb_rate_g + pertb_rate_g_pln(k)
+        end do
 
         if (flowarea_g .gt. 0.0d0) then
           adj = pertb_rate_g / flowarea_g
@@ -889,6 +907,8 @@
         use mod_flowarray, only: u, v, w
         implicit none
         real(8) :: ptb_array(1:n1, 1:n2, 1:n3)
+        real(8) :: flowarea_k, pertb_rate_k
+        real(8) :: flowarea_pln(max(n1m, n2m, n3m)), pertb_rate_pln(max(n1m, n2m, n3m))
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8) :: flowarea, pertb_rate, adj
@@ -900,17 +920,25 @@
         do i = 1, n1m
           flowarea = 0.0d0
           pertb_rate = 0.0d0
-!$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
+!$OMP PARALLEL DO PRIVATE(FLOWAREA_K, PERTB_RATE_K)
           do j = 1, n2m
+            flowarea_k = 0.0d0
+            pertb_rate_k = 0.0d0
             do k = 1, n3m
               if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
                 u(i, j, k) = u(i, j, k) + ptb_array(i, j, k)
-                flowarea = flowarea + f2fy(j) * f2fz(k)
-                pertb_rate = pertb_rate + ptb_array(i, j, k) * f2fy(j) * f2fz(k)
+                flowarea_k = flowarea_k + f2fy(j) * f2fz(k)
+                pertb_rate_k = pertb_rate_k + ptb_array(i, j, k) * f2fy(j) * f2fz(k)
               end if
             end do
+            flowarea_pln(j) = flowarea_k
+            pertb_rate_pln(j) = pertb_rate_k
           end do
 !$OMP END PARALLEL DO
+          do j = 1, n2m
+            flowarea = flowarea + flowarea_pln(j)
+            pertb_rate = pertb_rate + pertb_rate_pln(j)
+          end do
           if (flowarea .gt. 0.0d0) then
             adj = pertb_rate / flowarea
 !$OMP PARALLEL DO
@@ -932,17 +960,25 @@
         do j = 1, n2m
           flowarea = 0.0d0
           pertb_rate = 0.0d0
-!$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
+!$OMP PARALLEL DO PRIVATE(FLOWAREA_K, PERTB_RATE_K)
           do k = 1, n3m
+            flowarea_k = 0.0d0
+            pertb_rate_k = 0.0d0
             do i = 1, n1m
                if (funcbody(xmp(i), y(j), zmp(k), time) .gt. 1.e-10) then
                 v(i, j, k) = v(i, j, k) + ptb_array(i, j, k)
-                flowarea = flowarea + f2fz(k) * f2fx(i)
-                pertb_rate = pertb_rate + ptb_array(i, j, k) * f2fz(k) * f2fx(i)
+                flowarea_k = flowarea_k + f2fz(k) * f2fx(i)
+                pertb_rate_k = pertb_rate_k + ptb_array(i, j, k) * f2fz(k) * f2fx(i)
               end if
             end do
+            flowarea_pln(k) = flowarea_k
+            pertb_rate_pln(k) = pertb_rate_k
           end do
 !$OMP END PARALLEL DO
+          do k = 1, n3m
+            flowarea = flowarea + flowarea_pln(k)
+            pertb_rate = pertb_rate + pertb_rate_pln(k)
+          end do
           if (flowarea .gt. 0.0d0) then
             adj = pertb_rate / flowarea
 !$OMP PARALLEL DO
@@ -964,17 +1000,25 @@
         do k = 1, n3m
           flowarea = 0.0d0
           pertb_rate = 0.0d0
-!$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
+!$OMP PARALLEL DO PRIVATE(FLOWAREA_K, PERTB_RATE_K)
           do i = 1, n1m
+            flowarea_k = 0.0d0
+            pertb_rate_k = 0.0d0
             do j = 1, n2m
                if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
                 w(i, j, k) = w(i, j, k) + ptb_array(i, j, k)
-                flowarea = flowarea + f2fx(i) * f2fy(j)
-                pertb_rate = pertb_rate + ptb_array(i, j, k) * f2fx(i) * f2fy(j)
+                flowarea_k = flowarea_k + f2fx(i) * f2fy(j)
+                pertb_rate_k = pertb_rate_k + ptb_array(i, j, k) * f2fx(i) * f2fy(j)
               end if
             end do
+            flowarea_pln(i) = flowarea_k
+            pertb_rate_pln(i) = pertb_rate_k
           end do
 !$OMP END PARALLEL DO
+          do i = 1, n1m
+            flowarea = flowarea + flowarea_pln(i)
+            pertb_rate = pertb_rate + pertb_rate_pln(i)
+          end do
           if (flowarea .gt. 0.0d0) then
             adj = pertb_rate / flowarea
 !$OMP PARALLEL DO

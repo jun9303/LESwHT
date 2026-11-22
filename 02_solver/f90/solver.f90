@@ -17,6 +17,7 @@ program solver
   implicit none
 
   real(8) :: omp_get_wtime
+  integer(8) :: i, j, k
   real(8) :: time_prev
   logical :: perturb_applied
 
@@ -112,8 +113,16 @@ program solver
 
       allocate (divgsum(0:n1, 0:n2, 0:n3))
       allocate (phi(0:n1, 0:n2, 0:n3))
-      divgsum = 0.0d0
-      phi = 0.0d0
+!$OMP PARALLEL DO COLLAPSE(2)
+      do k = 0, n3
+        do j = 0, n2
+          do i = 0, n1
+            divgsum(i, j, k) = 0.0d0
+            phi(i, j, k) = 0.0d0
+          end do
+        end do
+      end do
+!$OMP END PARALLEL DO
 
       poisstime_b(msub) = omp_get_wtime()
       call divgs(divgsum)              ! AT SLV_CONT LIBRARY

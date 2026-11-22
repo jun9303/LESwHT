@@ -32,7 +32,7 @@
         real(8) :: ubd, vbd, wbd
 
 !############################################################### W/O IBM
-!$OMP PARALLEL DO  &
+!$OMP PARALLEL DO COLLAPSE(2)  &
 !$OMP PRIVATE(DIVG1,DIVG2,DIVG3)
         do k = 1, n3m
           do j = 1, n2m
@@ -48,7 +48,15 @@
 !############################################### W/  STATIONALY IBM BODY
         if (masson .eq. 1 .and. imovingon .eq. 0) then
 
-          qmass = 0.
+!$OMP PARALLEL DO COLLAPSE(2)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                qmass(i, j, k) = 0.
+              end do
+            end do
+          end do
+!$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO  &
 !$OMP PRIVATE(II,JJ,KK)
@@ -195,7 +203,7 @@
 
         end if
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
