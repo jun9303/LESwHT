@@ -1,37 +1,34 @@
-# LESwHT (Large Eddy Simulation with Heat Transfer)
+# LESwHT: dimple_surf branch
 
-LESwHT is a large eddy simulation (LES) workflow for incompressible turbulent flow with immersed boundaries (IB) and heat transfer (HT).
+This branch runs LESwHT (large eddy simulation with immersed boundaries and heat transfer) for turbulent
+channel flow over dimpled walls. Its pipeline starts with a **dimple generator**: a periodic dimpled slab is
+built as an STL surface, and the solver's `geometry/funcbody.f90` reads that STL to tell solid from fluid.
+Everything after the generator (grid, IBM pre-processing, solver, post-processing) runs on the generated
+case.
 
-## dimple_surf Branch Status
+The solver, its OpenMP settings and its bug fixes are the same as on `master`; see the `master` README for
+the general solver notes (Poisson solver choice, bodies at domain boundaries, known limits).
 
-This branch documents and supports the experimental dimple-surface pipeline. The default end-to-end entrypoint is `run.sh`, which now includes:
+## What differs from master
 
-1. Dimple geometry generation
-2. Grid generation + IBM pre-processing
-3. CFR update step that rewrites `UDRV_I` in `02_solver/settings.input` from STL-derived effective height
-4. Solver run
-5. Automatic post-processing for all discovered instantaneous and averaged fields
-
-## Repository Layout (Current)
-
-- `00_dimple_generator/`: dimple slab STL generator and per-case output bootstrap
-- `01_pre_processor/`: grid generation (`grid.py`) and IBM pre-processing (`preprocessing.py`)
-- `02_solver/`: LES/IBM/HT solver (`solver_exec`, Fortran)
-- `03_post_processor/`: post-processing orchestration (`run_postprocess_all.sh`) and per-mode runners
-- `geometry/`: body geometry source (`funcbody.f90`)
-- `output/`: generated case directories and active case pointer (`running_case.env`)
-- `run.sh`: full experimental pipeline for dimple cases
-- `reset.sh`: clean build artifacts and reset root output directory
+- `00_dimple_generator/`: builds the dimpled slab STL and a case directory, and writes
+  `output/running_case.env`, which the later stages read.
+- `geometry/funcbody.f90`: inside/outside test against the generated STL (not an analytic body).
+- Case-local output: every stage writes under `output/<case>/` (set by `LESWHT_OUTPUT_ROOT`).
+- `run.sh`: runs every stage in order, including a step that sets the constant-flow-rate target `UDRV_I`
+  from the dimple volume.
+- `03_post_processor/run_postprocess_all.sh`: post-processes every instantaneous and averaged field.
+- Solver options used here: an optional eighth value `IDELTA_SGS` on the SGS line of `settings.input`
+  (filter width of the thermal SGS model; 1: cube root of the cell volume, 2: largest cell size), a CFL
+  step controller, a drag history split into IBM, inertia and wall-shear parts, and ICH = 1/2 runs that
+  start from rest.
 
 ## Requirements
 
-- Linux
-- GNU toolchain: `gcc`, `g++`, `gfortran`
-- Python 3.10+
-- Python packages from `requirements.txt` (notably `numpy`, `trimesh`, `manifold3d`)
-- OpenMP runtime (`libgomp`)
+- Linux, GNU compilers (`gcc`, `g++`, `gfortran`) with OpenMP (`libgomp`)
+- Python 3.10 or newer with the packages in `requirements.txt` (`numpy`, `scipy`, `trimesh`, `manifold3d`)
 
-Recommended setup from project root:
+Set up once, from the repository root:
 
 ```bash
 python3 -m venv .venv
@@ -39,148 +36,86 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Quick Start (Experimental dimple_surf Workflow)
+`run.sh` uses `.venv/bin/python` when it exists.
 
-From project root:
+## Run the full pipeline
+
+From the repository root:
 
 ```bash
-bash run.sh
+bash run.sh -t 0 -d 30.0 -s 1.0 -x 1.0
 ```
 
-Optional parameters:
+| Option | Meaning | Default |
+|---|---|---|
+| `-t` | dimple topology (see below) | 0 |
+| `-d` | dimple depth in wall units | 30.0 |
+| `-s` | isotropic scale factor | 1.0 |
+| `-x` | streamwise stretch factor | 1.0 |
+
+Topologies: 0 cylinder, 1 spherical, 2 teardrop down, 3 teardrop up, 4 diamond, 5 triangle down,
+6 triangle up.
+
+## Run step by step
+
+1. **Generate the dimpled slab.**
+
+   ```bash
+   cd 00_dimple_generator
+   python3 main.py -t 0 -d 30.0 -s 1.0 -x 1.0 --compact
+   ```
+
+   This creates `output/<topology>_<depth>_<scale>_<stretch>_<timestamp>/` with
+   `geometry/dimple_slab_ascii.stl`, and writes `output/running_case.env`, for example:
+
+   ```bash
+   LESWHT_CASE_NAME=0_30.0_1.0_1.0_20260415_101500
+   LESWHT_OUTPUT_ROOT=/path/to/LESwHT/output/0_30.0_1.0_1.0_20260415_101500
+   LESWHT_GEOMETRY_STL=/path/to/LESwHT/output/0_30.0_1.0_1.0_20260415_101500/geometry/dimple_slab_ascii.stl
+   ```
+
+2. **Build the grid and the IBM data.** Both scripts read `output/running_case.env`.
+
+   ```bash
+   cd ../01_pre_processor
+   bash run_grid.sh
+   bash run_preprocessing.sh
+   ```
+
+   Inputs: `grid.input` and `preprocessing.input`.
+
+3. **Set the flow-rate target.** `run.sh` does this between steps 2 and 4: it computes the effective dimple
+   height `h_eff` (dimple volume divided by the slab footprint) from the STL and writes
+   `UDRV_I = 2 / (2 + h_eff)` into `02_solver/settings.input`. When running by hand, set `UDRV_I` yourself.
+
+4. **Build and run the solver.**
+
+   ```bash
+   cd ../02_solver
+   bash run_solver.sh
+   ```
+
+   Inputs: `settings.input` and `boundary.input`. The thread count is `SLURM_CPUS_PER_TASK` under Slurm and 64
+   otherwise (set `OMP_NUM_THREADS` in the script to change it). `POISS=poiss_fd bash run_solver.sh` builds
+   with another Poisson solver; the default `poiss_ftft` fits the x- and z-periodic slab.
+
+5. **Post-process.**
+
+   ```bash
+   cd ../03_post_processor
+   bash run_postprocess_all.sh
+   ```
+
+   Single modes: `inst/run_postprocess.sh` (instantaneous) and `avg/run_postprocess.sh` (averaged), with
+   `inst/post_inst.input` and `avg/post_avg.input`.
+
+Results are under `output/<case>/`: `grid/`, `ibmpre/`, `field/`, `field_avg/`, `ftr/` (histories),
+`post_inst/` and `post_avg/`.
+
+## Clean up
 
 ```bash
-bash run.sh -t 0 -d 45.0 -s 1.0 -x 1.0
-```
-
-Arguments in `run.sh`:
-
-- `-t`: topology ID (`0` to `6`)
-- `-d`: dimple depth (wall units)
-- `-s`: isotropic scaling
-- `-x`: streamwise stretch/scaling
-
-`run.sh` stage flow:
-
-1. `[1/4]` Generate dimple slab geometry by running `00_dimple_generator/main.py`.
-2. `[2/4]` Run `01_pre_processor/run_grid.sh` and `01_pre_processor/run_preprocessing.sh`.
-3. `[2.5/4]` Load STL from `output/running_case.env`, compute effective dimple volume/height, and update `UDRV_I` in `02_solver/settings.input`.
-4. `[3/4]` Build and run solver with `02_solver/run_solver.sh`.
-5. `[4/4]` Run `03_post_processor/run_postprocess_all.sh`.
-
-Treat `run.sh` as the default command for experimental dimple runs.
-
-## Dimple Generator Description
-
-The generator in `00_dimple_generator/` builds a watertight periodic dimple slab STL from baseline templates and writes the run context for downstream scripts.
-
-Primary entry:
-
-```bash
-cd 00_dimple_generator
-python3 main.py -t 0 -d 30.0 -s 1.0 -x 1.0 --compact
-```
-
-Supported topologies:
-
-- `0`: Cylinder
-- `1`: Spherical
-- `2`: Teardrop Down
-- `3`: Teardrop Up
-- `4`: Diamond
-- `5`: Triangle Down
-- `6`: Triangle Up
-
-Important behavior:
-
-- Uses baseline STL templates under `00_dimple_generator/baselineSTL/`.
-- Topology `0` uses an analytic cylindrical baseline path.
-- Boolean carving is performed with trimesh/manifold backend when available.
-- `--compact` (default) creates a compact periodic cell (`z in [-5, 5]`, bounded streamwise extent).
-
-Generator outputs:
-
-- Case directory: `output/<topology>_<depth>_<scale>_<stretch>_<timestamp>/`
-- Geometry STL: `.../geometry/dimple_slab_ascii.stl`
-- Active case pointer: `output/running_case.env`
-
-## Active Case File (running_case.env)
-
-`output/running_case.env` is the interface between geometry generation and all downstream stages.
-
-Example:
-
-```bash
-LESWHT_CASE_NAME=0_45.0_1.0_1.0_20260415_101500
-LESWHT_OUTPUT_ROOT=/anvil/projects/x-phy250071/LESwHT/output/0_45.0_1.0_1.0_20260415_101500
-LESWHT_GEOMETRY_STL=/anvil/projects/x-phy250071/LESwHT/output/0_45.0_1.0_1.0_20260415_101500/geometry/dimple_slab_ascii.stl
-```
-
-How it is used:
-
-1. `00_dimple_generator/main.py` writes/updates this file.
-2. `01_pre_processor/run_grid.sh` and `01_pre_processor/run_preprocessing.sh` source it.
-3. `run.sh` CFR update stage reads `LESWHT_GEOMETRY_STL` from it.
-4. Solver and post-process scripts use `LESWHT_OUTPUT_ROOT` for case-local I/O.
-
-## Manual Stage-by-Stage Run
-
-If you are not using full orchestration:
-
-1. Generate geometry:
-
-```bash
-cd 00_dimple_generator
-python3 main.py -t 0 -d 45.0 -s 1.0 -x 1.0 --compact
-```
-
-2. Run pre-processing:
-
-```bash
-cd ../01_pre_processor
-bash run_grid.sh
-bash run_preprocessing.sh
-```
-
-3. Run solver:
-
-```bash
-cd ../02_solver
-bash run_solver.sh
-```
-
-4. Run all post-processing:
-
-```bash
-cd ../03_post_processor
-bash run_postprocess_all.sh
-```
-
-Direct postprocessor runners:
-
-- Instantaneous: `03_post_processor/inst/run_postprocess.sh`
-- Averaged: `03_post_processor/avg/run_postprocess.sh`
-
-## Common Inputs to Edit
-
-- `01_pre_processor/grid.input`
-- `01_pre_processor/preprocessing.input`
-- `02_solver/settings.input`
-- `02_solver/boundary.input`
-- `03_post_processor/inst/post_inst.input`
-- `03_post_processor/avg/post_avg.input`
-
-## Cleaning and Re-running
-
-Full reset:
-
-```bash
-bash reset.sh
-```
-
-Targeted clean:
-
-```bash
-cd 01_pre_processor && make clean
-cd 02_solver && make clean
+bash reset.sh                      # build files and the output directory
+cd 01_pre_processor && make clean  # pre-processor extension only
+cd 02_solver && make clean         # solver only
 ```
