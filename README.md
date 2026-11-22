@@ -128,8 +128,8 @@ numactl --interleave=all ./solver_exec    # used by run_solver.sh when numactl i
   domains (two-socket nodes, for example).
 - Loops run over (k, j) pairs or line blocks, so 2D runs (one z-plane) and thin 3D domains use all
   threads, not only `n3m` of them.
-- Sums that feed the solution are added in a fixed order, so the fields are the same for any thread
-  count. A few monitor-only sums (drag, heat flux history) can differ in the last digits.
+- Sums are added in a fixed order, so the fields and the history files (`output/ftr`) are the same for
+  any thread count.
 
 ### Poisson solver
 
