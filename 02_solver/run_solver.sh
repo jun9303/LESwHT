@@ -7,7 +7,9 @@ if [ -f ../output/running_case.env ]; then
     source ../output/running_case.env
 fi
 
+export LESWHT_CASE_NAME="${LESWHT_CASE_NAME:-}"
 export LESWHT_OUTPUT_ROOT="${LESWHT_OUTPUT_ROOT:-../output}"
+export LESWHT_GEOMETRY_STL="${LESWHT_GEOMETRY_STL:-}"   # read by funcbody
 
 mkdir -p "$LESWHT_OUTPUT_ROOT/ftr" \
          "$LESWHT_OUTPUT_ROOT/field" \
