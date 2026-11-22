@@ -955,6 +955,7 @@
         integer(8) :: i, j, k
         integer(8) :: imax, jmax, kmax, l
         real(8) :: nusgsavg, nusgsmax, area
+        real(8) :: sa_l, sw_l, sa_jk(n2m, n3m), sw_jk(n2m, n3m)
         real(8) :: funcbody
         real(8) :: nusgst
         integer(8) :: it, jt, kt
@@ -981,13 +982,15 @@
         it = 0
         jt = 0
         kt = 0
-!$OMP DO COLLAPSE(2) REDUCTION(+:NUSGSAVG, AREA)
+!$OMP DO COLLAPSE(2) PRIVATE(SA_L, SW_L)
         do k = 1, n3m
           do j = 1, n2m
+            sa_l = 0.
+            sw_l = 0.
             do i = 1, n1m
               if (fbody_c(i, j, k) .ge. 1.e-10) then
-                nusgsavg = nusgsavg + nusgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
-                area = area + f2fx(i) * f2fy(j) * f2fz(k)
+                sa_l = sa_l + nusgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
+                sw_l = sw_l + f2fx(i) * f2fy(j) * f2fz(k)
                 if (nusgs(i, j, k) .gt. nusgst) then
                   nusgst = nusgs(i, j, k)
                   it = i
@@ -998,6 +1001,8 @@
                 nusgs(i, j, k) = 0.
               end if
             end do
+            sa_jk(j, k) = sa_l
+            sw_jk(j, k) = sw_l
           end do
         end do
 !$OMP END DO
@@ -1012,6 +1017,13 @@
 !$OMP END CRITICAL(NUT_MAX)
 !$OMP END PARALLEL
         nusgsmax = max(nusgsmax, 0.)
+!     LINE SUMS ADDED IN K-J ORDER (THE SAME FOR ANY THREAD COUNT)
+        do k = 1, n3m
+          do j = 1, n2m
+            nusgsavg = nusgsavg + sa_jk(j, k)
+            area = area + sw_jk(j, k)
+          end do
+        end do
 
         nusgsavg = nusgsavg / area
 
@@ -1633,6 +1645,7 @@
         integer(8) :: i, j, k
         integer(8) :: imax, jmax, kmax, l
         real(8) :: alsgsavg, alsgsmax, area
+        real(8) :: sa_l, sw_l, sa_jk(n2m, n3m), sw_jk(n2m, n3m)
         real(8) :: funcbody
         real(8) :: alsgst
         integer(8) :: it, jt, kt
@@ -1659,13 +1672,15 @@
         it = 0
         jt = 0
         kt = 0
-!$OMP DO COLLAPSE(2) REDUCTION(+:ALSGSAVG, AREA)
+!$OMP DO COLLAPSE(2) PRIVATE(SA_L, SW_L)
         do k = 1, n3m
           do j = 1, n2m
+            sa_l = 0.
+            sw_l = 0.
             do i = 1, n1m
               if (fbody_c(i, j, k) .ge. 1.e-10) then
-                alsgsavg = alsgsavg + alsgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
-                area = area + f2fx(i) * f2fy(j) * f2fz(k)
+                sa_l = sa_l + alsgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
+                sw_l = sw_l + f2fx(i) * f2fy(j) * f2fz(k)
                 if (alsgs(i, j, k) .gt. alsgst) then
                   alsgst = alsgs(i, j, k)
                   it = i
@@ -1676,6 +1691,8 @@
                 alsgs(i, j, k) = 0.
               end if
             end do
+            sa_jk(j, k) = sa_l
+            sw_jk(j, k) = sw_l
           end do
         end do
 !$OMP END DO
@@ -1690,6 +1707,13 @@
 !$OMP END CRITICAL(ALP_MAX)
 !$OMP END PARALLEL
         alsgsmax = max(alsgsmax, 0.)
+!     LINE SUMS ADDED IN K-J ORDER (THE SAME FOR ANY THREAD COUNT)
+        do k = 1, n3m
+          do j = 1, n2m
+            alsgsavg = alsgsavg + sa_jk(j, k)
+            area = area + sw_jk(j, k)
+          end do
+        end do
 
         alsgsavg = alsgsavg / area
 

@@ -659,7 +659,7 @@
          flux_zm = 0.d0
          flux_zp = 0.d0
 
-!$OMP PARALLEL DO PRIVATE(AREA, TFACE) REDUCTION(+:FLUX_XM,FLUX_XP)
+         ! Face sums stay serial, so the history is the same for any number of threads.
          do k = 1, n3m
            do j = 1, n2m
              area = f2fy(j) * f2fz(k)
@@ -673,9 +673,7 @@
              end if
            end do
          end do
-!$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO PRIVATE(AREA, TFACE) REDUCTION(+:FLUX_YM,FLUX_YP)
          do k = 1, n3m
            do i = 1, n1m
              area = f2fx(i) * f2fz(k)
@@ -689,9 +687,7 @@
              end if
            end do
          end do
-!$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO PRIVATE(AREA, TFACE) REDUCTION(+:FLUX_ZM,FLUX_ZP)
          do j = 1, n2m
            do i = 1, n1m
              area = f2fx(i) * f2fy(j)
@@ -705,7 +701,6 @@
              end if
            end do
          end do
-!$OMP END PARALLEL DO
 
          heat_flux(1) = flux_xp - flux_xm
          heat_flux(2) = flux_yp - flux_ym
@@ -749,6 +744,10 @@
          real(8) :: cd(3), cdavg(3), vol_solid_geom, vol_cell
          real(8) :: dti, funcbody, tmp, vol_fluid
          real(8) :: dy1, dy2, dz1, dz2, grad_u, grad_v, grad_w
+         ! fixed-order partial sums (per plane, per block of LBLK points), the same for any thread count
+         integer(8) :: ib, nb
+         integer(8), parameter :: lblk = 1024
+         real(8) :: vs_k, vs_pln(n3m), csum, csum_b(3, (max(nbody(1), nbody(2), nbody(3)) + lblk - 1) / lblk)
 
          dti = 1.0d0 / dt
          call body_values()
@@ -757,36 +756,51 @@
          vol_solid_geom = 0.0d0
 
          ! 1. ESTIMATE SOLID VOLUME FROM THE CURRENT GEOMETRY MASK.
-!$OMP PARALLEL DO COLLAPSE(2) REDUCTION(+:VOL_SOLID_GEOM)
+!$OMP PARALLEL DO PRIVATE(VS_K)
          do k = 1, n3m
+           vs_k = 0.0d0
            do j = 1, n2m
              do i = 1, n1m
                if (fbody_u(i, j, k) .lt. 1.d-10) then
-                 vol_solid_geom = vol_solid_geom + c2cx(i) * f2fy(j) * f2fz(k)
+                 vs_k = vs_k + c2cx(i) * f2fy(j) * f2fz(k)
                end if
              end do
            end do
+           vs_pln(k) = vs_k
          end do
 !$OMP END PARALLEL DO
+         do k = 1, n3m
+           vol_solid_geom = vol_solid_geom + vs_pln(k)
+         end do
 
          vol_fluid = xl * yl * zl - vol_solid_geom
          if (vol_fluid .le. 0.0d0) vol_fluid = xl * yl * zl
 
          ! 2. INTEGRATE THE RAW IBM FORCING (FCVAVG) OVER THE ACTIVE IBM NODES
-!$OMP PARALLEL DO PRIVATE(N, L, II, JJ, KK, VOL_CELL) REDUCTION(-:CD)
+         nb = (max(nbody(1), nbody(2), nbody(3)) + lblk - 1) / lblk
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(N, II, JJ, KK, VOL_CELL, CSUM)
          do l = 1, 3
-           do n = 1, nbody(l)
-             ii = ifc(n, l)
-             jj = jfc(n, l)
-             kk = kfc(n, l)
+           do ib = 1, nb
+             csum = 0.0d0
+             do n = (ib - 1) * lblk + 1, min(ib * lblk, nbody(l))
+               ii = ifc(n, l)
+               jj = jfc(n, l)
+               kk = kfc(n, l)
 
-             vol_cell = c2cx(ii) * f2fy(jj) * f2fz(kk)
+               vol_cell = c2cx(ii) * f2fy(jj) * f2fz(kk)
 
-             ! RAW IBM FORCE (TERM 1 OF EQ. 11)
-             cd(l) = cd(l) - fcvavg(n, l) * vol_cell
+               ! RAW IBM FORCE (TERM 1 OF EQ. 11)
+               csum = csum - fcvavg(n, l) * vol_cell
+             end do
+             csum_b(l, ib) = csum
            end do
          end do
 !$OMP END PARALLEL DO
+         do ib = 1, nb
+           do l = 1, 3
+             cd(l) = cd(l) + csum_b(l, ib)
+           end do
+         end do
 
          ! 3. ADD THE MATERIAL DERIVATIVE (TERM 2 OF EQ. 11)
          !    THESE ARE DIRECTLY SUPPLIED BY YOUR EXISTING LAGFORCE SUBROUTINE.
@@ -801,7 +815,6 @@
            tmp = 0.0d0
            dy1 = 1.0d0 / c2cyi(1)
            dy2 = dy1 + 1.0d0 / c2cyi(2)
-!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_W) REDUCTION(+:CD)
            do k = 1, n3m
              do i = 1, n1m
                if (fbody_u(i, 1, k) .ge. 1.d-10) then
@@ -815,7 +828,6 @@
                end if
              end do
            end do
-!$OMP END PARALLEL DO
          end if
 
          ! --- Y-TOP WALL ---
@@ -823,7 +835,6 @@
            tmp = 0.0d0
            dy1 = 1.0d0 / c2cyi(n2)
            dy2 = dy1 + 1.0d0 / c2cyi(n2m)
-!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_W) REDUCTION(+:CD)
            do k = 1, n3m
              do i = 1, n1m
                if (fbody_u(i, n2m, k) .ge. 1.d-10) then
@@ -837,7 +848,6 @@
                end if
              end do
            end do
-!$OMP END PARALLEL DO
          end if
 
          ! --- Z-BOTTOM WALL ---
@@ -845,7 +855,6 @@
            tmp = 0.0d0
            dz1 = 1.0d0 / c2czi(1)
            dz2 = dz1 + 1.0d0 / c2czi(2)
-!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_V) REDUCTION(+:CD)
            do j = 1, n2m
              do i = 1, n1m
                if (fbody_u(i, j, 1) .ge. 1.d-10) then
@@ -859,7 +868,6 @@
                end if
              end do
            end do
-!$OMP END PARALLEL DO
          end if
 
          ! --- Z-TOP WALL ---
@@ -867,7 +875,6 @@
            tmp = 0.0d0
            dz1 = 1.0d0 / c2czi(n3)
            dz2 = dz1 + 1.0d0 / c2czi(n3m)
-!$OMP PARALLEL DO PRIVATE(TMP, GRAD_U, GRAD_V) REDUCTION(+:CD)
            do j = 1, n2m
              do i = 1, n1m
                if (fbody_u(i, j, n3m) .ge. 1.d-10) then
@@ -881,7 +888,6 @@
                end if
              end do
            end do
-!$OMP END PARALLEL DO
          end if
 
          ! 5. NON-DIMENSIONALIZE TOTAL FORCE TO EVALUATE WALL SHEAR STRESS (TAU_W)
