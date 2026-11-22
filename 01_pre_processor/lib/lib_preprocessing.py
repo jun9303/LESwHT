@@ -119,12 +119,12 @@ def grid_preprocessing_data(grid):
 
     def write_real_line(values):
         for value in values:
-            file.write(' %f ' % value)
+            file.write(' %.16e ' % value)
         file.write('\n')
 
     file.write('%d %d %d\n' %(grid['N_x'], grid['N_y'], grid['N_z']))
     file.write('%d %d %d\n' %(grid['Cell_x'], grid['Cell_y'], grid['Cell_z']))
-    file.write('%f %f %f\n' %(grid['L_x'], grid['L_y'], grid['L_z']))
+    file.write('%.16e %.16e %.16e\n' %(grid['L_x'], grid['L_y'], grid['L_z']))
 
     write_real_line([grid['grid_info_x'][i]['coord'] for i in range(1,grid['N_x']+1)])
     write_real_line([grid['grid_info_y'][j]['coord'] for j in range(1,grid['N_y']+1)])
@@ -165,7 +165,7 @@ def grid_preprocessing_data(grid):
     write_real_line([grid['grid_info_x'][i]['center'] for i in range(grid['N_x']+1)])
     write_real_line([grid['grid_info_y'][j]['center'] for j in range(grid['N_y']+1)])
     for tmp in [grid['grid_info_z'][k]['center'] for k in range(grid['N_z']+1)]:
-        file.write(' %f ' %(tmp))
+        file.write(' %.16e ' %(tmp))
 
     file.close()
 
@@ -258,19 +258,19 @@ def ibm_preprocessing_data(nintp,ninner,fcp,intpindx,geomfac):
         for l in range(3):
             for m in range(3):
                 for n in range(3):
-                    file.write(' %15.8f ' %(geomfac['u'][i,l,m,n]))
+                    file.write(' %.16e ' %(geomfac['u'][i,l,m,n]))
         file.write('\n')
     for j in range(nv):
         for l in range(3):
             for m in range(3):
                 for n in range(3):
-                    file.write(' %15.8f ' %(geomfac['v'][j,l,m,n]))
+                    file.write(' %.16e ' %(geomfac['v'][j,l,m,n]))
         file.write('\n')
     for k in range(nw):
         for l in range(3):
             for m in range(3):
                 for n in range(3):
-                    file.write(' %15.8f ' %(geomfac['w'][k,l,m,n]))
+                    file.write(' %.16e ' %(geomfac['w'][k,l,m,n]))
         file.write('\n')
     print('--- GEOMETRIC FACTOR DATA RECORD DONE')
 
@@ -296,7 +296,7 @@ def ibm_preprocessing_data_htransfer(nintp,ninner,fcp,intpindx,geomfac):
         for l in range(3):
             for m in range(3):
                 for n in range(3):
-                    file.write(' %15.8f ' %(geomfac['t'][k,l,m,n]))
+                    file.write(' %.16e ' %(geomfac['t'][k,l,m,n]))
         file.write('\n')
     print('--- HEAT TRANSFER DATA RECORD DONE')
 
