@@ -20,7 +20,13 @@ FFTE_OBJS = $(FFTE_DIR)/zfft1d.o \
             $(FFTE_DIR)/factor.o
 
 # Solver Object List
-# For the Poisson solver, choose one among poiss_[mgrd, x_ft, z_ft, ftft].o depending on simulation setups
+# Poisson solver: POISS selects one of the files in f90/lib/poiss, e.g. `make new POISS=poiss_z_ft`.
+#   poiss_ftft : x and z periodic (FFT in x and z, TDMA in y)
+#   poiss_z_ft : x non-periodic, z periodic (multigrid in x-y, FFT in z)
+#   poiss_x_ft : x periodic, z non-periodic (multigrid in y-z, FFT in x)
+#   poiss_mgrd : any setup (3D multigrid with BiCGSTAB)
+#   poiss_fd   : any setup with a non-periodic y; direct (no iteration); a periodic direction must be uniform
+POISS ?= poiss_ftft
 OBJS =  mod_common.o \
         mod_flowarray.o \
         mod_poiss.o \
@@ -31,7 +37,7 @@ OBJS =  mod_common.o \
         slv_engy.o \
         slv_cont.o \
         slv_auxi.o \
-        poiss_ftft.o \
+        $(POISS).o \
         funcbody.o \
         ibm_body.o \
         ibm_forcing.o
@@ -97,6 +103,9 @@ poiss_z_ft.o: ./f90/lib/poiss/poiss_z_ft.f90
 
 poiss_ftft.o: ./f90/lib/poiss/poiss_ftft.f90
 	$(FC) $(FFLAGS) ./f90/lib/poiss/poiss_ftft.f90 -c $(LIB)
+
+poiss_fd.o: ./f90/lib/poiss/poiss_fd.f90
+	$(FC) $(FFLAGS) ./f90/lib/poiss/poiss_fd.f90 -c $(LIB)
 
 #-----------------------------------------------------------------------
 #     External & Geometry Linkage

@@ -21,6 +21,16 @@
         use mod_poiss
         implicit none
         integer(8) :: i, j, k, ilev
+        integer(8) :: nlev0
+
+!     A NON-PERIODIC X NEEDS AT LEAST TWO CELLS ON THE COARSEST MULTIGRID LEVEL: WITH ONE, THE MODE-1
+!     Y LINE THERE HAS NO X COUPLING AND IS SINGULAR (DIVISION BY ZERO BELOW). USE FEWER LEVELS.
+        nlev0 = nlev
+        do while (nlev .gt. 1 .and. xprdic .ne. 1 .and. n1m / (2**nlev) .lt. 2)
+          nlev = nlev - 1
+        end do
+        if (nlev .ne. nlev0) write (*, '(A,I3,A,I3,A)') ' POISINIT: NLEV', nlev0, ' ->', nlev, &
+          ' (AT LEAST TWO CELLS ON THE COARSEST LEVEL)'
 
         call z_ft_allo
 
@@ -128,7 +138,9 @@
 
         if (n3m == 1) then
           allocate (cp(0:n1, 0:n2), tmp(n1, n2))
+!$OMP PARALLEL WORKSHARE
           cp = 0.0_8
+!$OMP END PARALLEL WORKSHARE
 !$OMP PARALLEL DO
           do j = 1, n2m
             do i = 1, n1m
@@ -136,6 +148,7 @@
             end do
           end do
 
+          call rhsmean0(tmp)
           call mg2d(cp, tmp, 1_8, test1, 0.0_8)
 
 !$OMP PARALLEL DO
@@ -178,10 +191,29 @@
 ! --- SOLVE A SET OF POISSON EQS.
         test = test1 / float(n3mh) * float(n3m) * 0.8_8   ! CONVERGENCE CRITERIA
 
+! --- MODE 1 TAKES THE MOST CYCLES: SOLVE IT FIRST WITH ALL THREADS ON ITS LINES (AS IN 2D),
+!     THEN SHARE OUT THE OTHER MODES ONE BY ONE
+        allocate (cp(0:n1, 0:n2))
+        cp = 0.0_8
+        call rhsmean0(ccap(1, 1, 1))
+        if (1 <= imgsor) then
+          call mg2d(cp, ccap(1, 1, 1), 1_8, test, 0.0_8)
+        else
+          call gsor2d(cp, ccap(1, 1, 1), 1_8, test, 0.0_8)
+        end if
+!$OMP PARALLEL DO
+        do j = 1, n2m
+          do i = 1, n1m
+            ccap(i, j, 1) = cp(i, j)
+          end do
+        end do
+!$OMP END PARALLEL DO
+        deallocate (cp)
+
 !$OMP PARALLEL PRIVATE(CP)
         allocate (cp(0:n1, 0:n2))
-!$OMP DO
-        do kkk = 1, n3mh
+!$OMP DO SCHEDULE(DYNAMIC)
+        do kkk = 2, n3mh
           cp = 0.0_8
           if (kkk <= imgsor) then
             call mg2d(cp, ccap(1, 1, kkk), kkk, test, 0.0_8)
@@ -234,6 +266,59 @@
 
         return
       end subroutine poisson
+!=======================================================================
+      subroutine rhsmean0(rhs)
+!=======================================================================
+!     MODE 1 IS A NEUMANN PROBLEM: ITS RIGHT-HAND SIDE MUST HAVE ZERO MEAN (WEIGHTED BY THE CELL AREAS
+!     F2FX * F2FY), OR NO SOLUTION EXISTS AND THE MULTIGRID STALLS AT MGITR. A MEAN ABOVE ROUND-OFF
+!     (1E-10 OF THE WEIGHTED MEAN |RHS|) IS SUBTRACTED; AT ROUND-OFF THE RIGHT-HAND SIDE IS LEFT AS IT IS.
+!     ROW SUMS IN PARALLEL, ADDED IN ROW ORDER (THE SAME FOR ANY THREAD COUNT).
+        use mod_common
+        implicit none
+        complex(8) :: rhs(n1, n2)
+        integer(8) :: i, j
+        real(8) :: sw, swr, swa
+        real(8) :: sw_j(n2m), swr_j(n2m), swa_j(n2m)
+        logical, save :: said = .false.
+
+!$OMP PARALLEL DO PRIVATE(I)
+        do j = 1, n2m
+          sw_j(j) = 0.0_8
+          swr_j(j) = 0.0_8
+          swa_j(j) = 0.0_8
+          do i = 1, n1m
+            sw_j(j) = sw_j(j) + f2fx(i) * f2fy(j)
+            swr_j(j) = swr_j(j) + f2fx(i) * f2fy(j) * real(rhs(i, j), 8)
+            swa_j(j) = swa_j(j) + f2fx(i) * f2fy(j) * abs(rhs(i, j))
+          end do
+        end do
+!$OMP END PARALLEL DO
+        sw = 0.0_8
+        swr = 0.0_8
+        swa = 0.0_8
+        do j = 1, n2m
+          sw = sw + sw_j(j)
+          swr = swr + swr_j(j)
+          swa = swa + swa_j(j)
+        end do
+        if (abs(swr) .le. 1.0e-10_8 * swa) return
+
+        swr = swr / sw
+!$OMP PARALLEL DO PRIVATE(I)
+        do j = 1, n2m
+          do i = 1, n1m
+            rhs(i, j) = rhs(i, j) - swr
+          end do
+        end do
+!$OMP END PARALLEL DO
+        if (.not. said) then
+          write (*, '(A,ES11.3,A)') ' POISSON: MODE-1 RIGHT-HAND SIDE MEAN', swr, &
+            ' SUBTRACTED (ALSO IN LATER SOLVES WHEN ABOVE ROUND-OFF)'
+          said = .true.
+        end if
+
+        return
+      end subroutine rhsmean0
 
 !=======================================================================
       subroutine mg2d(pc, rhs, kv, test, oldv)
@@ -255,15 +340,21 @@
 !-----------------------------------------------------------------------
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: i, j, kv, kk, ilev
         real(8) :: test, sumres, oldv
         complex(8) :: pc(0:n1, 0:n2), rhs(n1, n2)
         complex(8) :: resd(n1md, n2m), ggii(0:n1md, 0:n2)
+        logical :: par
 
+        par = .false.
         kk = 0
+!$      par = .not. omp_in_parallel()
+!$OMP PARALLEL WORKSHARE IF(par)
         resd = 0.0_8
         ggii = 0.0_8
+!$OMP END PARALLEL WORKSHARE
 
         call toplevel(0_8, pc, rhs, sumres, oldv, test, kv, resd, ggii)
         if (sumres < test) goto 205
@@ -303,6 +394,7 @@
 !=======================================================================
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: i, j, ic
         integer(8) :: id, kv
@@ -310,25 +402,31 @@
         complex(8) :: tt
         complex(8) :: pc(0:n1, 0:n2), rhs(n1, n2)
         complex(8) :: resd(n1md, n2m), ggii(0:n1md, 0:n2)
+        logical :: par
+
+        par = .false.
+!$      par = (.not. omp_in_parallel()) .and. (n1m * n2m .ge. mg_par_min)
 
         if (id == 1) then
 !         INTERPOLATE & ADD
           ic = 0
+!$OMP PARALLEL DO PRIVATE(J, IC) IF(par)
           do i = iimg(nlev - 1, 1), iimg(nlev - 1, 2) - 1
-            ic = ic + 2
+            ic = 2 * (i - iimg(nlev - 1, 1) + 1)
             do j = 1, n2m
               pc(ic, j) = pc(ic, j) + coi1(i) * ggii(i, j) + coi2(i) * ggii(ipm(i), j)
             end do
           end do
 
           i = iimg(nlev - 1, 2)
-          ic = ic + 2
+          ic = 2 * (iimg(nlev - 1, 2) - iimg(nlev - 1, 1) + 1)
           do j = 1, n2m
             pc(ic, j) = pc(ic, j) + coi1(i) * ggii(i, j)      ! USE ONE POINT COI(~)=1.
           end do
         end if
 
 !  RELAX
+!$OMP PARALLEL DO PRIVATE(I) IF(par)
         do j = 1, n2m
           do i = 1, n1m, 2
             ggii(i, j) = rhs(i, j) - oldv * (aw(i) * pc(imm(i), j) + ae(i) * pc(ipm(i), j))
@@ -343,6 +441,7 @@
           tt = 0.0_8
         end if
 
+!$OMP PARALLEL DO PRIVATE(I) IF(par)
         do j = 1, n2m
           do i = 2, n1m, 2
             ggii(i - 1, j) = ggii(i - 1, j) - tt
@@ -355,6 +454,7 @@
 !  CALCULATE RESIDUAL
         sumres = 0.0_8
 
+!$OMP PARALLEL DO PRIVATE(I) REDUCTION(MAX:SUMRES) IF(par)
         do j = 1, n2m
           do i = 1, n1m
             resd(i, j) = rhs(i, j) - aw(i) * ggii(imm(i), j) - ae(i) * ggii(ipm(i), j) &
@@ -369,8 +469,9 @@
 
 !  RESTRICT
         ic = -1
+!$OMP PARALLEL DO PRIVATE(J, IC) IF(par)
         do i = iimg(nlev - 1, 1), iimg(nlev - 1, 2)
-          ic = ic + 2
+          ic = 2 * (i - iimg(nlev - 1, 1)) + 1
           do j = 1, n2m
             resd(i, j) = resd(ic, j) * cor1(i) + resd(ic + 1, j) * cor2(i)
           end do
@@ -384,25 +485,42 @@
 !=======================================================================
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: i, j, l1, l2, ll1, ll2, kv
         complex(8) :: rr(0:n1md, 0:n2), uu(0:n1md, 0:n2)
+        integer(8) :: nl, nb, ib, i1, i2
 
-        do i = l1, l2, 2
-          uu(i, ll1) = rr(i, ll1) * bet(i, 1, kv)
-        end do
+!     LINES L1, L1+2, ..., L2 ARE INDEPENDENT: SPLIT THEM INTO NB BLOCKS (>= 16 LINES EACH)
+        if (l2 < l1) return
+        nl = (l2 - l1) / 2 + 1
+        nb = 1
+!$      if ((.not. omp_in_parallel()) .and. (nl * (ll2 - ll1 + 1) .ge. mg_par_min)) &
+!$        nb = max(1_8, min(nl / 16, int(omp_get_max_threads(), 8)))
 
-        do j = ll1 + 1, ll2
-          do i = l1, l2, 2
-            uu(i, j) = (rr(i, j) - as(j) * uu(i, j - 1)) * bet(i, j, kv)
+!$OMP PARALLEL DO PRIVATE(I, J, I1, I2) IF(nb .gt. 1)
+        do ib = 1, nb
+          i1 = l1 + 2 * (((ib - 1) * nl) / nb)
+          i2 = l1 + 2 * ((ib * nl) / nb - 1)
+
+          do i = i1, i2, 2
+            uu(i, ll1) = rr(i, ll1) * bet(i, 1, kv)
           end do
-        end do
 
-        do j = ll2 - 1, ll1, -1
-          do i = l1, l2, 2
-            uu(i, j) = uu(i, j) - gam(i, j + 1, kv) * uu(i, j + 1)
+          do j = ll1 + 1, ll2
+            do i = i1, i2, 2
+              uu(i, j) = (rr(i, j) - as(j) * uu(i, j - 1)) * bet(i, j, kv)
+            end do
           end do
+
+          do j = ll2 - 1, ll1, -1
+            do i = i1, i2, 2
+              uu(i, j) = uu(i, j) - gam(i, j + 1, kv) * uu(i, j + 1)
+            end do
+          end do
+
         end do
+!$OMP END PARALLEL DO
 
         return
       end subroutine trdiag1m
@@ -412,21 +530,27 @@
 !=======================================================================
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: i, j, ilev, ibgh
         complex(8) :: resd(n1md, n2m), ggii(0:n1md, 0:n2)
+        logical :: par
+
+        par = .false.
+!$      par = (.not. omp_in_parallel()) .and. (iimg(ilev + 1, 3) * n2m .ge. mg_par_min)
 
         ibgh = iimg(ilev + 1, 1) - 1
 
+!$OMP PARALLEL DO PRIVATE(J, IBGH) IF(par)
         do i = iimg(ilev, 1), iimg(ilev, 2) - 1
-          ibgh = ibgh + 2
+          ibgh = iimg(ilev + 1, 1) - 1 + 2 * (i - iimg(ilev, 1) + 1)
           do j = 1, n2m
             ggii(ibgh, j) = ggii(ibgh, j) + coi1(i) * ggii(i, j) + coi2(i) * ggii(ipm(i), j)
           end do
         end do
 
         i = iimg(ilev, 2)
-        ibgh = ibgh + 2
+        ibgh = iimg(ilev + 1, 1) - 1 + 2 * (iimg(ilev, 2) - iimg(ilev, 1) + 1)
         do j = 1, n2m
           ggii(ibgh, j) = ggii(ibgh, j) + coi1(i) * ggii(i, j)           ! USE ONE POINT
         end do
@@ -439,10 +563,16 @@
 !=======================================================================
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: i, j, ilev, kv, ibg
         complex(8) :: resd(n1md, n2m), ggii(0:n1md, 0:n2)
+        logical :: par
 
+        par = .false.
+!$      par = (.not. omp_in_parallel()) .and. (iimg(ilev, 3) * n2m .ge. mg_par_min)
+
+!$OMP PARALLEL DO PRIVATE(I) IF(par)
         do j = 1, n2m
           do i = iimg(ilev, 1), iimg(ilev, 2)
             resd(i, j) = resd(i, j) - aw(i) * ggii(imm(i), j) - ae(i) * ggii(ipm(i), j) &
@@ -452,8 +582,9 @@
 
         ibg = iimg(ilev, 1) - 2
 
+!$OMP PARALLEL DO PRIVATE(J, IBG) IF(par)
         do i = iimg(ilev - 1, 1), iimg(ilev - 1, 2)
-          ibg = ibg + 2
+          ibg = iimg(ilev, 1) - 2 + 2 * (i - iimg(ilev - 1, 1) + 1)
           do j = 1, n2m
             resd(i, j) = resd(ibg, j) * cor1(i) + resd(ibg + 1, j) * cor2(i)
           end do
@@ -467,11 +598,17 @@
 !=======================================================================
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: i, j, ilev, iiter, kv, ii
         complex(8) :: resd(n1md, n2m), ggii(0:n1md, 0:n2)
         real(8) :: oldv
+        logical :: par
 
+        par = .false.
+!$      par = (.not. omp_in_parallel()) .and. (iimg(ilev, 3) * n2m .ge. mg_par_min)
+
+!$OMP PARALLEL DO PRIVATE(I) IF(par)
         do j = 1, n2m
           do i = iimg(ilev, 1), iimg(ilev, 2), 2
             ggii(i, j) = resd(i, j) - oldv * (aw(i) * ggii(imm(i), j) + ae(i) * ggii(ipm(i), j))
@@ -480,6 +617,7 @@
 
         call trdiag1m(ggii, ggii, iimg(ilev, 1), iimg(ilev, 2), 1_8, n2m, kv)
 
+!$OMP PARALLEL DO PRIVATE(I) IF(par)
         do j = 1, n2m
           do i = iimg(ilev, 1) + 1, iimg(ilev, 2), 2
             ggii(i, j) = resd(i, j) - aw(i) * ggii(imm(i), j) - ae(i) * ggii(ipm(i), j)
@@ -490,6 +628,7 @@
 
         do ii = 1, iiter - 1
 
+!$OMP PARALLEL DO PRIVATE(I) IF(par)
           do j = 1, n2m
             do i = iimg(ilev, 1), iimg(ilev, 2), 2
               ggii(i, j) = resd(i, j) - (aw(i) * ggii(imm(i), j) + ae(i) * ggii(ipm(i), j))
@@ -498,6 +637,7 @@
 
           call trdiag1m(ggii, ggii, iimg(ilev, 1), iimg(ilev, 2), 1_8, n2m, kv)
 
+!$OMP PARALLEL DO PRIVATE(I) IF(par)
           do j = 1, n2m
             do i = iimg(ilev, 1) + 1, iimg(ilev, 2), 2
               ggii(i, j) = resd(i, j) - aw(i) * ggii(imm(i), j) - ae(i) * ggii(ipm(i), j)

@@ -29,7 +29,10 @@
         implicit none
         integer(8) :: i, j, k
         integer(8) :: i_cg, imax, jmax, kmax
+        integer(8) :: it, jt, kt
+        real(8) :: rt
         real(8) :: rho_cg, rho_ol, alp_cg, w_cg, bet_cg, rv_tmp, acc
+        real(8) :: rho_cg_k, rho_cg_pln(n3m), rv_tmp_k, rv_tmp_pln(n3m), uppp_k, uppp_pln(n3m), bttt_k, bttt_pln(n3m)
         real(8) :: phiref, resm_cg, bttt, uppp
 
         real(8), dimension(0:n1, 0:n2, 0:n3) :: phi
@@ -42,16 +45,40 @@
         real(8), dimension(n1, n2, n3) :: t_cg
         real(8), dimension(n1, n2, n3) :: res_cg
 
-        p_cg = 0.0_8
-        s_cg = 0.0_8
-        y_cg = 0.0_8
-        z_cg = 0.0_8
-        v_cg = 0.0_8
-        t_cg = 0.0_8
+!$OMP PARALLEL DO COLLAPSE(2)
+        do k = 0, n3
+          do j = 0, n2
+            do i = 0, n1
+              p_cg(i, j, k) = 0.0_8
+              s_cg(i, j, k) = 0.0_8
+              y_cg(i, j, k) = 0.0_8
+              z_cg(i, j, k) = 0.0_8
+              v_cg(i, j, k) = 0.0_8
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
+        do k = 1, n3
+          do j = 1, n2
+            do i = 1, n1
+              t_cg(i, j, k) = 0.0_8
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
 
         if (ioldv == 0) then
-          phi = 0.0_8
-!$OMP PARALLEL DO PRIVATE(I, J)
+!$OMP PARALLEL DO COLLAPSE(2)
+          do k = 0, n3
+            do j = 0, n2
+              do i = 0, n1
+                phi(i, j, k) = 0.0_8
+              end do
+            end do
+          end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J)
           do k = 1, n3m
             do j = 1, n2m
               do i = 1, n1m
@@ -60,7 +87,7 @@
             end do
           end do
         else
-!$OMP PARALLEL DO PRIVATE(I, J, ACC)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J, ACC)
           do k = 1, n3m
             do j = 1, n2m
               do i = 1, n1m
@@ -81,18 +108,23 @@
         do i_cg = 1, mgitr
 
           rho_cg = 0.0_8
-!$OMP PARALLEL DO PRIVATE(I, J) REDUCTION(+:RHO_CG)
+!$OMP PARALLEL DO PRIVATE(I, J, RHO_CG_K)
           do k = 1, n3m
+            rho_cg_k = 0.0_8
             do j = 1, n2m
               do i = 1, n1m
-                rho_cg = rho_cg + divgsum(i, j, k) * res_cg(i, j, k)
+                rho_cg_k = rho_cg_k + divgsum(i, j, k) * res_cg(i, j, k)
               end do
             end do
+            rho_cg_pln(k) = rho_cg_k
+          end do
+          do k = 1, n3m
+            rho_cg = rho_cg + rho_cg_pln(k)
           end do
 
           bet_cg = rho_cg / rho_ol * alp_cg / w_cg
 
-!$OMP PARALLEL DO PRIVATE(I, J)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J)
           do k = 1, n3m
             do j = 1, n2m
               do i = 1, n1m
@@ -103,7 +135,7 @@
 
           call mg3d(y_cg, p_cg, test1, ioldv)
 
-!$OMP PARALLEL DO PRIVATE(I, J, ACC)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J, ACC)
           do k = 1, n3m
             do j = 1, n2m
               do i = 1, n1m
@@ -117,18 +149,23 @@
           end do
 
           rv_tmp = 0.0_8
-!$OMP PARALLEL DO PRIVATE(I, J) REDUCTION(+:RV_TMP)
+!$OMP PARALLEL DO PRIVATE(I, J, RV_TMP_K)
           do k = 1, n3m
+            rv_tmp_k = 0.0_8
             do j = 1, n2m
               do i = 1, n1m
-                rv_tmp = rv_tmp + divgsum(i, j, k) * v_cg(i, j, k)
+                rv_tmp_k = rv_tmp_k + divgsum(i, j, k) * v_cg(i, j, k)
               end do
             end do
+            rv_tmp_pln(k) = rv_tmp_k
+          end do
+          do k = 1, n3m
+            rv_tmp = rv_tmp + rv_tmp_pln(k)
           end do
 
           alp_cg = rho_cg / rv_tmp
 
-!$OMP PARALLEL DO PRIVATE(I, J)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J)
           do k = 1, n3m
             do j = 1, n2m
               do i = 1, n1m
@@ -139,7 +176,7 @@
 
           call mg3d(z_cg, s_cg, test1, ioldv)
 
-!$OMP PARALLEL DO PRIVATE(I, J, ACC)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J, ACC)
           do k = 1, n3m
             do j = 1, n2m
               do i = 1, n1m
@@ -154,18 +191,26 @@
 
           bttt = 0.0_8
           uppp = 0.0_8
-!$OMP PARALLEL DO PRIVATE(I, J) REDUCTION(+:UPPP) REDUCTION(+:BTTT)
+!$OMP PARALLEL DO PRIVATE(I, J, UPPP_K, BTTT_K)
           do k = 1, n3m
+            uppp_k = 0.0_8
+            bttt_k = 0.0_8
             do j = 1, n2m
               do i = 1, n1m
-                uppp = uppp + t_cg(i, j, k) * s_cg(i, j, k)
-                bttt = bttt + t_cg(i, j, k)**2.0_8
+                uppp_k = uppp_k + t_cg(i, j, k) * s_cg(i, j, k)
+                bttt_k = bttt_k + t_cg(i, j, k)**2.0_8
               end do
             end do
+            uppp_pln(k) = uppp_k
+            bttt_pln(k) = bttt_k
+          end do
+          do k = 1, n3m
+            uppp = uppp + uppp_pln(k)
+            bttt = bttt + bttt_pln(k)
           end do
           w_cg = uppp / bttt
 
-!$OMP PARALLEL DO PRIVATE(I, J)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J)
           do k = 1, n3m
             do j = 1, n2m
               do i = 1, n1m
@@ -175,20 +220,40 @@
           end do
 
           resm_cg = 0.0_8
-!$OMP PARALLEL DO PRIVATE(I, J) REDUCTION(MAX:RESM_CG)
+          imax = 0
+          jmax = 0
+          kmax = 0
+!     EACH THREAD FINDS THE MAXIMUM OF ITS CELLS; THE MERGE KEEPS THE SERIAL PICK
+!     (LARGEST VALUE, AND THE LAST CELL IN K-J-I ORDER AMONG EQUAL VALUES).
+!$OMP PARALLEL PRIVATE(I, J, RT, IT, JT, KT)
+          rt = 0.0_8
+          it = 0
+          jt = 0
+          kt = 0
+!$OMP DO COLLAPSE(2)
           do k = 1, n3m
             do j = 1, n2m
               do i = 1, n1m
                 res_cg(i, j, k) = s_cg(i, j, k) - w_cg * t_cg(i, j, k)
-                resm_cg = max(resm_cg, abs(res_cg(i, j, k)))
-                if (resm_cg == abs(res_cg(i, j, k))) then
-                  imax = i
-                  jmax = j
-                  kmax = k
+                if (abs(res_cg(i, j, k)) .ge. rt) then
+                  rt = abs(res_cg(i, j, k))
+                  it = i
+                  jt = j
+                  kt = k
                 end if
               end do
             end do
           end do
+!$OMP END DO
+!$OMP CRITICAL(MGRD_RESM)
+          if (rt .gt. resm_cg .or. (rt .eq. resm_cg .and. ((kt - kmax) * n2m + (jt - jmax)) * n1m + (it - imax) .gt. 0)) then
+            resm_cg = rt
+            imax = it
+            jmax = jt
+            kmax = kt
+          end if
+!$OMP END CRITICAL(MGRD_RESM)
+!$OMP END PARALLEL
           rho_ol = rho_cg
 
           write (77, 102) i_cg, resm_cg * dtconst, imax, jmax, kmax
@@ -208,7 +273,7 @@
 1000    continue
 
         phiref = phi(1, n2m, 1)
-!$OMP PARALLEL DO PRIVATE(I, J)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -236,6 +301,19 @@
         integer(8) :: iold, icyc, ilev
         real(8) :: resm
 
+!       GI IS A WORK ARRAY ON THE STACK: START FROM ZERO. THE FIRST SWEEPS MULTIPLY IT BY IOLD = 0 AND THE
+!       BOUNDARY NEIGHBOURS (I = 0, K = 0, ENDS OF THE COARSE LEVELS) BY ZERO COEFFICIENTS, AND 0 TIMES
+!       UNSET MEMORY CAN BE NAN (OR CHANGE WITH THE THREAD COUNT).
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I)
+        do k = 0, n3md
+          do j = 0, n2
+            do i = 0, n1md
+              gi(i, j, k) = 0.0_8
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+
         call toplevel(gi, resid, rhs, resm, iold)
 
         if (nlev == 0) goto 777
@@ -255,7 +333,7 @@
         call goup(gi, nlev)
 777     call toplevel(gi, resid, rhs, resm, 1_8)
 
-!$OMP PARALLEL DO PRIVATE(I, J)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -369,7 +447,7 @@
 !------ CALCULATE RESIDUAL
 
         resm = 0.0_8
-!$OMP PARALLEL DO PRIVATE(I, J, ACC) REDUCTION(MAX:RESM)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J, ACC) REDUCTION(MAX:RESM)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -388,7 +466,7 @@
 101     format(es15.8, 3i6)
 
 !------ RESTRICT RESIDUAL TO A LOWER LEVEL
-!$OMP PARALLEL DO PRIVATE(I, J)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J)
         do k = kkmg(nlev - 1, 1), kkmg(nlev - 1, 2)
           do j = 1, n2m
             do i = iimg(nlev - 1, 1), iimg(nlev - 1, 2)
@@ -415,7 +493,7 @@
         real(8) :: resid(n1md, n2m, n3md), gi(0:n1md, 0:n2, 0:n3md)
         real(8) :: acc
 
-!$OMP PARALLEL DO PRIVATE(I, J, ACC)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J, ACC)
         do k = kkmg(ilev, 1), kkmg(ilev, 2)
           do j = 1, n2m
             do i = iimg(ilev, 1), iimg(ilev, 2)
@@ -442,7 +520,7 @@
         integer(8) :: ilev
         real(8) :: resid(n1md, n2m, n3md)
 
-!$OMP PARALLEL DO PRIVATE(I, J)
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J)
         do k = kkmg(ilev, 1), kkmg(ilev, 2)
           do j = 1, n2m
             do i = iimg(ilev, 1), iimg(ilev, 2)
@@ -789,18 +867,25 @@
           end do
 
 !------ CALCULATE POISSON COEFFICIENTS FOR COARSE GRIDS
+!       AT THE ENDS OF A LEVEL THE NEIGHBOUR CENTRE (I - 1, I + 1, K - 1, K + 1) BELONGS TO ANOTHER LEVEL OR
+!       WAS NEVER SET (PAST THE COARSEST LEVEL), SO THE COEFFICIENT IS ONLY EVALUATED WHERE ITS FLAG IS 1;
+!       0 TIMES A NUMBER BUILT FROM UNSET MEMORY COULD GIVE NAN.
           ic = 0
           do i = ibg, iend
             ic = ic + 1
-            aw(i) = iwest(i) * 1.0_8 / ((xmpm(i) - xmpm(i - 1)) * (x(ic * isp + 1) - x((ic - 1) * isp + 1)))
-            ae(i) = ieast(i) * 1.0_8 / ((xmpm(i + 1) - xmpm(i)) * (x(ic * isp + 1) - x((ic - 1) * isp + 1)))
+            aw(i) = 0.0_8
+            ae(i) = 0.0_8
+            if (iwest(i) .eq. 1) aw(i) = 1.0_8 / ((xmpm(i) - xmpm(i - 1)) * (x(ic * isp + 1) - x((ic - 1) * isp + 1)))
+            if (ieast(i) .eq. 1) ae(i) = 1.0_8 / ((xmpm(i + 1) - xmpm(i)) * (x(ic * isp + 1) - x((ic - 1) * isp + 1)))
           end do
 
           kc = 0
           do k = kbg, kend
             kc = kc + 1
-            ab(k) = kback(k) * 1.0_8 / ((zmpm(k) - zmpm(k - 1)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
-            af(k) = kforw(k) * 1.0_8 / ((zmpm(k + 1) - zmpm(k)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
+            ab(k) = 0.0_8
+            af(k) = 0.0_8
+            if (kback(k) .eq. 1) ab(k) = 1.0_8 / ((zmpm(k) - zmpm(k - 1)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
+            if (kforw(k) .eq. 1) af(k) = 1.0_8 / ((zmpm(k + 1) - zmpm(k)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
           end do
 
         end do
@@ -832,7 +917,9 @@
           ibgl = iimg(ilev - 1, 1)             ! AT LOWER LEVEL
           do i = iimg(ilev, 1), iimg(ilev, 2), 2
             fiup(i) = (xmpm(i) - xmpm(ibgl - 1)) / (xmpm(ibgl) - xmpm(ibgl - 1))
-            fiup(i + 1) = (xmpm(i + 1) - xmpm(ibgl)) / (xmpm(ibgl + 1) - xmpm(ibgl))
+            fiup(i + 1) = 0.0_8                ! LAST PAIR: SET BELOW (NEUMANN), XMPM(IBGL + 1) IS NOT SET THERE
+            if (ibgl + 1 .le. iimg(ilev - 1, 2)) &
+              fiup(i + 1) = (xmpm(i + 1) - xmpm(ibgl)) / (xmpm(ibgl + 1) - xmpm(ibgl))
             il1(i) = ibgl - 1
             il2(i) = ibgl
             il1(i + 1) = ibgl
@@ -847,7 +934,9 @@
           kbgl = kkmg(ilev - 1, 1)             ! AT LOWER LEVEL
           do k = kkmg(ilev, 1), kkmg(ilev, 2), 2
             fkup(k) = (zmpm(k) - zmpm(kbgl - 1)) / (zmpm(kbgl) - zmpm(kbgl - 1))
-            fkup(k + 1) = (zmpm(k + 1) - zmpm(kbgl)) / (zmpm(kbgl + 1) - zmpm(kbgl))
+            fkup(k + 1) = 0.0_8                ! LAST PAIR: SET BELOW (NEUMANN), ZMPM(KBGL + 1) IS NOT SET THERE
+            if (kbgl + 1 .le. kkmg(ilev - 1, 2)) &
+              fkup(k + 1) = (zmpm(k + 1) - zmpm(kbgl)) / (zmpm(kbgl + 1) - zmpm(kbgl))
             kl1(k) = kbgl - 1
             kl2(k) = kbgl
             kl1(k + 1) = kbgl

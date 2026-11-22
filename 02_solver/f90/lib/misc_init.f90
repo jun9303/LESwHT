@@ -48,6 +48,13 @@
         end if
         read (10, *) dummy
         read (10, *) ibmon, masson, imovingon, ihtrans, idecomp
+!       THE MOVING-BODY PATH (FINDFORCING EACH STEP) IS NOT USABLE: IT PASSES ARRAYS WITH OTHER SHAPES
+!       THAN THE IBM ROUTINES DECLARE (COORDINATES WITHOUT THE -1:N+1 RANGE, FCP/INTPINDX/GEOMFAC LEADING
+!       DIMENSIONS) AND NO BODY-VELOCITY FUNCTIONS (UBD, VBD, WBD) ARE DEFINED. STOP HERE, NOT AT STEP 1.
+        if (imovingon .eq. 1) then
+          write (*, *) 'IMOVINGON = 1 IS NOT AVAILABLE IN THIS VERSION (SEE MISC_INIT.F90); SET IMOVINGON = 0.'
+          stop
+        end if
         read (10, *) dummy
         read (10, *) gridfile
         read (10, *) prev_fld
@@ -145,6 +152,41 @@
         if (zprdic .eq. 1) then
           bc_zbtm = 4
           bc_ztop = 4
+        end if
+
+!       FAR FIELD (BC = 1): NO FLOW THROUGH THE BOUNDARY AND ZERO GRADIENT OF THE TANGENTIAL VELOCITY.
+!       THESE FLAGS SWITCH THE TANGENTIAL GHOSTS (UCALC) AND THE BOUNDARY TERMS OF RHS AND LHSU/V/W
+!       TO ZERO GRADIENT; WITHOUT THEM THE GHOSTS KEPT THEIR INITIAL VALUES.
+        jub = 0
+        jwb = 0
+        jut = 0
+        jwt = 0
+        kub = 0
+        kvb = 0
+        kut = 0
+        kvt = 0
+        if (bc_ybtm .eq. 1) then
+          jub = 1
+          jwb = 1
+        end if
+        if (bc_ytop .eq. 1) then
+          jut = 1
+          jwt = 1
+        end if
+        if (bc_zbtm .eq. 1) then
+          kub = 1
+          kvb = 1
+        end if
+        if (bc_ztop .eq. 1) then
+          kut = 1
+          kvt = 1
+        end if
+
+!       CONSTANT FLOW RATE NEEDS A PERIODIC X: WITH AN INLET THE INLET VELOCITY SETS THE FLOW RATE, AND
+!       CONVBC CLOSES THE OUTLET FOR ICH = 1 (NO SOLUTION OF THE PRESSURE EQUATION).
+        if ((ich .eq. 1) .and. (xprdic .eq. 0)) then
+          write (*, *) ' --- ICH=1 (CONSTANT FLOW RATE) REQUIRES X PERIODICITY. WITH AN INLET, USE ICH=0.'
+          stop
         end if
 
         call check_idecomp_input
@@ -276,9 +318,12 @@
         end do
         close (11)
 
+        nzero = 0
+        if (iles .eq. 1) then
           open (11, file=trim(output_dir_ibmpre)//'/ibmpre_nutzero.bin')
-        read (11, *) nzero
-        close (11)
+          read (11, *) nzero
+          close (11)
+        end if
 
         if (ihtrans .eq. 1) then
             open (11, file=trim(output_dir_ibmpre)//'/ibmpre_fcpts_t.bin')
@@ -307,11 +352,18 @@
         if (iles .eq. 1) then
           call les_allo()
           if (ihtrans .eq. 1) call les_thermal_allo()
+        else
+!         DNS: THE MOMENTUM AND ENERGY SOLVERS STILL READ THE EDDY VISCOSITY AND DIFFUSIVITY (MULTIPLIED
+!         BY ZERO), SO THEY ARE ALLOCATED AND SET TO ZERO
+          allocate (nusgs(0:n1, 0:n2, 0:n3), nusgs1(0:n1, 0:n2, 0:n3, 3))
+          nusgs = 0.
+          nusgs1 = 0.
+          if (ihtrans .eq. 1) call les_thermal_allo()
         end if
 
-        if (ihtrans .eq. 1) then
-          ! cstar/kstar/omega_dvm are used by thermal solver paths even when ICONJG=0.
-          ! Keep default unity properties unless ICONJG=1 explicitly loads ibmpre_conjg.bin.
+!       CSTAR/KSTAR/OMEGA_DVM ARE USED BY THERMAL SOLVER PATHS EVEN WHEN ICONJG=0 (CSTAR = KSTAR = 1,
+!       SET IN CONJG_ALLO, UNLESS ICONJG=1 LOADS IBMPRE_CONJG.BIN)
+        if ((iconjg .eq. 1) .or. (ihtrans .eq. 1)) then
           call conjg_allo()
         end if
 
@@ -386,8 +438,44 @@
 36      format('  NBODY_U :', i12, '  NBODY_V :', i12, '  NBODY_W :', i12)
 37      format('  NINTP_T :', i12, '  NBODY_T :', i12)
 
+        call check_stencils()
+
         return
       end subroutine ibmpreread
+!=======================================================================
+!=======================================================================
+      subroutine check_stencils
+!=======================================================================
+!       AN INTERPOLATION STENCIL MUST STAY INSIDE A NON-PERIODIC DIRECTION (INDICES 1 .. N-1), OR THE
+!       IBM FORCING READS OUTSIDE THE ARRAYS. FILES FROM AN OLDER PREPROCESSOR CAN HOLD SUCH STENCILS
+!       WHEN A BODY IS TANGENT TO, OR WITHIN TWO CELLS OF, A DOMAIN END. STOP AND ASK FOR A RERUN.
+        use mod_common
+        use mod_flowarray, only: ifc, jfc, kfc, intpindx
+        implicit none
+        integer(8) :: n, l, lmax, nbad, ipp, jpp, kpp
+
+        lmax = 3
+        if (ihtrans .eq. 1) lmax = 4
+        nbad = 0
+        do l = 1, lmax
+          do n = 1, nintp(l)
+            ipp = ifc(n, l) + 2 * intpindx(n, l, 1)
+            jpp = jfc(n, l) + 2 * intpindx(n, l, 2)
+            kpp = kfc(n, l) + 2 * intpindx(n, l, 3)
+            if ((xprdic .eq. 0) .and. ((ipp .lt. 1) .or. (ipp .gt. n1m))) nbad = nbad + 1
+            if ((yprdic .eq. 0) .and. ((jpp .lt. 1) .or. (jpp .gt. n2m))) nbad = nbad + 1
+            if ((zprdic .eq. 0) .and. ((kpp .lt. 1) .or. (kpp .gt. n3m))) nbad = nbad + 1
+          end do
+        end do
+
+        if (nbad .gt. 0) then
+          write (*, '(A,I10,A)') ' IBM DATA: ', nbad, ' INTERPOLATION STENCILS LEAVE A NON-PERIODIC DIRECTION.'
+          write (*, *) ' RERUN 01_PRE_PROCESSOR (PREPROCESSING.PY) WITH THIS VERSION OF IBM_BODY.F90.'
+          stop
+        end if
+
+        return
+      end subroutine check_stencils
 !=======================================================================
 !=======================================================================
       subroutine nutzeroread
@@ -461,8 +549,8 @@
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8) :: flowarea(n1), fl, fl_s, adj
-        real(8) :: y_center, y_half, eta_y, poiseuille_shape
-        real(8), parameter :: ubulk_init_cpg = 12.0d0
+        real(8) :: xi, ylo, yhi, eta
+        logical :: isfl(0:n2)
         real(8), parameter :: eps_pr = 1.0d-12
 
         ihist = 0
@@ -474,27 +562,33 @@
         p = 0.
 
         flowarea = 0.
-        y_center = 0.5d0 * (y(1) + y(n2))
-        y_half = 0.5d0 * (y(n2) - y(1))
-        if (dabs(y_half) .le. 1.0d-12) y_half = 1.0d0
 
         write (*, *) '========= MAKING INITIAL FIELD ========='
         write (*, *) ''
 
-!$OMP PARALLEL DO
+!       ICH = 0: UNIFORM UDRV_I IN THE FLUID. ICH = 1, 2: START FROM REST (SEE BELOW).
+!$OMP PARALLEL DO PRIVATE(XI, J, K, ISFL, YLO, YHI, ETA)
         do i = 0, n1    ! START FROM 0 TO COVER THE INLET GHOST CELL
-          do j = 0, n2
-            do k = 0, n3
+          ! X IS ALLOCATED 1:N1, SO THE GHOST FACE I = 0 IS PLACED ONE CELL BEFORE X(1)
+          if (i .eq. 0) then
+            xi = 2.0d0 * x(1) - x(2)
+          else
+            xi = x(i)
+          end if
+          do k = 0, n3
+            do j = 0, n2
+              isfl(j) = funcbody(xi, ymp(j), zmp(k), time) .ge. 1.e-10
+            end do
+            do j = 0, n2
               ! APPLY PROFILE ONLY IN THE FLUID DOMAIN
-              if (funcbody(x(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
-                  eta_y = (ymp(j) - y_center) / y_half
-                  poiseuille_shape = dmax1(0.0d0, 1.0d0 - eta_y**2)
+              if (isfl(j)) then
                 if (ich .eq. 0) then
                   u(i, j, k) = udrv_i
-                elseif (ich .eq. 1) then
-                    u(i, j, k) = 1.d-12 ! 1.5d0 * udrv_i * poiseuille_shape
-                elseif (ich .eq. 2) then
-                    u(i, j, k) = 1.d-12 ! 1.5d0 * ubulk_init_cpg * poiseuille_shape ! INITIAL UBULK_I = 12.D0
+                elseif ((ich .eq. 1) .or. (ich .eq. 2)) then
+                  ! THIS BRANCH STARTS ICH = 1/2 RUNS FROM REST AND LETS THE DRIVING FORCE BUILD THE FLOW.
+                  ! A PARABOLIC START WOULD BE 1.5 * UB * (1 - ETA**2) ACROSS THE FLUID GAP IN Y:
+                  ! CALL YFLUIDGAP(ISFL, J, YLO, YHI); ETA = (YMP(J) - 0.5*(YLO + YHI)) / (0.5*(YHI - YLO))
+                  u(i, j, k) = 1.d-12
                 else
                   u(i, j, k) = udrv_i
                 end if
@@ -624,6 +718,34 @@
 
         return
       end subroutine makefld
+!=======================================================================
+!=======================================================================
+      subroutine yfluidgap(isfl, j, ylo, yhi)
+!=======================================================================
+!       FLUID GAP IN Y THAT CONTAINS CELL J OF A COLUMN (ISFL = FLUID FLAGS OF ITS CELLS 0..N2):
+!       YLO / YHI ARE THE LOWER FACE OF ITS FIRST FLUID CELL AND THE UPPER FACE OF ITS LAST ONE
+!       (A BODY SURFACE ON THE GRID, OR A DOMAIN WALL). A GHOST ROW USES THE GAP OF THE ROW NEXT TO IT.
+        use mod_common
+        implicit none
+        logical :: isfl(0:n2)
+        integer(8) :: j, jlo, jhi
+        real(8) :: ylo, yhi
+
+        jlo = min(max(j, 1_8), n2m)
+        jhi = jlo
+        do while (jlo .gt. 1)
+          if (.not. isfl(jlo - 1)) exit
+          jlo = jlo - 1
+        end do
+        do while (jhi .lt. n2m)
+          if (.not. isfl(jhi + 1)) exit
+          jhi = jhi + 1
+        end do
+        ylo = y(jlo)
+        yhi = y(jhi + 1)
+
+        return
+      end subroutine yfluidgap
 !=======================================================================
 !=======================================================================
       subroutine prefld
@@ -813,39 +935,53 @@
         implicit none
         real(8) :: ptb, flowarea, pertb_rate, adj
         real(8) :: flowarea_g, pertb_rate_g
-        real(8) :: y_center, y_half, eta_y, wall_dist
+        real(8) :: flowarea_g_k, pertb_rate_g_k
+        real(8) :: flowarea_g_pln(max(n1m, n2m, n3m)), pertb_rate_g_pln(max(n1m, n2m, n3m))
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8), parameter :: ret = 180.0d0
-
-        y_center = 0.5d0 * (y(1) + y(n2))
-        y_half = 0.5d0 * (y(n2) - y(1))
-        if (dabs(y_half) .le. 1.0d-12) y_half = 1.0d0
+        ! THE PERTURBATION SITS NEAR THE UPPER WALL OF THE FLUID GAP IN Y THAT CONTAINS THE CELL (SEE
+        ! YFLUIDGAP): ETA IS THE GAP COORDINATE (-1 .. 1), WD THE WALL DISTANCE IN HALF-GAP UNITS. FOR A
+        ! CHANNEL WITH WALLS AT Y = -1 AND 1, ETA = Y AND WD = 1 - Y.
+        logical :: isfl(0:n2)
+        real(8) :: ylo, yhi, eta, wd
 
         ! --- PERTURB U (GLOBAL MEAN CORRECTION) ---
         flowarea_g = 0.0d0
         pertb_rate_g = 0.0d0
 
- !$OMP PARALLEL DO PRIVATE(PTB,ETA_Y,WALL_DIST) REDUCTION(+:FLOWAREA_G, PERTB_RATE_G)
+!$OMP PARALLEL DO PRIVATE(PTB, FLOWAREA_G_K, PERTB_RATE_G_K, J, K, ISFL, YLO, YHI, ETA, WD)
         do i = 1, n1m
-          do j = 1, n2m
-            do k = 1, n3m
-              if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
-                flowarea_g = flowarea_g + f2fy(j) * f2fz(k)
-                eta_y = (ymp(j) - y_center) / y_half
-                if ((eta_y .gt. .5d0) .and. (eta_y .lt. .99d0)) then
-                  wall_dist = dabs((y(n2 - 2) - ymp(j)) / y_half)
+          flowarea_g_k = 0.0d0
+          pertb_rate_g_k = 0.0d0
+          do k = 1, n3m
+            do j = 0, n2
+              isfl(j) = funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10
+            end do
+            do j = 1, n2m
+              if (isfl(j)) then
+                flowarea_g_k = flowarea_g_k + f2fy(j) * f2fz(k)
+                call yfluidgap(isfl, j, ylo, yhi)
+                eta = (ymp(j) - 0.5d0 * (ylo + yhi)) / (0.5d0 * (yhi - ylo))
+                wd = (yhi - ymp(j)) / (0.5d0 * (yhi - ylo))
+                if ((eta .gt. .5d0) .and. (eta .lt. .99d0)) then
                   ptb = eps_ptr * udrv_i * cos(zmp(k)/zl*acos(-1.d0)) &
-                        * wall_dist * ret                               &
-                        * exp(-.01d0*(wall_dist * ret)**2.d0 + .5d0)
+                        * wd * ret                                     &
+                        * exp(-.01d0*(wd*ret)**2.d0 + .5d0)
                   u(i, j, k) = u(i, j, k) + ptb
-                  pertb_rate_g = pertb_rate_g + ptb * f2fy(j) * f2fz(k)
+                  pertb_rate_g_k = pertb_rate_g_k + ptb * f2fy(j) * f2fz(k)
                 end if
               end if
             end do
           end do
+          flowarea_g_pln(i) = flowarea_g_k
+          pertb_rate_g_pln(i) = pertb_rate_g_k
         end do
 !$OMP END PARALLEL DO
+        do i = 1, n1m
+          flowarea_g = flowarea_g + flowarea_g_pln(i)
+          pertb_rate_g = pertb_rate_g + pertb_rate_g_pln(i)
+        end do
 
         if (flowarea_g .gt. 0.0d0) then
           adj = pertb_rate_g / flowarea_g
@@ -865,26 +1001,38 @@
         ! --- PERTURB W (GLOBAL MEAN CORRECTION) ---
         flowarea_g = 0.0d0
         pertb_rate_g = 0.0d0
- !$OMP PARALLEL DO PRIVATE(PTB,ETA_Y,WALL_DIST) REDUCTION(+:FLOWAREA_G, PERTB_RATE_G)
+!$OMP PARALLEL DO PRIVATE(PTB, FLOWAREA_G_K, PERTB_RATE_G_K, I, J, ISFL, YLO, YHI, ETA, WD)
         do k = 1, n3m
+          flowarea_g_k = 0.0d0
+          pertb_rate_g_k = 0.0d0
           do i = 1, n1m
+            do j = 0, n2
+              isfl(j) = funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10
+            end do
             do j = 1, n2m
-              if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
-                flowarea_g = flowarea_g + f2fx(i) * f2fy(j)
-                eta_y = (ymp(j) - y_center) / y_half
-                if ((eta_y .gt. .5d0) .and. (eta_y .lt. .99d0)) then
-                  wall_dist = dabs((y(n2 - 2) - ymp(j)) / y_half)
+              if (isfl(j)) then
+                flowarea_g_k = flowarea_g_k + f2fx(i) * f2fy(j)
+                call yfluidgap(isfl, j, ylo, yhi)
+                eta = (ymp(j) - 0.5d0 * (ylo + yhi)) / (0.5d0 * (yhi - ylo))
+                wd = (yhi - ymp(j)) / (0.5d0 * (yhi - ylo))
+                if ((eta .gt. .5d0) .and. (eta .lt. .99d0)) then
                   ptb = eps_ptr * sin(xmp(i)/xl*acos(-1.d0)) &
-                        * wall_dist * ret                               &
-                        * exp(-.01d0*(wall_dist * ret)**2.d0)
+                        * wd * ret                           &
+                        * exp(-.01d0*(wd*ret)**2.d0)
                   w(i, j, k) = w(i, j, k) + ptb
-                  pertb_rate_g = pertb_rate_g + ptb * f2fx(i) * f2fy(j)
+                  pertb_rate_g_k = pertb_rate_g_k + ptb * f2fx(i) * f2fy(j)
                 end if
               end if
             end do
           end do
+          flowarea_g_pln(k) = flowarea_g_k
+          pertb_rate_g_pln(k) = pertb_rate_g_k
         end do
 !$OMP END PARALLEL DO
+        do k = 1, n3m
+          flowarea_g = flowarea_g + flowarea_g_pln(k)
+          pertb_rate_g = pertb_rate_g + pertb_rate_g_pln(k)
+        end do
 
         if (flowarea_g .gt. 0.0d0) then
           adj = pertb_rate_g / flowarea_g
@@ -917,6 +1065,8 @@
         use mod_flowarray, only: u, v, w
         implicit none
         real(8) :: ptb_array(1:n1, 1:n2, 1:n3)
+        real(8) :: flowarea_k, pertb_rate_k
+        real(8) :: flowarea_pln(max(n1m, n2m, n3m)), pertb_rate_pln(max(n1m, n2m, n3m))
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8) :: flowarea, pertb_rate, adj
@@ -928,17 +1078,25 @@
         do i = 1, n1m
           flowarea = 0.0d0
           pertb_rate = 0.0d0
-!$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
+!$OMP PARALLEL DO PRIVATE(FLOWAREA_K, PERTB_RATE_K)
           do j = 1, n2m
+            flowarea_k = 0.0d0
+            pertb_rate_k = 0.0d0
             do k = 1, n3m
               if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
                 u(i, j, k) = u(i, j, k) + ptb_array(i, j, k)
-                flowarea = flowarea + f2fy(j) * f2fz(k)
-                pertb_rate = pertb_rate + ptb_array(i, j, k) * f2fy(j) * f2fz(k)
+                flowarea_k = flowarea_k + f2fy(j) * f2fz(k)
+                pertb_rate_k = pertb_rate_k + ptb_array(i, j, k) * f2fy(j) * f2fz(k)
               end if
             end do
+            flowarea_pln(j) = flowarea_k
+            pertb_rate_pln(j) = pertb_rate_k
           end do
 !$OMP END PARALLEL DO
+          do j = 1, n2m
+            flowarea = flowarea + flowarea_pln(j)
+            pertb_rate = pertb_rate + pertb_rate_pln(j)
+          end do
           if (flowarea .gt. 0.0d0) then
             adj = pertb_rate / flowarea
 !$OMP PARALLEL DO
@@ -960,17 +1118,25 @@
         do j = 1, n2m
           flowarea = 0.0d0
           pertb_rate = 0.0d0
-!$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
+!$OMP PARALLEL DO PRIVATE(FLOWAREA_K, PERTB_RATE_K)
           do k = 1, n3m
+            flowarea_k = 0.0d0
+            pertb_rate_k = 0.0d0
             do i = 1, n1m
                if (funcbody(xmp(i), y(j), zmp(k), time) .gt. 1.e-10) then
                 v(i, j, k) = v(i, j, k) + ptb_array(i, j, k)
-                flowarea = flowarea + f2fz(k) * f2fx(i)
-                pertb_rate = pertb_rate + ptb_array(i, j, k) * f2fz(k) * f2fx(i)
+                flowarea_k = flowarea_k + f2fz(k) * f2fx(i)
+                pertb_rate_k = pertb_rate_k + ptb_array(i, j, k) * f2fz(k) * f2fx(i)
               end if
             end do
+            flowarea_pln(k) = flowarea_k
+            pertb_rate_pln(k) = pertb_rate_k
           end do
 !$OMP END PARALLEL DO
+          do k = 1, n3m
+            flowarea = flowarea + flowarea_pln(k)
+            pertb_rate = pertb_rate + pertb_rate_pln(k)
+          end do
           if (flowarea .gt. 0.0d0) then
             adj = pertb_rate / flowarea
 !$OMP PARALLEL DO
@@ -992,17 +1158,25 @@
         do k = 1, n3m
           flowarea = 0.0d0
           pertb_rate = 0.0d0
-!$OMP PARALLEL DO REDUCTION(+:FLOWAREA, PERTB_RATE)
+!$OMP PARALLEL DO PRIVATE(FLOWAREA_K, PERTB_RATE_K)
           do i = 1, n1m
+            flowarea_k = 0.0d0
+            pertb_rate_k = 0.0d0
             do j = 1, n2m
                if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
                 w(i, j, k) = w(i, j, k) + ptb_array(i, j, k)
-                flowarea = flowarea + f2fx(i) * f2fy(j)
-                pertb_rate = pertb_rate + ptb_array(i, j, k) * f2fx(i) * f2fy(j)
+                flowarea_k = flowarea_k + f2fx(i) * f2fy(j)
+                pertb_rate_k = pertb_rate_k + ptb_array(i, j, k) * f2fx(i) * f2fy(j)
               end if
             end do
+            flowarea_pln(i) = flowarea_k
+            pertb_rate_pln(i) = pertb_rate_k
           end do
 !$OMP END PARALLEL DO
+          do i = 1, n1m
+            flowarea = flowarea + flowarea_pln(i)
+            pertb_rate = pertb_rate + pertb_rate_pln(i)
+          end do
           if (flowarea .gt. 0.0d0) then
             adj = pertb_rate / flowarea
 !$OMP PARALLEL DO
@@ -1145,6 +1319,9 @@
 
         if (iles .eq. 1) then
           call les_deallo()
+          if (ihtrans .eq. 1) call les_thermal_deallo()
+        else
+          deallocate (nusgs, nusgs1)
           if (ihtrans .eq. 1) call les_thermal_deallo()
         end if
 

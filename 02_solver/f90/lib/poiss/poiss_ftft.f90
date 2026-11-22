@@ -25,6 +25,7 @@
         implicit none
 
         integer(8) :: i, j, k, jjp
+        integer(8) :: adi_nblk, nbl, ib, ilo, ihi
         real(8) :: phi(0:n1, 0:n2, 0:n3), divgsum(0:n1, 0:n2, 0:n3)
         real(8) :: cn1, cn3
         real(8) :: ajcref, ajmref, ajpref
@@ -72,48 +73,54 @@
 !$OMP END PARALLEL
 
 ! --- SOLVE TDMA MATRIX
-!$OMP PARALLEL PRIVATE(AJM, AJP, AJC, CRHS, CRHSREF, AJCREF, AJMREF, AJPREF, PHREF)
+!     (WAVENUMBER, LINE BLOCK) PAIRS SO THAT EVERY THREAD HAS WORK WHEN N3MH IS SMALL
+        nbl = adi_nblk(n3mh, n1m)
+!$OMP PARALLEL PRIVATE(AJM, AJP, AJC, CRHS, CRHSREF, AJCREF, AJMREF, AJPREF, PHREF, JJP, ILO, IHI)
         allocate (crhs(n2, n1))
         allocate (ajm(n2, n1), ajp(n2, n1), ajc(n2, n1))
-!$OMP DO
+!$OMP DO COLLAPSE(2)
         do k = 1, n3mh
-          do i = 1, n1m
-            do j = 1, n2m
-              jjp = jpv(j)
-              ajm(j, i) = f2fyi(j) * c2cyi(j) * (1.0_8 - fixjl(j))
-              ajp(j, i) = f2fyi(j) * c2cyi(jjp) * (1.0_8 - fixju(j))
-              ajc(j, i) = -((ajm(j, i) + ajp(j, i) + ak1(i) + ak3(k)) * &
-                            (1.0_8 - fixjl(j)) * (1.0_8 - fixju(j)) + &
-                            (f2fyi(1) * c2cyi(2) + ak1(i) + ak3(k)) * fixjl(j) + &
-                            (f2fyi(n2m) * c2cyi(n2m) + ak1(i) + ak3(k)) * fixju(j))
-              crhs(j, i) = ccap(k, i, j)
+          do ib = 1, nbl
+            ilo = 1 + ((ib - 1) * n1m) / nbl
+            ihi = (ib * n1m) / nbl
+            do i = ilo, ihi
+              do j = 1, n2m
+                jjp = jpv(j)
+                ajm(j, i) = f2fyi(j) * c2cyi(j) * (1.0_8 - fixjl(j))
+                ajp(j, i) = f2fyi(j) * c2cyi(jjp) * (1.0_8 - fixju(j))
+                ajc(j, i) = -((ajm(j, i) + ajp(j, i) + ak1(i) + ak3(k)) * &
+                              (1.0_8 - fixjl(j)) * (1.0_8 - fixju(j)) + &
+                              (f2fyi(1) * c2cyi(2) + ak1(i) + ak3(k)) * fixjl(j) + &
+                              (f2fyi(n2m) * c2cyi(n2m) + ak1(i) + ak3(k)) * fixju(j))
+                crhs(j, i) = ccap(k, i, j)
+              end do
             end do
-          end do
 
-          if (k == 1) then
-            crhsref = crhs(n2m, 1)
-            ajcref = ajc(n2m, 1)
-            ajmref = ajm(n2m, 1)
-            ajpref = ajp(n2m, 1)
-            crhs(n2m, 1) = 0.0_8
-            ajc(n2m, 1) = 1.0_8
-            ajm(n2m, 1) = 0.0_8
-            ajp(n2m, 1) = 0.0_8
-          end if
+            if (k == 1 .and. ilo == 1) then
+              crhsref = crhs(n2m, 1)
+              ajcref = ajc(n2m, 1)
+              ajmref = ajm(n2m, 1)
+              ajpref = ajp(n2m, 1)
+              crhs(n2m, 1) = 0.0_8
+              ajc(n2m, 1) = 1.0_8
+              ajm(n2m, 1) = 0.0_8
+              ajp(n2m, 1) = 0.0_8
+            end if
 
-          call ctrdiag(ajm, ajc, ajp, crhs, 1_8, n2m, crhs, n1m)
+            call ctrdiag(ajm(1, ilo), ajc(1, ilo), ajp(1, ilo), crhs(1, ilo), 1_8, n2m, crhs(1, ilo), ihi - ilo + 1)
 
-          if (k == 1) then
-            phref = (-ajmref * crhs(n2m - 1, 1) + crhsref) / ajcref
-            do j = 1, n2m
-              crhs(j, 1) = crhs(j, 1) - phref
-            end do
-            crhs(n2m, 1) = 0.0_8
-          end if
+            if (k == 1 .and. ilo == 1) then
+              phref = (-ajmref * crhs(n2m - 1, 1) + crhsref) / ajcref
+              do j = 1, n2m
+                crhs(j, 1) = crhs(j, 1) - phref
+              end do
+              crhs(n2m, 1) = 0.0_8
+            end if
 
-          do i = 1, n1m
-            do j = 1, n2m
-              ccap(k, i, j) = crhs(j, i)
+            do i = ilo, ihi
+              do j = 1, n2m
+                ccap(k, i, j) = crhs(j, i)
+              end do
             end do
           end do
         end do

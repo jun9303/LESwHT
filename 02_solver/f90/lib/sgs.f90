@@ -24,6 +24,17 @@
         cfz1 = 0.
         cfz2 = 0.
 
+!     ONE Z-PLANE (2D LES): A Z TEST FILTER HAS NOTHING TO AVERAGE, CFZ1 IS NOT SET BELOW, AND THE
+!     Z-PERIODIC PASS IN TEST_FILTER WOULD ZERO THE FIELD. FILTER = 3 RUNS AS FILTER = 1 (X ONLY);
+!     FILTER = 2 (Z ONLY) LEAVES NO TEST FILTER AND STOPS.
+        if (n3m .eq. 1 .and. filter .eq. 3) then
+          filter = 1
+          write (*, *) 'SGSFILTERINIT: N3M = 1, FILTER = 3 RUNS AS FILTER = 1 (X ONLY).'
+        else if (n3m .eq. 1 .and. filter .eq. 2) then
+          write (*, *) 'SGSFILTERINIT: N3M = 1 AND FILTER = 2 (Z ONLY) LEAVE NO TEST FILTER; USE FILTER = 1.'
+          stop
+        end if
+
         if (xprdic .eq. 1) then
 
           if (n1m .eq. 1) goto 101
@@ -353,7 +364,7 @@
         real(8) :: a(9), b(6)
         real(8) :: aaa, bbb
 
-!$OMP PARALLEL DO PRIVATE(UP,UM,VP,VM,WP,WM) &
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(UP,UM,VP,VM,WP,WM) &
 !$OMP PRIVATE(A,B,AAA,BBB)
         do k = 1, n3m
           do j = 1, n2m
@@ -419,6 +430,7 @@
         implicit none
         integer(8) :: i, j, k
         real(8) :: ljmj_v, mjmj_v
+        real(8) :: ljmj_v_k, ljmj_v_pln(n3m), mjmj_v_k, mjmj_v_pln(n3m)
         real(8) :: sdxf2, sdyf2, sdzf2, aaa, bbb, ami, volume
         real(8) :: b(6), str(6), alp(9)
 
@@ -431,7 +443,7 @@
         allocate (mmij(n1m, n2m, n3m, 6))
         allocate (uui(n1m, n2m, n3m, 3))
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(B,STR,ALP) &
 !$OMP PRIVATE(SDXF2,SDYF2,SDZF2,AAA,BBB)
         do k = 1, n3m
@@ -490,18 +502,14 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO
         do i = 1, 6
           call test_filter(mmij(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
         do j = 1, 9
           call test_filter(aalp(:, :, :, j), filter)
         end do
-!$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(B,STR,ALP) &
 !$OMP PRIVATE(SDXF2,SDYF2,SDZF2,AAA,BBB,AMI)
         do k = 1, n3m
@@ -579,20 +587,18 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO
         do i = 1, 3
           call test_filter(uui(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
         do j = 1, 6
           call test_filter(llij(:, :, :, j), filter)
         end do
-!$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO &
-!$OMP REDUCTION(+:LJMJ_V,MJMJ_V)
+!$OMP PRIVATE(VOLUME, LJMJ_V_K, MJMJ_V_K)
         do k = 1, n3m
+          ljmj_v_k = 0.0d0
+          mjmj_v_k = 0.0d0
           do j = 1, n2m
             do i = 1, n1m
               volume = f2fx(i) * f2fy(j) * f2fz(k)
@@ -602,20 +608,26 @@
               llij(i, j, k, 4) = llij(i, j, k, 4) - uui(i, j, k, 2) * uui(i, j, k, 2)
               llij(i, j, k, 5) = llij(i, j, k, 5) - uui(i, j, k, 2) * uui(i, j, k, 3)
               llij(i, j, k, 6) = llij(i, j, k, 6) - uui(i, j, k, 3) * uui(i, j, k, 3)
-              ljmj_v = ljmj_v &
+              ljmj_v_k = ljmj_v_k &
                        + (2.*llij(i, j, k, 2) * mmij(i, j, k, 2) + llij(i, j, k, 1) * mmij(i, j, k, 1) &
                           + 2.*llij(i, j, k, 3) * mmij(i, j, k, 3) + llij(i, j, k, 4) * mmij(i, j, k, 4) &
                           + 2.*llij(i, j, k, 5) * mmij(i, j, k, 5) + llij(i, j, k, 6) * mmij(i, j, k, 6)) &
                        * float(nwall_dvm(i, j, k)) * volume
-              mjmj_v = mjmj_v &
+              mjmj_v_k = mjmj_v_k &
                        + (2.*mmij(i, j, k, 2)**2.+mmij(i, j, k, 1)**2. &
                           +2.*mmij(i, j, k, 3)**2.+mmij(i, j, k, 4)**2. &
                           +2.*mmij(i, j, k, 5)**2.+mmij(i, j, k, 6)**2.) &
                        * float(nwall_dvm(i, j, k)) * volume
             end do
           end do
+          ljmj_v_pln(k) = ljmj_v_k
+          mjmj_v_pln(k) = mjmj_v_k
         end do
 !$OMP END PARALLEL DO
+        do k = 1, n3m
+          ljmj_v = ljmj_v + ljmj_v_pln(k)
+          mjmj_v = mjmj_v + mjmj_v_pln(k)
+        end do
 
         deallocate (aalp)
         deallocate (llij)
@@ -624,7 +636,7 @@
 
         csgsts = dmax1(0., -0.5 * ljmj_v / mjmj_v)
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -668,11 +680,29 @@
           stop
         end if
 
-        tmp = a0
+!     THE CALLERS FILTER ONE COMPONENT AT A TIME; EACH PASS BELOW RUNS ON ALL THREADS.
+!$OMP PARALLEL DO COLLAPSE(2)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              tmp(i, j, k) = a0(i, j, k)
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
 
         if (xfilter .eq. 1) then
-          src = tmp
+!$OMP PARALLEL DO COLLAPSE(2)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                src(i, j, k) = tmp(i, j, k)
+              end do
+            end do
+          end do
+!$OMP END PARALLEL DO
           if (xprdic .ne. 1) then
+!$OMP PARALLEL DO COLLAPSE(2)
             do k = 1, n3m
               do j = 1, n2m
                 do i = 2, n1m - 1
@@ -682,7 +712,9 @@
                 end do
               end do
             end do
+!$OMP END PARALLEL DO
           else
+!$OMP PARALLEL DO COLLAPSE(2)
             do j = 1, n2m
               do k = 1, n3m
                 do i = 2, n1m - 1
@@ -698,12 +730,22 @@
                                  + cfx1(n1m, 1) * src(1, j, k)
               end do
             end do
+!$OMP END PARALLEL DO
           end if
         end if
 
         if (yfilter .eq. 1) then
-          src = tmp
+!$OMP PARALLEL DO COLLAPSE(2)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                src(i, j, k) = tmp(i, j, k)
+              end do
+            end do
+          end do
+!$OMP END PARALLEL DO
           if (yprdic .ne. 1) then
+!$OMP PARALLEL DO COLLAPSE(2)
             do k = 1, n3m
               do j = 2, n2m - 1
                 do i = 1, n1m
@@ -713,7 +755,9 @@
                 end do
               end do
             end do
+!$OMP END PARALLEL DO
           else
+!$OMP PARALLEL DO COLLAPSE(2)
             do k = 1, n3m
               do i = 1, n1m
                 do j = 2, n2m - 1
@@ -729,12 +773,22 @@
                                  + cfy1(n2m, 1) * src(i, 1, k)
               end do
             end do
+!$OMP END PARALLEL DO
           end if
         end if
 
         if (zfilter .eq. 1) then
-          src = tmp
+!$OMP PARALLEL DO COLLAPSE(2)
+          do k = 1, n3m
+            do j = 1, n2m
+              do i = 1, n1m
+                src(i, j, k) = tmp(i, j, k)
+              end do
+            end do
+          end do
+!$OMP END PARALLEL DO
           if (zprdic .ne. 1) then
+!$OMP PARALLEL DO COLLAPSE(2)
             do k = 2, n3m - 1
               do j = 1, n2m
                 do i = 1, n1m
@@ -744,14 +798,23 @@
                 end do
               end do
             end do
+!$OMP END PARALLEL DO
           else
-            do i = 1, n1m
+!     INTERIOR PLANES, THEN THE TWO PERIODIC END PLANES
+!$OMP PARALLEL DO COLLAPSE(2)
+            do k = 2, n3m - 1
               do j = 1, n2m
-                do k = 2, n3m - 1
+                do i = 1, n1m
                   tmp(i, j, k) = cfz1(k, -1) * src(i, j, k - 1) &
                                  + cfz1(k, 0) * src(i, j, k) &
                                  + cfz1(k, 1) * src(i, j, k + 1)
                 end do
+              end do
+            end do
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO
+            do j = 1, n2m
+              do i = 1, n1m
                 tmp(i, j, 1) = cfz1(1, -1) * src(i, j, n3m) &
                                + cfz1(1, 0) * src(i, j, 1) &
                                + cfz1(1, 1) * src(i, j, 2)
@@ -760,10 +823,19 @@
                                  + cfz1(n3m, 1) * src(i, j, 1)
               end do
             end do
+!$OMP END PARALLEL DO
           end if
         end if
 
-        a0 = tmp
+!$OMP PARALLEL DO COLLAPSE(2)
+        do k = 1, n3m
+          do j = 1, n2m
+            do i = 1, n1m
+              a0(i, j, k) = tmp(i, j, k)
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
 
         return
       end subroutine test_filter
@@ -883,7 +955,10 @@
         integer(8) :: i, j, k
         integer(8) :: imax, jmax, kmax, l
         real(8) :: nusgsavg, nusgsmax, area
+        real(8) :: sa_l, sw_l, sa_jk(n2m, n3m), sw_jk(n2m, n3m)
         real(8) :: funcbody
+        real(8) :: nusgst
+        integer(8) :: it, jt, kt
 
         imax = 0
         jmax = 0
@@ -895,32 +970,60 @@
         end do
 !$OMP END PARALLEL DO
 
+        call body_values()
         nusgsavg = 0.
         area = 0.
-        nusgsmax = 0.
+        nusgsmax = -huge(1.0_8)
 
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:NUSGSAVG, AREA) &
-!$OMP REDUCTION(MAX:NUSGSMAX)
+!     EACH THREAD FINDS THE MAXIMUM OF ITS FLUID CELLS; THE MERGE KEEPS THE SINGLE-THREAD PICK
+!     (LARGEST VALUE, AND THE FIRST CELL IN K-J-I ORDER AMONG EQUAL VALUES); THE VALUE IS AT LEAST 0.
+!$OMP PARALLEL PRIVATE(NUSGST, IT, JT, KT)
+        nusgst = -huge(1.0_8)
+        it = 0
+        jt = 0
+        kt = 0
+!$OMP DO COLLAPSE(2) PRIVATE(SA_L, SW_L)
         do k = 1, n3m
           do j = 1, n2m
+            sa_l = 0.
+            sw_l = 0.
             do i = 1, n1m
-              if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
-                nusgsavg = nusgsavg + nusgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
-                area = area + f2fx(i) * f2fy(j) * f2fz(k)
-                if (nusgs(i, j, k) .gt. nusgsmax) then
-                  nusgsmax = nusgs(i, j, k)
-                  imax = i
-                  jmax = j
-                  kmax = k
+              if (fbody_c(i, j, k) .ge. 1.e-10) then
+                sa_l = sa_l + nusgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
+                sw_l = sw_l + f2fx(i) * f2fy(j) * f2fz(k)
+                if (nusgs(i, j, k) .gt. nusgst) then
+                  nusgst = nusgs(i, j, k)
+                  it = i
+                  jt = j
+                  kt = k
                 end if
               else
                 nusgs(i, j, k) = 0.
               end if
             end do
+            sa_jk(j, k) = sa_l
+            sw_jk(j, k) = sw_l
           end do
         end do
-!$OMP END PARALLEL DO
+!$OMP END DO
+!$OMP CRITICAL(NUT_MAX)
+        if (nusgst .gt. nusgsmax .or. (nusgst .eq. nusgsmax .and. it .gt. 0 .and. &
+            ((kt - kmax) * n2m + (jt - jmax)) * n1m + (it - imax) .lt. 0)) then
+          nusgsmax = nusgst
+          imax = it
+          jmax = jt
+          kmax = kt
+        end if
+!$OMP END CRITICAL(NUT_MAX)
+!$OMP END PARALLEL
+        nusgsmax = max(nusgsmax, 0.)
+!     LINE SUMS ADDED IN K-J ORDER (THE SAME FOR ANY THREAD COUNT)
+        do k = 1, n3m
+          do j = 1, n2m
+            nusgsavg = nusgsavg + sa_jk(j, k)
+            area = area + sw_jk(j, k)
+          end do
+        end do
 
         nusgsavg = nusgsavg / area
 
@@ -955,7 +1058,17 @@
         implicit none
         integer(8) :: i, j, k, im, jm, km
 
-        nusgs1 = 0.
+!$OMP PARALLEL DO COLLAPSE(2)
+        do k = 0, n3
+          do j = 0, n2
+            do i = 0, n1
+              nusgs1(i, j, k, 1) = 0.
+              nusgs1(i, j, k, 2) = 0.
+              nusgs1(i, j, k, 3) = 0.
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
 
         if (xprdic .eq. 1) then
 !$OMP PARALLEL DO
@@ -990,7 +1103,7 @@
 !$OMP END PARALLEL DO
         end if
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = k_bgpz, n3m
           do j = j_bgpy, n2m
             do i = 1, n1m
@@ -1001,7 +1114,7 @@
           end do
         end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = k_bgpz, n3m
           do j = 1, n2m
             do i = i_bgpx, n1m
@@ -1012,7 +1125,7 @@
           end do
         end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = j_bgpy, n2m
             do i = i_bgpx, n1m
@@ -1040,9 +1153,9 @@
                 nusgs1(1, j, k, 3) = 0.
               else
                 nusgs1(1, j, k, 2) = &
-                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(2, j, km) + f2fz(km) * nusgs(2, j, k))
+                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(1, j, km) + f2fz(km) * nusgs(1, j, k))
                 nusgs1(1, j, k, 3) = &
-                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(2, jm, k) + f2fy(jm) * nusgs(2, j, k))
+                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(1, jm, k) + f2fy(jm) * nusgs(1, j, k))
               end if
               if (bc_xtop .eq. 0) then
                 nusgs1(n1, j, k, 1) = 0.
@@ -1075,9 +1188,9 @@
                 nusgs1(i, 1, k, 3) = 0.
               else
                 nusgs1(i, 1, k, 2) = &
-                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(i, 2, km) + f2fz(km) * nusgs(i, 2, k))
+                  c2czi(k) * 0.5 * (f2fz(k) * nusgs(i, 1, km) + f2fz(km) * nusgs(i, 1, k))
                 nusgs1(i, 1, k, 3) = &
-                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, 2, k) + f2fx(im) * nusgs(i, 2, k))
+                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, 1, k) + f2fx(im) * nusgs(i, 1, k))
               end if
               if (bc_ytop .eq. 0) then
                 nusgs1(i, n2, k, 1) = 0.
@@ -1110,9 +1223,9 @@
                 nusgs1(i, j, 1, 3) = 0.
               else
                 nusgs1(i, j, 1, 2) = &
-                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(i, jm, 2) + f2fy(jm) * nusgs(i, j, 2))
+                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(i, jm, 1) + f2fy(jm) * nusgs(i, j, 1))
                 nusgs1(i, j, 1, 3) = &
-                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, j, 2) + f2fx(im) * nusgs(i, j, 2))
+                  c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, j, 1) + f2fx(im) * nusgs(i, j, 1))
               end if
               if (bc_ztop .eq. 0) then
                 nusgs1(i, j, n3, 1) = 0.
@@ -1120,7 +1233,7 @@
                 nusgs1(i, j, n3, 3) = 0.
               else
                 nusgs1(i, j, n3, 2) = &
-                  c2cyi(k) * 0.5 * (f2fy(j) * nusgs(i, jm, n3m) + f2fy(jm) * nusgs(i, j, n3m))
+                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(i, jm, n3m) + f2fy(jm) * nusgs(i, j, n3m))
                 nusgs1(i, j, n3, 3) = &
                   c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, j, n3m) + f2fx(im) * nusgs(i, j, n3m))
               end if
@@ -1145,7 +1258,7 @@
         integer(8) :: i, j, k
         real(8) :: rhsu2, rhsu3, rhsv1, rhsv3, rhsw1, rhsw2
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(RHSU2,RHSU3)
         do k = 1, n3m
           do j = 1, n2m
@@ -1162,7 +1275,7 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(RHSV1,RHSV3)
         do k = 1, n3m
           do j = j_bgpy, n2m
@@ -1179,7 +1292,7 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(RHSW1,RHSW2)
         do k = k_bgpz, n3m
           do j = 1, n2m
@@ -1266,7 +1379,7 @@
       real(8)    :: d(9),s(6)
       real(8)    :: del,sss
 
-!$OMP PARALLEL DO private(D,S,DEL,SSS)
+!$OMP PARALLEL DO COLLAPSE(2) private(D,S,DEL,SSS)
       do k=1,n3m
         do j=1,n2m
           do i=1,n1m
@@ -1314,6 +1427,7 @@
         implicit none
         integer(8) :: i, j, k
         real(8) :: ljmj_v, mjmj_v
+        real(8) :: ljmj_v_k, ljmj_v_pln(n3m), mjmj_v_k, mjmj_v_pln(n3m)
         real(8) :: del, sss, ami, volume
         real(8) :: d(9), s(6), alp(3)
 
@@ -1326,7 +1440,7 @@
         allocate (mmij(n1m, n2m, n3m, 3))
         allocate (uui(n1m, n2m, n3m, 3))
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(D,S,ALP) &
 !$OMP PRIVATE(DEL,SSS)
         do k = 1, n3m
@@ -1371,20 +1485,16 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO
         do i = 1, 3
           call test_filter(mmij(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
 
 ! TEST-FILTER STRAIN RATE (1:6) AND TEMPERATURE GRADIENT (7:9)
-!$OMP PARALLEL DO
         do i = 1, 9
           call test_filter(aalp(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(D) &
 !$OMP PRIVATE(DEL,SSS,AMI)
         do k = 1, n3m
@@ -1429,45 +1539,47 @@
         end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DO
         do i = 1, 3
           call test_filter(uui(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
         do i = 1, 3
           call test_filter(aalp(:, :, :, i), filter)
         end do
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
         do j = 1, 3
           call test_filter(llij(:, :, :, j), filter)
         end do
-!$OMP END PARALLEL DO
 
 !$OMP PARALLEL DO &
-!$OMP REDUCTION(+:LJMJ_V,MJMJ_V)
+!$OMP PRIVATE(VOLUME, LJMJ_V_K, MJMJ_V_K)
         do k = 1, n3m
+          ljmj_v_k = 0.0d0
+          mjmj_v_k = 0.0d0
           do j = 1, n2m
             do i = 1, n1m
               volume = f2fx(i) * f2fy(j) * f2fz(k)
               llij(i, j, k, 1) = llij(i, j, k, 1) - uui(i, j, k, 1) * aalp(i, j, k, 1)
               llij(i, j, k, 2) = llij(i, j, k, 2) - uui(i, j, k, 2) * aalp(i, j, k, 2)
               llij(i, j, k, 3) = llij(i, j, k, 3) - uui(i, j, k, 3) * aalp(i, j, k, 3)
-              ljmj_v = ljmj_v &
+              ljmj_v_k = ljmj_v_k &
                        + (llij(i, j, k, 1) * mmij(i, j, k, 1) &
                           + llij(i, j, k, 2) * mmij(i, j, k, 2) &
                           + llij(i, j, k, 3) * mmij(i, j, k, 3)) &
                        * float(nwall_dvm(i, j, k)) * volume
-              mjmj_v = mjmj_v &
+              mjmj_v_k = mjmj_v_k &
                        + (mmij(i, j, k, 1) * mmij(i, j, k, 1) &
                           + mmij(i, j, k, 2) * mmij(i, j, k, 2) &
                           + mmij(i, j, k, 3) * mmij(i, j, k, 3)) &
                        * float(nwall_dvm(i, j, k)) * volume
             end do
           end do
+          ljmj_v_pln(k) = ljmj_v_k
+          mjmj_v_pln(k) = mjmj_v_k
         end do
 !$OMP END PARALLEL DO
+        do k = 1, n3m
+          ljmj_v = ljmj_v + ljmj_v_pln(k)
+          mjmj_v = mjmj_v + mjmj_v_pln(k)
+        end do
 
         deallocate (aalp)
         deallocate (llij)
@@ -1476,7 +1588,7 @@
 
         csgshf = dmax1(0., -ljmj_v / mjmj_v)
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -1545,7 +1657,10 @@
         integer(8) :: i, j, k
         integer(8) :: imax, jmax, kmax, l
         real(8) :: alsgsavg, alsgsmax, area
+        real(8) :: sa_l, sw_l, sa_jk(n2m, n3m), sw_jk(n2m, n3m)
         real(8) :: funcbody
+        real(8) :: alsgst
+        integer(8) :: it, jt, kt
 
         imax = 0
         jmax = 0
@@ -1557,32 +1672,60 @@
         end do
 !$OMP END PARALLEL DO
 
+        call body_values()
         alsgsavg = 0.
         area = 0.
-        alsgsmax = 0.
+        alsgsmax = -huge(1.0_8)
 
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:ALSGSAVG, AREA) &
-!$OMP REDUCTION(MAX:ALSGSMAX)
+!     EACH THREAD FINDS THE MAXIMUM OF ITS FLUID CELLS; THE MERGE KEEPS THE SINGLE-THREAD PICK
+!     (LARGEST VALUE, AND THE FIRST CELL IN K-J-I ORDER AMONG EQUAL VALUES); THE VALUE IS AT LEAST 0.
+!$OMP PARALLEL PRIVATE(ALSGST, IT, JT, KT)
+        alsgst = -huge(1.0_8)
+        it = 0
+        jt = 0
+        kt = 0
+!$OMP DO COLLAPSE(2) PRIVATE(SA_L, SW_L)
         do k = 1, n3m
           do j = 1, n2m
+            sa_l = 0.
+            sw_l = 0.
             do i = 1, n1m
-              if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
-                alsgsavg = alsgsavg + alsgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
-                area = area + f2fx(i) * f2fy(j) * f2fz(k)
-                if (alsgs(i, j, k) .gt. alsgsmax) then
-                  alsgsmax = alsgs(i, j, k)
-                  imax = i
-                  jmax = j
-                  kmax = k
+              if (fbody_c(i, j, k) .ge. 1.e-10) then
+                sa_l = sa_l + alsgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
+                sw_l = sw_l + f2fx(i) * f2fy(j) * f2fz(k)
+                if (alsgs(i, j, k) .gt. alsgst) then
+                  alsgst = alsgs(i, j, k)
+                  it = i
+                  jt = j
+                  kt = k
                 end if
               else
                 alsgs(i, j, k) = 0.
               end if
             end do
+            sa_jk(j, k) = sa_l
+            sw_jk(j, k) = sw_l
           end do
         end do
-!$OMP END PARALLEL DO
+!$OMP END DO
+!$OMP CRITICAL(ALP_MAX)
+        if (alsgst .gt. alsgsmax .or. (alsgst .eq. alsgsmax .and. it .gt. 0 .and. &
+            ((kt - kmax) * n2m + (jt - jmax)) * n1m + (it - imax) .lt. 0)) then
+          alsgsmax = alsgst
+          imax = it
+          jmax = jt
+          kmax = kt
+        end if
+!$OMP END CRITICAL(ALP_MAX)
+!$OMP END PARALLEL
+        alsgsmax = max(alsgsmax, 0.)
+!     LINE SUMS ADDED IN K-J ORDER (THE SAME FOR ANY THREAD COUNT)
+        do k = 1, n3m
+          do j = 1, n2m
+            alsgsavg = alsgsavg + sa_jk(j, k)
+            area = area + sw_jk(j, k)
+          end do
+        end do
 
         alsgsavg = alsgsavg / area
 
@@ -1607,7 +1750,17 @@
         implicit none
         integer(8) :: i, j, k, im, jm, km
 
-        alsgs1 = 0.
+!$OMP PARALLEL DO COLLAPSE(2)
+        do k = 0, n3
+          do j = 0, n2
+            do i = 0, n1
+              alsgs1(i, j, k, 1) = 0.
+              alsgs1(i, j, k, 2) = 0.
+              alsgs1(i, j, k, 3) = 0.
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
 
         if (xprdic .eq. 1) then
 !$OMP PARALLEL DO
@@ -1642,7 +1795,7 @@
 !$OMP END PARALLEL DO
         end if
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -1653,7 +1806,7 @@
           end do
         end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -1664,7 +1817,7 @@
           end do
         end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
@@ -1692,9 +1845,9 @@
                 alsgs1(1, j, k, 3) = 0.
               else
                 alsgs1(1, j, k, 2) = &
-                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(2, j, km) + f2fz(km) * alsgs(2, j, k))
+                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(1, j, km) + f2fz(km) * alsgs(1, j, k))
                 alsgs1(1, j, k, 3) = &
-                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(2, jm, k) + f2fy(jm) * alsgs(2, j, k))
+                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(1, jm, k) + f2fy(jm) * alsgs(1, j, k))
               end if
               if (bc_xtop .eq. 0) then
                 alsgs1(n1, j, k, 1) = 0.
@@ -1727,9 +1880,9 @@
                 alsgs1(i, 1, k, 3) = 0.
               else
                 alsgs1(i, 1, k, 2) = &
-                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(i, 2, km) + f2fz(km) * alsgs(i, 2, k))
+                  c2czi(k) * 0.5 * (f2fz(k) * alsgs(i, 1, km) + f2fz(km) * alsgs(i, 1, k))
                 alsgs1(i, 1, k, 3) = &
-                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, 2, k) + f2fx(im) * alsgs(i, 2, k))
+                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, 1, k) + f2fx(im) * alsgs(i, 1, k))
               end if
               if (bc_ytop .eq. 0) then
                 alsgs1(i, n2, k, 1) = 0.
@@ -1762,9 +1915,9 @@
                 alsgs1(i, j, 1, 3) = 0.
               else
                 alsgs1(i, j, 1, 2) = &
-                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(i, jm, 2) + f2fy(jm) * alsgs(i, j, 2))
+                  c2cyi(j) * 0.5 * (f2fy(j) * alsgs(i, jm, 1) + f2fy(jm) * alsgs(i, j, 1))
                 alsgs1(i, j, 1, 3) = &
-                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, j, 2) + f2fx(im) * alsgs(i, j, 2))
+                  c2cxi(i) * 0.5 * (f2fx(i) * alsgs(im, j, 1) + f2fx(im) * alsgs(i, j, 1))
               end if
               if (bc_ztop .eq. 0) then
                 alsgs1(i, j, n3, 1) = 0.
@@ -1797,7 +1950,7 @@
         integer(8) :: i, j, k
         real(8) :: rhst1, rhst2, rhst3
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(RHST1,RHST2,RHST3)
         do k = 1, n3m
           do j = 1, n2m

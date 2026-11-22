@@ -17,6 +17,7 @@ program solver
   implicit none
 
   real(8) :: omp_get_wtime
+  integer(8) :: i, j, k
   real(8) :: time_prev
   logical :: perturb_applied
 
@@ -49,6 +50,10 @@ program solver
     call prefld()                        ! AT MISC_INIT LIBRARY
   else
     call makefld()                       ! AT MISC_INIT LIBRARY
+    ! MAKEFLD SETS THE GHOST PLANES FROM FUNCBODY; IN A PERIODIC DIRECTION THEY MUST BE COPIES OF THE
+    ! OPPOSITE INTERIOR PLANES BEFORE THE FIRST STEP
+    call prdic_adj_uvw(0)                ! AT SLV_MMTM LIBRARY
+    if (ihtrans .eq. 1) call prdic_adj_t ! AT SLV_ENGY LIBRARY
     call writefield()
   end if
 
@@ -113,8 +118,16 @@ program solver
 
       allocate (divgsum(0:n1, 0:n2, 0:n3))
       allocate (phi(0:n1, 0:n2, 0:n3))
-      divgsum = 0.0d0
-      phi = 0.0d0
+!$OMP PARALLEL DO COLLAPSE(2)
+      do k = 0, n3
+        do j = 0, n2
+          do i = 0, n1
+            divgsum(i, j, k) = 0.0d0
+            phi(i, j, k) = 0.0d0
+          end do
+        end do
+      end do
+!$OMP END PARALLEL DO
 
       poisstime_b(msub) = omp_get_wtime()
       call divgs(divgsum)              ! AT SLV_CONT LIBRARY

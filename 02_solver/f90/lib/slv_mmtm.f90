@@ -26,27 +26,37 @@
 
          ! --- Controller Variables ---
          real(8) :: flowvol, qvol_current, u_bulk_current, err_u
+         real(8) :: flowvol_k, flowvol_pln(n3m), qvol_current_k, qvol_current_pln(n3m)
          real(8), save :: err_integral = 0.0d0
          real(8) :: Kp, Ki
          real(8) :: funcbody
          real(8) :: dy1, dy2, dz1, dz2, grad_u
 
+         call body_values()
          flowvol = 0.0d0
          qvol_current = 0.0d0
          u_bulk_current = 0.0d0
 
-!$OMP PARALLEL DO REDUCTION(+:FLOWVOL, QVOL_CURRENT)
+!$OMP PARALLEL DO PRIVATE(FLOWVOL_K, QVOL_CURRENT_K)
          do k = 1, n3m
+           flowvol_k = 0.0d0
+           qvol_current_k = 0.0d0
            do j = 1, n2m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
-                 flowvol = flowvol + c2cx(i) * f2fy(j) * f2fz(k)
-                 qvol_current = qvol_current + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
+               if (fbody_u(i, j, k) .ge. 1.e-10) then
+                 flowvol_k = flowvol_k + c2cx(i) * f2fy(j) * f2fz(k)
+                 qvol_current_k = qvol_current_k + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
                end if
              end do
            end do
+           flowvol_pln(k) = flowvol_k
+           qvol_current_pln(k) = qvol_current_k
          end do
 !$OMP END PARALLEL DO
+         do k = 1, n3m
+           flowvol = flowvol + flowvol_pln(k)
+           qvol_current = qvol_current + qvol_current_pln(k)
+         end do
 
          if (flowvol .gt. 0.0d0) then
            u_bulk_current = qvol_current / flowvol
@@ -60,16 +70,14 @@
            tmp = 0.
            dy1 = 1.0d0 / c2cyi(1)
            dy2 = dy1 + 1.0d0 / c2cyi(2)
-!$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do k = 1, n3m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(1), zmp(k), time) .ge. 1.d-10) then
+               if (fbody_u(i, 1, k) .ge. 1.d-10) then
                  grad_u = (u(i, 1, k) * dy2**2 - u(i, 2, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
                  tmp = tmp + grad_u * c2cx(i) * f2fz(k) / re
                end if
              end do
            end do
-!$OMP END PARALLEL DO
            pmi(1) = pmi(1) + tmp
 
          end if
@@ -78,16 +86,14 @@
            tmp = 0.
            dy1 = 1.0d0 / c2cyi(n2)
            dy2 = dy1 + 1.0d0 / c2cyi(n2m)
-!$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do k = 1, n3m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(n2m), zmp(k), time) .ge. 1.d-10) then
+               if (fbody_u(i, n2m, k) .ge. 1.d-10) then
                  grad_u = (u(i, n2m, k) * dy2**2 - u(i, n2m-1, k) * dy1**2) / (dy1 * dy2 * (dy2 - dy1))
                  tmp = tmp + grad_u * c2cx(i) * f2fz(k) / re
                end if
              end do
            end do
-!$OMP END PARALLEL DO
            pmi(2) = pmi(2) + tmp
 
          end if
@@ -96,16 +102,14 @@
            tmp = 0.
            dz1 = 1.0d0 / c2czi(1)
            dz2 = dz1 + 1.0d0 / c2czi(2)
-!$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do j = 1, n2m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(j), zmp(1), time) .ge. 1.d-10) then
+               if (fbody_u(i, j, 1) .ge. 1.d-10) then
                  grad_u = (u(i, j, 1) * dz2**2 - u(i, j, 2) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
                  tmp = tmp + grad_u * c2cx(i) * f2fy(j) / re
                end if
              end do
            end do
-!$OMP END PARALLEL DO
            pmi(3) = pmi(3) + tmp
 
          end if
@@ -114,16 +118,14 @@
            tmp = 0.
            dz1 = 1.0d0 / c2czi(n3)
            dz2 = dz1 + 1.0d0 / c2czi(n3m)
-!$OMP PARALLEL DO PRIVATE(GRAD_U) REDUCTION(+:TMP)
            do j = 1, n2m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(j), zmp(n3m), time) .ge. 1.d-10) then
+               if (fbody_u(i, j, n3m) .ge. 1.d-10) then
                  grad_u = (u(i, j, n3m) * dz2**2 - u(i, j, n3m-1) * dz1**2) / (dz1 * dz2 * (dz2 - dz1))
                  tmp = tmp + grad_u * c2cx(i) * f2fy(j) / re
                end if
              end do
            end do
-!$OMP END PARALLEL DO
            pmi(4) = pmi(4) + tmp
 
          end if
@@ -137,12 +139,10 @@
            stop
          else
            tmp = 0.
-!$OMP PARALLEL DO REDUCTION(+:TMP)
            do n = 1, nbody(1)
              tmp = tmp + fcv(n, 1) * c2cx(ifc(n, 1)) * f2fy(jfc(n, 1)) &
                    * f2fz(kfc(n, 1))
            end do
-!$OMP END PARALLEL DO
            pmi(0) = pmi(0) + tmp
            volume = xl * yl * zl
 
@@ -202,42 +202,42 @@
            k_bgpz = 2
          end if
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO PRIVATE(IM)
          do ic = i_bgpx, n1m
            im = imv(ic)
            aiu(ic) = -c2cxi(ic) * f2fxi(im)
            ciu(ic) = -c2cxi(ic) * f2fxi(ic)
          end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO PRIVATE(IP)
          do ic = 1, n1m
            ip = ipv(ic)
            aivw(ic) = -c2cxi(ic) * f2fxi(ic)
            civw(ic) = -c2cxi(ip) * f2fxi(ic)
          end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO PRIVATE(JM)
          do jc = j_bgpy, n2m
            jm = jmv(jc)
            ajv(jc) = -c2cyi(jc) * f2fyi(jm)
            cjv(jc) = -c2cyi(jc) * f2fyi(jc)
          end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO PRIVATE(JP)
          do jc = 1, n2m
            jp = jpv(jc)
            ajuw(jc) = -c2cyi(jc) * f2fyi(jc)
            cjuw(jc) = -c2cyi(jp) * f2fyi(jc)
          end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO PRIVATE(KM)
          do kc = k_bgpz, n3m
            km = kmv(kc)
            akw(kc) = -c2czi(kc) * f2fzi(km)
            ckw(kc) = -c2czi(kc) * f2fzi(kc)
          end do
 !$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO PRIVATE(KP)
          do kc = 1, n3m
            kp = kpv(kc)
            akuv(kc) = -c2czi(kc) * f2fzi(kc)
@@ -298,19 +298,56 @@
          if (iles .eq. 1) call rhssgs    ! SUBGRID-SCALE COMPUTATIONS (LES CASE)
          call rhs
          if (ibmon .ne. 0) call rhs_ibm    ! IB METHOD COMPUTATION
-         call convbc                     ! DEFINED IN LICA_[BODYNAME, E.G. CYLINDER].F90 FILE
-         if (ich .ne. 1) call rhsincorpbc
+         ! CONVECTIVE OUTLET ONLY WITH A NON-PERIODIC X; A PERIODIC X TAKES ITS GHOSTS FROM
+         ! PRDIC_ADJ_UVW (AS RHSNLHS_T DOES FOR THE TEMPERATURE)
+         if (xprdic .eq. 0) then
+           call convbc                     ! DEFINED IN LICA_[BODYNAME, E.G. CYLINDER].F90 FILE
+           if (ich .ne. 1) call rhsincorpbc
+         end if
 
          call lhsu
          call lhsv
          if (n3m .ne. 1) call lhsw
 
          ! WHEN DO BLOWING/SUCTION RETRV_UVW SHOULD BE TURNED ON
-         call retrv_uvw
+         if (xprdic .eq. 0) call retrv_uvw
          call prdic_adj_uvw(0)
 
          return
        end
+!=======================================================================
+       subroutine body_values
+!=======================================================================
+!    funcbody at the cell centres (fbody_c) and at the u faces x(i) (fbody_u). A static geometry
+!    is evaluated once; a moving body is evaluated again at each new time.
+!-----------------------------------------------------------------------
+         use mod_common
+         implicit none
+         integer(8) :: i, j, k
+         real(8) :: funcbody
+         logical, save :: done = .false.
+         real(8), save :: tdone = 0.0d0
+
+         if (done .and. (imovingon .eq. 0 .or. time .eq. tdone)) return
+         if (.not. allocated(fbody_c)) then
+           allocate (fbody_c(1:n1m, 1:n2m, 1:n3m), fbody_u(1:n1, 1:n2m, 1:n3m))
+         end if
+!$OMP PARALLEL DO COLLAPSE(2)
+         do k = 1, n3m
+           do j = 1, n2m
+             do i = 1, n1m
+               fbody_c(i, j, k) = funcbody(xmp(i), ymp(j), zmp(k), time)
+             end do
+             do i = 1, n1
+               fbody_u(i, j, k) = funcbody(x(i), ymp(j), zmp(k), time)
+             end do
+           end do
+         end do
+         done = .true.
+         tdone = time
+
+         return
+       end subroutine body_values
 !=======================================================================
        subroutine rhs
 !=======================================================================
@@ -358,7 +395,7 @@
          end if
 
 !-----RHS1 CALCULATION FOR U MOMENTUM -----------------
-!$OMP PARALLEL DO  &
+!$OMP PARALLEL DO COLLAPSE(2)  &
 !$OMP PRIVATE(UN,US,UC,UF,VNX,VSX,WCX,WFX)   &
 !$OMP PRIVATE(ANXE,ANXW,ANXX,ANX1,ANX2,RK3X) &
 !$OMP PRIVATE(ALX1,ALX2,ALX3,ALX4,ALX5,ALX6) &
@@ -427,7 +464,7 @@
          end do
 
 !-----RHS1 CALCULATION FOR V MOMENTUM -----------------
-!$OMP PARALLEL DO  &
+!$OMP PARALLEL DO COLLAPSE(2)  &
 !$OMP PRIVATE(VE,VW,VC,VF,UEY,UWY,WCY,WFY)   &
 !$OMP PRIVATE(ANYN,ANYS,ANYY,ANY1,ANY2,RK3Y) &
 !$OMP PRIVATE(ALY1,ALY2,ALY3,ALY4,ALY5,ALY6) &
@@ -496,7 +533,7 @@
 
          if (n3m .eq. 1) goto 100
 !-----RHS1 CALCULATION FOR W MOMENTUM -----------------
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(WE,WW,WN,WS,UEZ,UWZ,VNZ,VSZ)    &
 !$OMP PRIVATE(ANZC,ANZF,ANZZ,ANZ1,ANZ2,RK3Z)  &
 !$OMP PRIVATE(ALZ1,ALZ2,ALZ3,ALZ4,ALZ5,ALZ6)  &
@@ -601,7 +638,7 @@
          wbody = 0.
          dti = 1./dt
 
-!$OMP PARALLEL DO
+!$OMP PARALLEL DO COLLAPSE(2)
          do k = 1, n3m
            do j = 1, n2m
              do i = 1, n1m
@@ -613,7 +650,7 @@
          end do
 
 !$OMP PARALLEL DO &
-!$OMP PRIVATE(II,JJ,KK,IP,JP,KP,IPP,JPP,KPP,UTARG,UBODY)
+!$OMP PRIVATE(II,JJ,KK,IP,JP,KP,IPP,JPP,KPP,UTARG) FIRSTPRIVATE(UBODY)
          do n = 1, nintp(1)
            ii = ifc(n, 1)
            jj = jfc(n, 1)
@@ -625,8 +662,8 @@
            jpp = jfc(n, 1) + intpindx(n, 1, 2) * 2
            kpp = kfc(n, 1) + intpindx(n, 1, 3) * 2
 
-           if ((ipp .ge. n1) .or. (ipp .le. 0)) call reindex_i(ip, ipp)
-           if ((kpp .ge. n3) .or. (kpp .le. 0)) call reindex_k(kp, kpp)
+           if ((xprdic .eq. 1) .and. ((ipp .ge. n1) .or. (ipp .le. 0))) call reindex_i(ip, ipp)
+           if ((zprdic .eq. 1) .and. ((kpp .ge. n3) .or. (kpp .le. 0))) call reindex_k(kp, kpp)
            ! IF (IMOVINGON.EQ.1) UBODY=UBD(X(II),YMP(JJ),ZMP(KK))
 
            utarg = geomfac(n, 1, 0, 0, 0) * ubody &
@@ -662,7 +699,7 @@
          end do
 
 !$OMP PARALLEL DO &
-!$OMP PRIVATE(II,JJ,KK,IP,JP,KP,IPP,JPP,KPP,VTARG,VBODY)
+!$OMP PRIVATE(II,JJ,KK,IP,JP,KP,IPP,JPP,KPP,VTARG) FIRSTPRIVATE(VBODY)
          do n = 1, nintp(2)
            ii = ifc(n, 2)
            jj = jfc(n, 2)
@@ -674,8 +711,8 @@
            jpp = jfc(n, 2) + intpindx(n, 2, 2) * 2
            kpp = kfc(n, 2) + intpindx(n, 2, 3) * 2
 
-           if ((ipp .ge. n1) .or. (ipp .le. 0)) call reindex_i(ip, ipp)
-           if ((kpp .ge. n3) .or. (kpp .le. 0)) call reindex_k(kp, kpp)
+           if ((xprdic .eq. 1) .and. ((ipp .ge. n1) .or. (ipp .le. 0))) call reindex_i(ip, ipp)
+           if ((zprdic .eq. 1) .and. ((kpp .ge. n3) .or. (kpp .le. 0))) call reindex_k(kp, kpp)
            ! IF (IMOVINGON.EQ.1) VBODY=VBD(XMP(II),Y(JJ),ZMP(KK))
 
            vtarg = geomfac(n, 2, 0, 0, 0) * vbody &
@@ -711,7 +748,7 @@
          end do
 
 !$OMP PARALLEL DO &
-!$OMP PRIVATE(II,JJ,KK,IP,JP,KP,IPP,JPP,KPP,WTARG,WBODY)
+!$OMP PRIVATE(II,JJ,KK,IP,JP,KP,IPP,JPP,KPP,WTARG) FIRSTPRIVATE(WBODY)
          do n = 1, nintp(3)
            ii = ifc(n, 3)
            jj = jfc(n, 3)
@@ -723,8 +760,8 @@
            jpp = jfc(n, 3) + intpindx(n, 3, 2) * 2
            kpp = kfc(n, 3) + intpindx(n, 3, 3) * 2
 
-           if ((ipp .ge. n1) .or. (ipp .le. 0)) call reindex_i(ip, ipp)
-           if ((kpp .ge. n3) .or. (kpp .le. 0)) call reindex_k(kp, kpp)
+           if ((xprdic .eq. 1) .and. ((ipp .ge. n1) .or. (ipp .le. 0))) call reindex_i(ip, ipp)
+           if ((zprdic .eq. 1) .and. ((kpp .ge. n3) .or. (kpp .le. 0))) call reindex_k(kp, kpp)
            ! IF (IMOVINGON.EQ.1) WBODY=WBD(XMP(II),YMP(JJ),Z(KK))
 
            wtarg = geomfac(n, 3, 0, 0, 0) * wbody &
@@ -769,7 +806,7 @@
 !***********************************************************************
 
 !$OMP PARALLEL DO &
-!$OMP PRIVATE(II,JJ,KK,UTARG,UBODY)
+!$OMP PRIVATE(II,JJ,KK,UTARG) FIRSTPRIVATE(UBODY)
          do n = nintp(1) + 1, nbody(1)
            ii = ifc(n, 1)
            jj = jfc(n, 1)
@@ -782,7 +819,7 @@
          end do
 
 !$OMP PARALLEL DO &
-!$OMP PRIVATE(II,JJ,KK,VTARG,VBODY)
+!$OMP PRIVATE(II,JJ,KK,VTARG) FIRSTPRIVATE(VBODY)
          do n = nintp(2) + 1, nbody(2)
            ii = ifc(n, 2)
            jj = jfc(n, 2)
@@ -795,7 +832,7 @@
          end do
 
 !$OMP PARALLEL DO &
-!$OMP PRIVATE(II,JJ,KK,WTARG,WBODY)
+!$OMP PRIVATE(II,JJ,KK,WTARG) FIRSTPRIVATE(WBODY)
          do n = nintp(3) + 1, nbody(3)
            ii = ifc(n, 3)
            jj = jfc(n, 3)
@@ -877,53 +914,68 @@
          implicit none
          integer(8) :: i, j, k
          real(8) :: qin, qout, qratio
-         real(8) :: ubar, ucoef, vwcoef
+         real(8) :: ubar, ucoef, vwcoef, afluid
+         real(8), parameter :: eps_denom = 1.0d-14
+         integer(8) :: nsolid
          real(8) :: funcbody
 
          if (ich .ne. 1) then
 
 !-----CALCULATE INFLUX
+           call body_values()
+           ! Plane sums stay serial, so the result is the same for any number of threads.
            qin = 0.
-!$OMP PARALLEL DO REDUCTION(+:QIN)
            do k = 1, n3m
              do j = 1, n2m
                qin = u(1, j, k) * f2fy(j) * f2fz(k) + qin
              end do
            end do
-!$OMP PARALLEL DO REDUCTION(+:QIN)
            do k = 1, n3m
              do i = 1, n1m
                qin = (v(i, 1, k) - v(i, n2, k)) * f2fx(i) * f2fz(k) + qin
              end do
            end do
-!$OMP PARALLEL DO REDUCTION(+:QIN)
            do j = 1, n2m
              do i = 1, n1m
                qin = (w(i, j, 1) - w(i, j, n3)) * f2fx(i) * f2fy(j) + qin
              end do
            end do
 
-!-----CALCULATE CONVECTIVE VELOCITY UC
+!-----CALCULATE CONVECTIVE VELOCITY UC (MEAN OVER THE FLUID PART OF THE OUTLET; A BODY THAT
+!     CROSSES THE OUTLET WOULD OTHERWISE LOWER IT BY THE SOLID FRACTION)
            ubar = 0.
-!$OMP PARALLEL DO REDUCTION(+:UBAR)
+           afluid = 0.
+           nsolid = 0
            do k = 1, n3m
              do j = 1, n2m
-               ubar = u(n1, j, k) * f2fy(j) * f2fz(k) + ubar
+               if (fbody_c(n1m, j, k) .gt. 1.e-10 .or. imovingon .eq. 1) then
+                 ubar = u(n1, j, k) * f2fy(j) * f2fz(k) + ubar
+                 afluid = f2fy(j) * f2fz(k) + afluid
+               else
+                 nsolid = nsolid + 1
+               end if
              end do
            end do
-           ubar = ubar / (yl * zl)
+           if (nsolid .eq. 0) then
+             ubar = ubar / (yl * zl)
+           else if (afluid .gt. eps_denom) then
+             ubar = ubar / afluid
+           else
+             ubar = 0.
+           end if
            ucoef = ubar * dtconst * f2fxi(n1m)
            vwcoef = ubar * dtconst * c2cxi(n1)
 
            qout = 0.
-!$OMP PARALLEL DO REDUCTION(+:QOUT)
            do k = 1, n3m
              do j = 1, n2m
-               if (funcbody(xmp(n1m), ymp(j), zmp(k), time) .le. 1.e-10 .and. imovingon .eq. 0) then
-                 ! SOLID PHASE: ZERO-GRADIENT (PRESERVES SOLID VELOCITY = 0)
-                 uout(j, k) = u(n1m, j, k)
-                 vout(j, k) = v(n1m, j, k)
-                 wout(j, k) = w(n1m, j, k)
+               if (fbody_c(n1m, j, k) .le. 1.e-10 .and. imovingon .eq. 0) then
+                 ! SOLID PHASE: THE GHOST TAKES THE BODY VELOCITY (ZERO), AS AT THE INLET. A ZERO GRADIENT
+                 ! WOULD COPY THE IBM VALUES OF THE FORCING POINTS NEXT TO THE FLUID, SO FLUX WOULD CROSS
+                 ! THE SOLID PART OF THE OUTLET AND THE FLUID SCALING BELOW WOULD MISS QIN.
+                 uout(j, k) = 0.
+                 vout(j, k) = 0.
+                 wout(j, k) = 0.
                else
                  ! FLUID PHASE: CONVECTIVE ADVECTION
                  uout(j, k) = u(n1, j, k) - ucoef * (u(n1, j, k) - u(n1m, j, k))
@@ -934,17 +986,19 @@
                qout = uout(j, k) * f2fy(j) * f2fz(k) + qout
              end do
            end do
-           qratio = qin / qout
+           if (dabs(qout) .gt. eps_denom) then
+             qratio = qin / qout
+           else
+             qratio = 1.0d0
+           end if
 
 !-----ADJUST BOUNDARY VELOCITY TO SATISFY GLOBAL MASS CONSERVATION
 !$OMP PARALLEL DO
            do k = 1, n3m
              do j = 1, n2m
-               ! ONLY SCALE THE FLUID PHASE BY THE MASS FLUX ERROR
-               if (funcbody(xmp(n1m), ymp(j), zmp(k), time) .gt. 1.e-10) then
+               ! ONLY SCALE THE FLUID PHASE BY THE MASS FLUX ERROR; ONLY U CARRIES FLUX THROUGH THE OUTLET
+               if (fbody_c(n1m, j, k) .gt. 1.e-10) then
                  uout(j, k) = uout(j, k) * qratio
-                 vout(j, k) = vout(j, k) * qratio
-                 wout(j, k) = wout(j, k) * qratio
                end if
                duout(j, k) = uout(j, k) - u(n1, j, k)
                dvout(j, k) = vout(j, k) - v(n1, j, k)
@@ -1056,6 +1110,7 @@
          real(8), dimension(:, :), allocatable :: ai, bi, ci, gi
          real(8), dimension(:, :), allocatable :: aj, bj, cj, gj
          real(8), dimension(:, :), allocatable :: ak, bk, ck, gk
+         integer(8) :: adi_nblk, nbl, ib, ilo, ihi, jlo, jhi
 
          cre = float(iles) * re
          cre2 = 2.*float(iles) * re
@@ -1096,48 +1151,70 @@
 
 100      continue
 
+         nbl = adi_nblk(n3m, min(n1m - i_bgpx + 1, n2m))
 !$OMP PARALLEL  &
 !$OMP PRIVATE(AJ,CJ,BJ,GJ)  &
-!$OMP PRIVATE(AI,CI,BI,GI)
+!$OMP PRIVATE(AI,CI,BI,GI,ILO,IHI,JLO,JHI)
          allocate (ai(n2, n1), bi(n2, n1), ci(n2, n1), gi(n2, n1))
          allocate (aj(n1, n2), bj(n1, n2), cj(n1, n2), gj(n1, n2))
-!$OMP DO
+!     Y AND X SWEEPS RUN OVER (PLANE, LINE BLOCK) PAIRS SO THAT EVERY THREAD HAS WORK WHEN
+!     N3M IS SMALL (N3M=1 IN 2D). RHS1 KEEPS THE Y-SWEPT FIELD FOR THE X SWEEP (AS IN Z ABOVE).
+!$OMP DO COLLAPSE(2)
          do k = 1, n3m
+           do ib = 1, nbl
+             ilo = i_bgpx + ((ib - 1) * (n1m - i_bgpx + 1)) / nbl
+             ihi = i_bgpx + (ib * (n1m - i_bgpx + 1)) / nbl - 1
 
 !-----Y-DIRECTION
-           do j = 1, n2m
-             do i = i_bgpx, n1m
-               aj(i, j) = ajuw(j) * (1.+cre * nusgs1(i, j, k, 3)) * (1.-fixjl(j) * float(jub))
-               cj(i, j) = cjuw(j) * (1.+cre * nusgs1(i, j + 1, k, 3)) * (1.-fixju(j) * float(jut))
-               bj(i, j) = acoefi - aj(i, j) - cj(i, j)
-               gj(i, j) = acoefi * rhs1(i, j, k, 1)
+             do j = 1, n2m
+               do i = ilo, ihi
+                 aj(i, j) = ajuw(j) * (1.+cre * nusgs1(i, j, k, 3)) * (1.-fixjl(j) * float(jub))
+                 cj(i, j) = cjuw(j) * (1.+cre * nusgs1(i, j + 1, k, 3)) * (1.-fixju(j) * float(jut))
+                 bj(i, j) = acoefi - aj(i, j) - cj(i, j)
+                 gj(i, j) = acoefi * rhs1(i, j, k, 1)
+               end do
+             end do
+
+             call trdiag2(aj, bj, cj, gj, gj, 1, n2m, ilo, ihi)
+
+             do j = 1, n2m
+               do i = ilo, ihi
+                 rhs1(i, j, k, 1) = gj(i, j)
+               end do
              end do
            end do
+         end do
+!$OMP END DO
 
-           call trdiag2(aj, bj, cj, gj, gj, 1, n2m, i_bgpx, n1m)
+!$OMP DO COLLAPSE(2)
+         do k = 1, n3m
+           do ib = 1, nbl
+             jlo = 1 + ((ib - 1) * n2m) / nbl
+             jhi = (ib * n2m) / nbl
 
 !-----X-DIRECTION
-           do i = i_bgpx, n1m
-             do j = 1, n2m
-               ai(j, i) = aiu(i) * (1.+cre2 * nusgs(i - 1, j, k))
-               ci(j, i) = ciu(i) * (1.+cre2 * nusgs(i, j, k))
-               bi(j, i) = acoefi - ai(j, i) - ci(j, i)
-               gi(j, i) = acoefi * gj(i, j)
-             end do
-           end do
-
-           if (xprdic .eq. 0) then
-             call trdiag1(ai, bi, ci, gi, gi, i_bgpx, n1m, 1, n2m)
-           else if (xprdic .eq. 1) then
-             call trdiag1p(ai, bi, ci, gi, i_bgpx, n1m, 1, n2m)
-           end if
-
-           do j = 1, n2m
              do i = i_bgpx, n1m
-               u(i, j, k) = gi(j, i) + u(i, j, k)
+               do j = jlo, jhi
+                 ai(j, i) = aiu(i) * (1.+cre2 * nusgs(i - 1, j, k))
+                 ci(j, i) = ciu(i) * (1.+cre2 * nusgs(i, j, k))
+                 bi(j, i) = acoefi - ai(j, i) - ci(j, i)
+                 gi(j, i) = acoefi * rhs1(i, j, k, 1)
+               end do
              end do
-           end do
 
+             if (xprdic .eq. 0) then
+               call trdiag1(ai, bi, ci, gi, gi, i_bgpx, n1m, jlo, jhi)
+             else if (xprdic .eq. 1) then
+               call trdiag1p(ai, bi, ci, gi, i_bgpx, n1m, jlo, jhi)
+             end if
+
+             do j = jlo, jhi
+               do i = i_bgpx, n1m
+                 u(i, j, k) = gi(j, i) + u(i, j, k)
+               end do
+             end do
+
+           end do
          end do
 !$OMP END DO
          deallocate (ai, bi, ci, gi)
@@ -1163,6 +1240,7 @@
          real(8), dimension(:, :), allocatable :: ai, bi, ci, gi
          real(8), dimension(:, :), allocatable :: aj, bj, cj, gj
          real(8), dimension(:, :), allocatable :: ak, bk, ck, gk
+         integer(8) :: adi_nblk, nbl, ib, ilo, ihi, jlo, jhi
 
          cre = float(iles) * re
          cre2 = 2.*float(iles) * re
@@ -1204,48 +1282,69 @@
 
 100      continue
 
+         nbl = adi_nblk(n3m, min(n1m, n2m - 1))
 !$OMP PARALLEL &
 !$OMP PRIVATE(AJ,CJ,BJ,GJ) &
-!$OMP PRIVATE(AI,CI,BI,GI)
+!$OMP PRIVATE(AI,CI,BI,GI,ILO,IHI,JLO,JHI)
          allocate (ai(n2, n1), bi(n2, n1), ci(n2, n1), gi(n2, n1))
          allocate (aj(n1, n2), bj(n1, n2), cj(n1, n2), gj(n1, n2))
-!$OMP DO
+!     Y AND X SWEEPS OVER (PLANE, LINE BLOCK) PAIRS, SEE LHSU.
+!$OMP DO COLLAPSE(2)
          do k = 1, n3m
+           do ib = 1, nbl
+             ilo = 1 + ((ib - 1) * n1m) / nbl
+             ihi = (ib * n1m) / nbl
 
 !-----Y-DIRECTION
-           do j = 2, n2m
-             do i = 1, n1m
-               aj(i, j) = ajv(j) * (1.+cre2 * nusgs(i, j - 1, k))
-               cj(i, j) = cjv(j) * (1.+cre2 * nusgs(i, j, k))
-               bj(i, j) = acoefi - aj(i, j) - cj(i, j)
-               gj(i, j) = acoefi * rhs1(i, j, k, 2)
+             do j = 2, n2m
+               do i = ilo, ihi
+                 aj(i, j) = ajv(j) * (1.+cre2 * nusgs(i, j - 1, k))
+                 cj(i, j) = cjv(j) * (1.+cre2 * nusgs(i, j, k))
+                 bj(i, j) = acoefi - aj(i, j) - cj(i, j)
+                 gj(i, j) = acoefi * rhs1(i, j, k, 2)
+               end do
+             end do
+
+             call trdiag2(aj, bj, cj, gj, gj, 2, n2m, ilo, ihi)
+
+             do j = 2, n2m
+               do i = ilo, ihi
+                 rhs1(i, j, k, 2) = gj(i, j)
+               end do
              end do
            end do
+         end do
+!$OMP END DO
 
-           call trdiag2(aj, bj, cj, gj, gj, 2, n2m, 1, n1m)
+!$OMP DO COLLAPSE(2)
+         do k = 1, n3m
+           do ib = 1, nbl
+             jlo = 2 + ((ib - 1) * (n2m - 1)) / nbl
+             jhi = 2 + (ib * (n2m - 1)) / nbl - 1
 
 !-----X-DIRECTION
-           do i = 1, n1m
-             do j = 2, n2m
-               ai(j, i) = aivw(i) * (1.+cre * nusgs1(i, j, k, 3))
-               ci(j, i) = civw(i) * (1.+cre * nusgs1(i + 1, j, k, 3))
-               bi(j, i) = acoefi - ai(j, i) - ci(j, i)
-               gi(j, i) = acoefi * gj(i, j)
-             end do
-           end do
-
-           if (xprdic .eq. 0) then
-             call trdiag1(ai, bi, ci, gi, gi, 1, n1m, 2, n2m)
-           else if (xprdic .eq. 1) then
-             call trdiag1p(ai, bi, ci, gi, 1, n1m, 2, n2m)
-           end if
-
-           do j = 2, n2m
              do i = 1, n1m
-               v(i, j, k) = gi(j, i) + v(i, j, k)
+               do j = jlo, jhi
+                 ai(j, i) = aivw(i) * (1.+cre * nusgs1(i, j, k, 3))
+                 ci(j, i) = civw(i) * (1.+cre * nusgs1(i + 1, j, k, 3))
+                 bi(j, i) = acoefi - ai(j, i) - ci(j, i)
+                 gi(j, i) = acoefi * rhs1(i, j, k, 2)
+               end do
              end do
-           end do
 
+             if (xprdic .eq. 0) then
+               call trdiag1(ai, bi, ci, gi, gi, 1, n1m, jlo, jhi)
+             else if (xprdic .eq. 1) then
+               call trdiag1p(ai, bi, ci, gi, 1, n1m, jlo, jhi)
+             end if
+
+             do j = jlo, jhi
+               do i = 1, n1m
+                 v(i, j, k) = gi(j, i) + v(i, j, k)
+               end do
+             end do
+
+           end do
          end do
 !$OMP END DO
          deallocate (ai, bi, ci, gi)
@@ -1271,6 +1370,7 @@
          real(8), dimension(:, :), allocatable :: ai, bi, ci, gi
          real(8), dimension(:, :), allocatable :: aj, bj, cj, gj
          real(8), dimension(:, :), allocatable :: ak, bk, ck, gk
+         integer(8) :: adi_nblk, nbl, ib, ilo, ihi, jlo, jhi
 
          cre = float(iles) * re
          cre2 = 2.*float(iles) * re
@@ -1310,48 +1410,69 @@
          deallocate (ak, bk, ck, gk)
 !$OMP END PARALLEL
 
+         nbl = adi_nblk(n3m - k_bgpz + 1, min(n1m, n2m))
 !$OMP PARALLEL  &
 !$OMP PRIVATE(AJ,CJ,BJ,GJ)  &
-!$OMP PRIVATE(AI,CI,BI,GI)
+!$OMP PRIVATE(AI,CI,BI,GI,ILO,IHI,JLO,JHI)
          allocate (ai(n2, n1), bi(n2, n1), ci(n2, n1), gi(n2, n1))
          allocate (aj(n1, n2), bj(n1, n2), cj(n1, n2), gj(n1, n2))
-!$OMP DO
+!     Y AND X SWEEPS OVER (PLANE, LINE BLOCK) PAIRS, SEE LHSU.
+!$OMP DO COLLAPSE(2)
          do k = k_bgpz, n3m
+           do ib = 1, nbl
+             ilo = 1 + ((ib - 1) * n1m) / nbl
+             ihi = (ib * n1m) / nbl
 
 !-----Y-DIRECTION
-           do j = 1, n2m
-             do i = 1, n1m
-               aj(i, j) = ajuw(j) * (1.+cre * nusgs1(i, j, k, 1)) * (1.-fixjl(j) * float(jwb))
-               cj(i, j) = cjuw(j) * (1.+cre * nusgs1(i, j + 1, k, 1)) * (1.-fixju(j) * float(jwt))
-               bj(i, j) = acoefi - aj(i, j) - cj(i, j)
-               gj(i, j) = acoefi * rhs1(i, j, k, 3)
+             do j = 1, n2m
+               do i = ilo, ihi
+                 aj(i, j) = ajuw(j) * (1.+cre * nusgs1(i, j, k, 1)) * (1.-fixjl(j) * float(jwb))
+                 cj(i, j) = cjuw(j) * (1.+cre * nusgs1(i, j + 1, k, 1)) * (1.-fixju(j) * float(jwt))
+                 bj(i, j) = acoefi - aj(i, j) - cj(i, j)
+                 gj(i, j) = acoefi * rhs1(i, j, k, 3)
+               end do
+             end do
+
+             call trdiag2(aj, bj, cj, gj, gj, 1, n2m, ilo, ihi)
+
+             do j = 1, n2m
+               do i = ilo, ihi
+                 rhs1(i, j, k, 3) = gj(i, j)
+               end do
              end do
            end do
+         end do
+!$OMP END DO
 
-           call trdiag2(aj, bj, cj, gj, gj, 1, n2m, 1, n1m)
+!$OMP DO COLLAPSE(2)
+         do k = k_bgpz, n3m
+           do ib = 1, nbl
+             jlo = 1 + ((ib - 1) * n2m) / nbl
+             jhi = (ib * n2m) / nbl
 
 !-----X-DIRECTION
-           do i = 1, n1m
-             do j = 1, n2m
-               ai(j, i) = aivw(i) * (1.+cre * nusgs1(i, j, k, 2))
-               ci(j, i) = civw(i) * (1.+cre * nusgs1(i + 1, j, k, 2))
-               bi(j, i) = acoefi - ai(j, i) - ci(j, i)
-               gi(j, i) = acoefi * gj(i, j)
-             end do
-           end do
-
-           if (xprdic .eq. 0) then
-             call trdiag1(ai, bi, ci, gi, gi, 1, n1m, 1, n2m)
-           else if (xprdic .eq. 1) then
-             call trdiag1p(ai, bi, ci, gi, 1, n1m, 1, n2m)
-           end if
-
-           do j = 1, n2m
              do i = 1, n1m
-               w(i, j, k) = gi(j, i) + w(i, j, k)
+               do j = jlo, jhi
+                 ai(j, i) = aivw(i) * (1.+cre * nusgs1(i, j, k, 2))
+                 ci(j, i) = civw(i) * (1.+cre * nusgs1(i + 1, j, k, 2))
+                 bi(j, i) = acoefi - ai(j, i) - ci(j, i)
+                 gi(j, i) = acoefi * rhs1(i, j, k, 3)
+               end do
              end do
-           end do
 
+             if (xprdic .eq. 0) then
+               call trdiag1(ai, bi, ci, gi, gi, 1, n1m, jlo, jhi)
+             else if (xprdic .eq. 1) then
+               call trdiag1p(ai, bi, ci, gi, 1, n1m, jlo, jhi)
+             end if
+
+             do j = jlo, jhi
+               do i = 1, n1m
+                 w(i, j, k) = gi(j, i) + w(i, j, k)
+               end do
+             end do
+
+           end do
          end do
 !$OMP END DO
          deallocate (ai, bi, ci, gi)
@@ -1361,6 +1482,22 @@
          return
        end
 
+!=======================================================================
+       integer(8) function adi_nblk(nk, nl)
+!=======================================================================
+!     NUMBER OF LINE BLOCKS PER PLANE FOR THE Y AND X SWEEPS OF LHSU, LHSV, LHSW AND LHS_T.
+!     NK PLANES x NBLK BLOCKS COVER ALL THREADS; A BLOCK KEEPS AT LEAST 16 OF THE NL LINES.
+!     NK >= THREADS GIVES ONE BLOCK (THE WHOLE PLANE, AS BEFORE).
+!-----------------------------------------------------------------------
+!$       use omp_lib
+         implicit none
+         integer(8) :: nk, nl
+
+         adi_nblk = 1
+!$       adi_nblk = max(1_8, min(nl / 16, (int(omp_get_max_threads(), 8) + nk - 1) / nk))
+
+         return
+       end function adi_nblk
 !=======================================================================
        subroutine trdiag1(a, b, c, r, uu, l1, l2, ll1, ll2)
 !=======================================================================

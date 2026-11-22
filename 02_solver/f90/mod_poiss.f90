@@ -1,6 +1,8 @@
 module mod_poiss
 !======================= PARAMETERS ==================================
   integer(8), parameter :: mlev = 20
+! MG_PAR_MIN: SMALLEST LEVEL (ROWS x N2M POINTS) WHOSE SWEEPS ARE SHARED BY ALL THREADS
+  integer(8), parameter :: mg_par_min = 16384
 
   real(8), dimension(:), allocatable :: aw, ae, as, an, ab, af
   real(8), dimension(:), allocatable :: fidw, fkdw, fiup, fkup
@@ -11,6 +13,10 @@ module mod_poiss
   integer(8) :: levhalf
   integer(8), dimension(:), allocatable :: ipm, imm, kpm, kmm
   real(8), dimension(:, :, :), allocatable :: ac, gam, bet
+  real(8), dimension(:, :), allocatable :: qfx, qfxt, qfz, qfzt
+  real(8), dimension(:), allocatable :: lfx, lfz, sfx, sfz
+  real(8), dimension(:, :, :), allocatable :: fda, fdb, fdc
+  integer(8) :: kfx0, kfz0
 
 ! MLEV: MAXIMUM LEVEL OF MULTIGRID
 ! AW,AE,AS,AN,AB,AF: COEEFICIENT FOR THE ITERATIVE METHOD (AX=B)
@@ -22,8 +28,31 @@ module mod_poiss
 ! AK3,AI3,AK1,AI1: MODIFIED WAVENUMBER
 ! IPM,IMM,KPM,KMM: PLUS-MINUS INDEX OF X & Z DIECTION FOR CONSIDERING PERIODICITY
 ! AC,GAM,BET: COEFICIENT FOR THE SOLVER OF TRIDIGONAL MATRIX
+! QFX,QFZ,LFX,LFZ: EIGENVECTORS AND EIGENVALUES OF THE X AND Z OPERATORS (POISS_FD)
+! SFX,SFZ: SQRT OF THE CELL WIDTHS; FDA,FDB,FDC: WORK FIELDS; KFX0,KFZ0: ZERO MODES (POISS_FD)
 
 contains
+!=======================================================================
+  subroutine fd_allo
+!=======================================================================
+    use mod_common
+    implicit none
+
+    allocate (as(n2m), an(n2m))
+    allocate (qfx(n1m, n1m), qfxt(n1m, n1m), lfx(n1m), sfx(n1m))
+    allocate (qfz(n3m, n3m), qfzt(n3m, n3m), lfz(n3m), sfz(n3m))
+    allocate (fda(n1m, n2m, n3m), fdb(n1m, n2m, n3m), fdc(n1m, n2m, n3m))
+
+    as = 0.
+    an = 0.
+!$OMP PARALLEL WORKSHARE
+    fda = 0.
+    fdb = 0.
+    fdc = 0.
+!$OMP END PARALLEL WORKSHARE
+
+    return
+  end subroutine fd_allo
 !=======================================================================
   subroutine x_ft_allo
 !=======================================================================

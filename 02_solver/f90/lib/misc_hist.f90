@@ -88,7 +88,11 @@
          real(8) :: ubulk_inst, cmfravg(3), funcbody, flowvol, qvol_u
          real(8) :: tbulk_flu_inst, tbulk_sol_inst, tbulkavg(2)
          real(8) :: tflu_vol, tsol_vol, tflu_int, tsol_int, cellvol
+         ! per-plane partial sums, added in plane order (the same for any thread count)
+         real(8) :: qv_k, fv_k, qv_pln(n3m), fv_pln(n3m)
+         real(8) :: s1_k, s2_k, s3_k, s4_k, s1_pln(n3m), s2_pln(n3m), s3_pln(n3m), s4_pln(n3m)
 
+         call body_values()
          qflux = 0.
          flowvol = 0.0d0
          qvol_u = 0.0d0
@@ -96,17 +100,25 @@
          tbulk_sol_inst = 0.0d0
          tbulkavg = 0.0d0
 
-!$OMP PARALLEL DO &
-!$OMP REDUCTION(+:QVOL_U,FLOWVOL)
+!$OMP PARALLEL DO PRIVATE(QV_K, FV_K)
          do k = 1, n3m
+           qv_k = 0.0d0
+           fv_k = 0.0d0
            do j = 1, n2m
              do i = 1, n1m
-               if (funcbody(x(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
-                 qvol_u = qvol_u + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
-                 flowvol = flowvol + c2cx(i) * f2fy(j) * f2fz(k)
+               if (fbody_u(i, j, k) .ge. 1.e-10) then
+                 qv_k = qv_k + u(i, j, k) * c2cx(i) * f2fy(j) * f2fz(k)
+                 fv_k = fv_k + c2cx(i) * f2fy(j) * f2fz(k)
                end if
              end do
            end do
+           qv_pln(k) = qv_k
+           fv_pln(k) = fv_k
+         end do
+!$OMP END PARALLEL DO
+         do k = 1, n3m
+           qvol_u = qvol_u + qv_pln(k)
+           flowvol = flowvol + fv_pln(k)
          end do
 
          qflux = qvol_u / xl
@@ -143,21 +155,35 @@
            tflu_int = 0.0d0
            tsol_int = 0.0d0
 
-!$OMP PARALLEL DO &
-!$OMP PRIVATE(CELLVOL) REDUCTION(+:TFLU_VOL,TSOL_VOL,TFLU_INT,TSOL_INT)
+!$OMP PARALLEL DO PRIVATE(CELLVOL, S1_K, S2_K, S3_K, S4_K)
            do k = 1, n3m
+             s1_k = 0.0d0
+             s2_k = 0.0d0
+             s3_k = 0.0d0
+             s4_k = 0.0d0
              do j = 1, n2m
                do i = 1, n1m
                  cellvol = c2cx(i) * f2fy(j) * f2fz(k)
-                 if (funcbody(xmp(i), ymp(j), zmp(k), time) .ge. 1.e-10) then
-                   tflu_vol = tflu_vol + cellvol
-                   tflu_int = tflu_int + t(i, j, k) * cellvol
+                 if (fbody_c(i, j, k) .ge. 1.e-10) then
+                   s1_k = s1_k + cellvol
+                   s3_k = s3_k + t(i, j, k) * cellvol
                  else
-                   tsol_vol = tsol_vol + cellvol
-                   tsol_int = tsol_int + t(i, j, k) * cellvol
+                   s2_k = s2_k + cellvol
+                   s4_k = s4_k + t(i, j, k) * cellvol
                  end if
                end do
              end do
+             s1_pln(k) = s1_k
+             s2_pln(k) = s2_k
+             s3_pln(k) = s3_k
+             s4_pln(k) = s4_k
+           end do
+!$OMP END PARALLEL DO
+           do k = 1, n3m
+             tflu_vol = tflu_vol + s1_pln(k)
+             tsol_vol = tsol_vol + s2_pln(k)
+             tflu_int = tflu_int + s3_pln(k)
+             tsol_int = tsol_int + s4_pln(k)
            end do
 
            if (tflu_vol .gt. 0.0d0) tbulk_flu_inst = tflu_int / tflu_vol
@@ -342,7 +368,7 @@
            ssavg = 0.
          end if
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(UCC,VCC,WCC)
          do k = 1, n3m
            do j = 1, n2m
@@ -369,7 +395,7 @@
            end do
          end do
 
-!$OMP PARALLEL DO &
+!$OMP PARALLEL DO COLLAPSE(2) &
 !$OMP PRIVATE(VG11,VG12,VG13,VG21,VG22,VG23,VG31,VG32,VG33) &
 !$OMP PRIVATE(UP,UM,VP,VM,WP,WM,SR,SRSR) &
 !$OMP PRIVATE(WX,WY,WZ)

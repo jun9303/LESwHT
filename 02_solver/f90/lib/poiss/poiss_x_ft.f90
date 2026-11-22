@@ -21,6 +21,16 @@
         use mod_poiss
         implicit none
         integer(8) :: i, j, k, ilev
+        integer(8) :: nlev0
+
+!     A NON-PERIODIC Z NEEDS AT LEAST TWO CELLS ON THE COARSEST MULTIGRID LEVEL: WITH ONE, THE MODE-1
+!     Y LINE THERE HAS NO Z COUPLING AND IS SINGULAR (DIVISION BY ZERO BELOW). USE FEWER LEVELS.
+        nlev0 = nlev
+        do while (nlev .gt. 1 .and. zprdic .ne. 1 .and. n3m / (2**nlev) .lt. 2)
+          nlev = nlev - 1
+        end do
+        if (nlev .ne. nlev0) write (*, '(A,I3,A,I3,A)') ' POISINIT: NLEV', nlev0, ' ->', nlev, &
+          ' (AT LEAST TWO CELLS ON THE COARSEST LEVEL)'
 
         call x_ft_allo
 
@@ -157,10 +167,29 @@
 ! --- SOLVE A SET OF POISSON EQS.
         test = test1 / float(n1mh) * float(n1m) * 0.9_8
 
+! --- MODE 1 TAKES THE MOST CYCLES: SOLVE IT FIRST WITH ALL THREADS ON ITS LINES,
+!     THEN SHARE OUT THE OTHER MODES ONE BY ONE
+        allocate (cp(0:n3, 0:n2))
+        cp = 0.0_8
+        call rhsmean0(ccap(1, 1, 1))
+        if (1 <= imgsor) then
+          call mg2d(cp, ccap(1, 1, 1), 1_8, test, 0.0_8)
+        else
+          call gsor2d(cp, ccap(1, 1, 1), 1_8, test, 0.0_8)
+        end if
+!$OMP PARALLEL DO
+        do j = 1, n2m
+          do k = 1, n3m
+            ccap(k, j, 1) = cp(k, j)
+          end do
+        end do
+!$OMP END PARALLEL DO
+        deallocate (cp)
+
 !$OMP PARALLEL PRIVATE(CP)
         allocate (cp(0:n3, 0:n2))
-!$OMP DO
-        do iii = 1, n1mh
+!$OMP DO SCHEDULE(DYNAMIC)
+        do iii = 2, n1mh
           cp = 0.0_8
 
           if (iii <= imgsor) then
@@ -215,7 +244,6 @@
         if (ich == 1) then
 !     SET THE AVERAGE PHI AT THE UPPER WALL TO BE ZERO.
           phiref = 0.0_8
-!$OMP PARALLEL DO REDUCTION(+:PHIREF)
           do i = 1, n1m
             phiref = phiref + phi(i, n2m, 1) * f2fx(i)
           end do
@@ -233,6 +261,59 @@
 
         return
       end subroutine poisson
+!=======================================================================
+      subroutine rhsmean0(rhs)
+!=======================================================================
+!     MODE 1 IS A NEUMANN PROBLEM: ITS RIGHT-HAND SIDE MUST HAVE ZERO MEAN (WEIGHTED BY THE CELL AREAS
+!     F2FZ * F2FY), OR NO SOLUTION EXISTS AND THE MULTIGRID STALLS AT MGITR. A MEAN ABOVE ROUND-OFF
+!     (1E-10 OF THE WEIGHTED MEAN |RHS|) IS SUBTRACTED; AT ROUND-OFF THE RIGHT-HAND SIDE IS LEFT AS IT IS.
+!     ROW SUMS IN PARALLEL, ADDED IN ROW ORDER (THE SAME FOR ANY THREAD COUNT).
+        use mod_common
+        implicit none
+        complex(8) :: rhs(n3, n2)
+        integer(8) :: k, j
+        real(8) :: sw, swr, swa
+        real(8) :: sw_j(n2m), swr_j(n2m), swa_j(n2m)
+        logical, save :: said = .false.
+
+!$OMP PARALLEL DO PRIVATE(K)
+        do j = 1, n2m
+          sw_j(j) = 0.0_8
+          swr_j(j) = 0.0_8
+          swa_j(j) = 0.0_8
+          do k = 1, n3m
+            sw_j(j) = sw_j(j) + f2fz(k) * f2fy(j)
+            swr_j(j) = swr_j(j) + f2fz(k) * f2fy(j) * real(rhs(k, j), 8)
+            swa_j(j) = swa_j(j) + f2fz(k) * f2fy(j) * abs(rhs(k, j))
+          end do
+        end do
+!$OMP END PARALLEL DO
+        sw = 0.0_8
+        swr = 0.0_8
+        swa = 0.0_8
+        do j = 1, n2m
+          sw = sw + sw_j(j)
+          swr = swr + swr_j(j)
+          swa = swa + swa_j(j)
+        end do
+        if (abs(swr) .le. 1.0e-10_8 * swa) return
+
+        swr = swr / sw
+!$OMP PARALLEL DO PRIVATE(K)
+        do j = 1, n2m
+          do k = 1, n3m
+            rhs(k, j) = rhs(k, j) - swr
+          end do
+        end do
+!$OMP END PARALLEL DO
+        if (.not. said) then
+          write (*, '(A,ES11.3,A)') ' POISSON: MODE-1 RIGHT-HAND SIDE MEAN', swr, &
+            ' SUBTRACTED (ALSO IN LATER SOLVES WHEN ABOVE ROUND-OFF)'
+          said = .true.
+        end if
+
+        return
+      end subroutine rhsmean0
 
 !=======================================================================
       subroutine mg2d(pc, rhs, iv, test, oldv)
@@ -251,15 +332,21 @@
 !-----------------------------------------------------------------------
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: k, j, iv, ii, ilev
         real(8) :: test, sumres, oldv
         complex(8) :: pc(0:n3, 0:n2), rhs(n3, n2)
         complex(8) :: resd(n3md, n2m), ggii(0:n3md, 0:n2)
+        logical :: par
 
+        par = .false.
         ii = 0
+!$      par = .not. omp_in_parallel()
+!$OMP PARALLEL WORKSHARE IF(par)
         resd = 0.0_8
         ggii = 0.0_8
+!$OMP END PARALLEL WORKSHARE
 
         call toplevel(0_8, pc, rhs, sumres, oldv, test, iv, resd, ggii)
         if (sumres < test) goto 2000
@@ -297,6 +384,7 @@
 !=======================================================================
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: k, j, kc
         integer(8) :: id, iv
@@ -304,12 +392,17 @@
         complex(8) :: tt
         complex(8) :: pc(0:n3, 0:n2), rhs(n3, n2)
         complex(8) :: resd(n3md, n2m), ggii(0:n3md, 0:n2)
+        logical :: par
+
+        par = .false.
+!$      par = (.not. omp_in_parallel()) .and. (n3m * n2m .ge. mg_par_min)
 
         if (id == 1) then
 !         INTERPOLATE & ADD
           kc = 0
+!$OMP PARALLEL DO PRIVATE(J, KC) IF(par)
           do k = kkmg(nlev - 1, 1), kkmg(nlev - 1, 2)
-            kc = kc + 2
+            kc = 2 * (k - kkmg(nlev - 1, 1) + 1)
             do j = 1, n2m
               pc(kc, j) = pc(kc, j) + coi1(k) * ggii(k, j) + coi2(k) * ggii(kpm(k), j)
             end do
@@ -317,6 +410,7 @@
         end if
 
 !  RELAX
+!$OMP PARALLEL DO PRIVATE(K) IF(par)
         do j = 1, n2m
           do k = 1, n3m, 2
             ggii(k, j) = rhs(k, j) - oldv * (ab(k) * pc(kmm(k), j) + af(k) * pc(kpm(k), j))
@@ -327,6 +421,7 @@
 
         if (iv == 1) then
           tt = ggii(1, n2m)
+!$OMP PARALLEL DO PRIVATE(K) IF(par)
           do j = 1, n2m
             do k = 1, n3m, 2
               ggii(k, j) = ggii(k, j) - tt
@@ -334,6 +429,7 @@
           end do
         end if
 
+!$OMP PARALLEL DO PRIVATE(K) IF(par)
         do j = 1, n2m
           do k = 2, n3m, 2
             ggii(k, j) = rhs(k, j) - (ab(k) * ggii(kmm(k), j) + af(k) * (ggii(kpm(k), j)))
@@ -345,6 +441,7 @@
 !  CALCULATE RESIDUAL
         sumres = 0.0_8
 
+!$OMP PARALLEL DO PRIVATE(K) REDUCTION(MAX:SUMRES) IF(par)
         do j = 1, n2m
           do k = 1, n3m
             resd(k, j) = rhs(k, j) - ab(k) * ggii(kmm(k), j) - af(k) * ggii(kpm(k), j) &
@@ -360,8 +457,9 @@
 
 !  RESTRICT
         kc = -1
+!$OMP PARALLEL DO PRIVATE(J, KC) IF(par)
         do k = kkmg(nlev - 1, 1), kkmg(nlev - 1, 2)
-          kc = kc + 2
+          kc = 2 * (k - kkmg(nlev - 1, 1)) + 1
           do j = 1, n2m
             resd(k, j) = resd(kc, j) * cor1(k) + resd(kc + 1, j) * cor2(k)
           end do
@@ -374,25 +472,42 @@
 !=======================================================================
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: k, j, l1, l2, ll1, ll2, iv
         complex(8) :: rr(0:n3md, 0:n2), uu(0:n3md, 0:n2)
+        integer(8) :: nl, nb, ib, k1, k2
 
-        do k = l1, l2, 2
-          uu(k, ll1) = rr(k, ll1) * bet(k, 1, iv)
-        end do
+!     LINES L1, L1+2, ..., L2 ARE INDEPENDENT: SPLIT THEM INTO NB BLOCKS (>= 16 LINES EACH)
+        if (l2 < l1) return
+        nl = (l2 - l1) / 2 + 1
+        nb = 1
+!$      if ((.not. omp_in_parallel()) .and. (nl * (ll2 - ll1 + 1) .ge. mg_par_min)) &
+!$        nb = max(1_8, min(nl / 16, int(omp_get_max_threads(), 8)))
 
-        do j = ll1 + 1, ll2
-          do k = l1, l2, 2
-            uu(k, j) = (rr(k, j) - as(j) * uu(k, j - 1)) * bet(k, j, iv)
+!$OMP PARALLEL DO PRIVATE(K, J, K1, K2) IF(nb .gt. 1)
+        do ib = 1, nb
+          k1 = l1 + 2 * (((ib - 1) * nl) / nb)
+          k2 = l1 + 2 * ((ib * nl) / nb - 1)
+
+          do k = k1, k2, 2
+            uu(k, ll1) = rr(k, ll1) * bet(k, 1, iv)
           end do
-        end do
 
-        do j = ll2 - 1, ll1, -1
-          do k = l1, l2, 2
-            uu(k, j) = uu(k, j) - gam(k, j + 1, iv) * uu(k, j + 1)
+          do j = ll1 + 1, ll2
+            do k = k1, k2, 2
+              uu(k, j) = (rr(k, j) - as(j) * uu(k, j - 1)) * bet(k, j, iv)
+            end do
           end do
+
+          do j = ll2 - 1, ll1, -1
+            do k = k1, k2, 2
+              uu(k, j) = uu(k, j) - gam(k, j + 1, iv) * uu(k, j + 1)
+            end do
+          end do
+
         end do
+!$OMP END PARALLEL DO
 
         return
       end subroutine trdiag1m
@@ -402,14 +517,20 @@
 !=======================================================================
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: k, j, ilev, kbgh
         complex(8) :: resd(n3md, n2m), ggii(0:n3md, 0:n2)
+        logical :: par
+
+        par = .false.
+!$      par = (.not. omp_in_parallel()) .and. (kkmg(ilev + 1, 3) * n2m .ge. mg_par_min)
 
         kbgh = kkmg(ilev + 1, 1) - 1
 
+!$OMP PARALLEL DO PRIVATE(J, KBGH) IF(par)
         do k = kkmg(ilev, 1), kkmg(ilev, 2)
-          kbgh = kbgh + 2
+          kbgh = kkmg(ilev + 1, 1) - 1 + 2 * (k - kkmg(ilev, 1) + 1)
           do j = 1, n2m
             ggii(kbgh, j) = ggii(kbgh, j) + coi1(k) * ggii(k, j) + coi2(k) * ggii(kpm(k), j)
           end do
@@ -423,10 +544,16 @@
 !=======================================================================
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: k, j, ilev, iv, kbg
         complex(8) :: resd(n3md, n2m), ggii(0:n3md, 0:n2)
+        logical :: par
 
+        par = .false.
+!$      par = (.not. omp_in_parallel()) .and. (kkmg(ilev, 3) * n2m .ge. mg_par_min)
+
+!$OMP PARALLEL DO PRIVATE(K) IF(par)
         do j = 1, n2m
           do k = kkmg(ilev, 1), kkmg(ilev, 2)
             resd(k, j) = resd(k, j) - ab(k) * ggii(kmm(k), j) - af(k) * ggii(kpm(k), j) &
@@ -436,8 +563,9 @@
 
         kbg = kkmg(ilev, 1) - 2
 
+!$OMP PARALLEL DO PRIVATE(J, KBG) IF(par)
         do k = kkmg(ilev - 1, 1), kkmg(ilev - 1, 2)
-          kbg = kbg + 2
+          kbg = kkmg(ilev, 1) - 2 + 2 * (k - kkmg(ilev - 1, 1) + 1)
           do j = 1, n2m
             resd(k, j) = resd(kbg, j) * cor1(k) + resd(kbg + 1, j) * cor2(k)
           end do
@@ -451,11 +579,17 @@
 !=======================================================================
         use mod_common
         use mod_poiss
+!$      use omp_lib
         implicit none
         integer(8) :: k, j, ilev, iiter, iv, kk
         complex(8) :: resd(n3md, n2m), ggii(0:n3md, 0:n2)
         real(8) :: oldv
+        logical :: par
 
+        par = .false.
+!$      par = (.not. omp_in_parallel()) .and. (kkmg(ilev, 3) * n2m .ge. mg_par_min)
+
+!$OMP PARALLEL DO PRIVATE(K) IF(par)
         do j = 1, n2m
           do k = kkmg(ilev, 1), kkmg(ilev, 2), 2
             ggii(k, j) = resd(k, j) - oldv * (ab(k) * ggii(kmm(k), j) + af(k) * ggii(kpm(k), j))
@@ -464,6 +598,7 @@
 
         call trdiag1m(ggii, ggii, kkmg(ilev, 1), kkmg(ilev, 2), 1_8, n2m, iv)
 
+!$OMP PARALLEL DO PRIVATE(K) IF(par)
         do j = 1, n2m
           do k = kkmg(ilev, 1) + 1, kkmg(ilev, 2), 2
             ggii(k, j) = resd(k, j) - ab(k) * ggii(kmm(k), j) - af(k) * ggii(kpm(k), j)
@@ -474,6 +609,7 @@
 
         do kk = 1, iiter - 1
 
+!$OMP PARALLEL DO PRIVATE(K) IF(par)
           do j = 1, n2m
             do k = kkmg(ilev, 1), kkmg(ilev, 2), 2
               ggii(k, j) = resd(k, j) - (ab(k) * ggii(kmm(k), j) + af(k) * ggii(kpm(k), j))
@@ -482,6 +618,7 @@
 
           call trdiag1m(ggii, ggii, kkmg(ilev, 1), kkmg(ilev, 2), 1_8, n2m, iv)
 
+!$OMP PARALLEL DO PRIVATE(K) IF(par)
           do j = 1, n2m
             do k = kkmg(ilev, 1) + 1, kkmg(ilev, 2), 2
               ggii(k, j) = resd(k, j) - ab(k) * ggii(kmm(k), j) - af(k) * ggii(kpm(k), j)
@@ -733,6 +870,16 @@
 
 !===== FOR THE Z PERIODICIRY
 !       INTRODUCE KPM & KMM
+        ! ENSURE SAFE DEFAULT INITIALIZATION FOR NON-PERIODIC BOUNDARIES AS WELL
+        do ilev = nlev, 0, -1
+          kbg = kkmg(ilev, 1)
+          kend = kkmg(ilev, 2)
+          do k = kbg, kend
+            kpm(k) = k + 1
+            kmm(k) = k - 1
+          end do
+        end do
+
         if (zprdic == 1) then
           do ilev = nlev, 0, -1
             kbg = kkmg(ilev, 1)
