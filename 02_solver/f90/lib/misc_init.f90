@@ -539,7 +539,8 @@
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8) :: flowarea(n1), fl, fl_s, adj
-        real(8) :: xi
+        real(8) :: xi, ylo, yhi, eta
+        logical :: isfl(0:n2)
         real(8), parameter :: eps_pr = 1.0d-12
 
         ihist = 0
@@ -555,7 +556,10 @@
         write (*, *) '========= MAKING INITIAL FIELD ========='
         write (*, *) ''
 
-!$OMP PARALLEL DO PRIVATE(XI)
+!       ICH = 1, 2: PARABOLIC PROFILE ACROSS THE FLUID GAP IN Y (BETWEEN BODY OR DOMAIN WALLS) THAT
+!       CONTAINS THE CELL, IN EACH (X, Z) COLUMN. FOR A CHANNEL WITH WALLS AT Y = -1 AND 1 THIS IS
+!       1.5 * UB * (1 - Y**2).
+!$OMP PARALLEL DO PRIVATE(XI, J, K, ISFL, YLO, YHI, ETA)
         do i = 0, n1    ! START FROM 0 TO COVER THE INLET GHOST CELL
           ! X IS ALLOCATED 1:N1, SO THE GHOST FACE I = 0 IS PLACED ONE CELL BEFORE X(1)
           if (i .eq. 0) then
@@ -563,16 +567,23 @@
           else
             xi = x(i)
           end if
-          do j = 0, n2
-            do k = 0, n3
+          do k = 0, n3
+            do j = 0, n2
+              isfl(j) = funcbody(xi, ymp(j), zmp(k), time) .ge. 1.e-10
+            end do
+            do j = 0, n2
               ! APPLY PROFILE ONLY IN THE FLUID DOMAIN
-              if (funcbody(xi, ymp(j), zmp(k), time) .ge. 1.e-10) then
+              if (isfl(j)) then
                 if (ich .eq. 0) then
                   u(i, j, k) = udrv_i
-                elseif (ich .eq. 1) then
-                  u(i, j, k) = 1.5d0 * udrv_i * (1.0d0 - ymp(j)**2)
-                elseif (ich .eq. 2) then
-                  u(i, j, k) = ( 1.5d0 * (1.0d0 - ymp(j)**2) ) * 12.d0 ! LET INITIAL UBULK_I = 12.D0
+                elseif ((ich .eq. 1) .or. (ich .eq. 2)) then
+                  call yfluidgap(isfl, j, ylo, yhi)
+                  eta = (ymp(j) - 0.5d0 * (ylo + yhi)) / (0.5d0 * (yhi - ylo))
+                  if (ich .eq. 1) then
+                    u(i, j, k) = 1.5d0 * udrv_i * (1.0d0 - eta**2)
+                  else
+                    u(i, j, k) = ( 1.5d0 * (1.0d0 - eta**2) ) * 12.d0 ! LET INITIAL UBULK_I = 12.D0
+                  end if
                 else
                   u(i, j, k) = udrv_i
                 end if
@@ -702,6 +713,34 @@
 
         return
       end subroutine makefld
+!=======================================================================
+!=======================================================================
+      subroutine yfluidgap(isfl, j, ylo, yhi)
+!=======================================================================
+!       FLUID GAP IN Y THAT CONTAINS CELL J OF A COLUMN (ISFL = FLUID FLAGS OF ITS CELLS 0..N2):
+!       YLO / YHI ARE THE LOWER FACE OF ITS FIRST FLUID CELL AND THE UPPER FACE OF ITS LAST ONE
+!       (A BODY SURFACE ON THE GRID, OR A DOMAIN WALL). A GHOST ROW USES THE GAP OF THE ROW NEXT TO IT.
+        use mod_common
+        implicit none
+        logical :: isfl(0:n2)
+        integer(8) :: j, jlo, jhi
+        real(8) :: ylo, yhi
+
+        jlo = min(max(j, 1_8), n2m)
+        jhi = jlo
+        do while (jlo .gt. 1)
+          if (.not. isfl(jlo - 1)) exit
+          jlo = jlo - 1
+        end do
+        do while (jhi .lt. n2m)
+          if (.not. isfl(jhi + 1)) exit
+          jhi = jhi + 1
+        end do
+        ylo = y(jlo)
+        yhi = y(jhi + 1)
+
+        return
+      end subroutine yfluidgap
 !=======================================================================
 !=======================================================================
       subroutine prefld
@@ -896,23 +935,34 @@
         integer(8) :: i, j, k
         real(8) :: funcbody
         real(8), parameter :: ret = 180.0d0
+        ! THE PERTURBATION SITS NEAR THE UPPER WALL OF THE FLUID GAP IN Y THAT CONTAINS THE CELL (SEE
+        ! YFLUIDGAP): ETA IS THE GAP COORDINATE (-1 .. 1), WD THE WALL DISTANCE IN HALF-GAP UNITS. FOR A
+        ! CHANNEL WITH WALLS AT Y = -1 AND 1, ETA = Y AND WD = 1 - Y.
+        logical :: isfl(0:n2)
+        real(8) :: ylo, yhi, eta, wd
 
         ! --- PERTURB U (GLOBAL MEAN CORRECTION) ---
         flowarea_g = 0.0d0
         pertb_rate_g = 0.0d0
 
-!$OMP PARALLEL DO PRIVATE(PTB, FLOWAREA_G_K, PERTB_RATE_G_K)
+!$OMP PARALLEL DO PRIVATE(PTB, FLOWAREA_G_K, PERTB_RATE_G_K, J, K, ISFL, YLO, YHI, ETA, WD)
         do i = 1, n1m
           flowarea_g_k = 0.0d0
           pertb_rate_g_k = 0.0d0
-          do j = 1, n2m
-            do k = 1, n3m
-              if (funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10) then
+          do k = 1, n3m
+            do j = 0, n2
+              isfl(j) = funcbody(x(i), ymp(j), zmp(k), time) .gt. 1.e-10
+            end do
+            do j = 1, n2m
+              if (isfl(j)) then
                 flowarea_g_k = flowarea_g_k + f2fy(j) * f2fz(k)
-                if ((ymp(j) .gt. .5d0) .and. (ymp(j) .lt. .99d0)) then
+                call yfluidgap(isfl, j, ylo, yhi)
+                eta = (ymp(j) - 0.5d0 * (ylo + yhi)) / (0.5d0 * (yhi - ylo))
+                wd = (yhi - ymp(j)) / (0.5d0 * (yhi - ylo))
+                if ((eta .gt. .5d0) .and. (eta .lt. .99d0)) then
                   ptb = eps_ptr * udrv_i * cos(zmp(k)/zl*acos(-1.d0)) &
-                        * abs(y(n2 - 2) - ymp(j)) * ret                &
-                        * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0 + .5d0)
+                        * wd * ret                                     &
+                        * exp(-.01d0*(wd*ret)**2.d0 + .5d0)
                   u(i, j, k) = u(i, j, k) + ptb
                   pertb_rate_g_k = pertb_rate_g_k + ptb * f2fy(j) * f2fz(k)
                 end if
@@ -946,18 +996,24 @@
         ! --- PERTURB W (GLOBAL MEAN CORRECTION) ---
         flowarea_g = 0.0d0
         pertb_rate_g = 0.0d0
-!$OMP PARALLEL DO PRIVATE(PTB, FLOWAREA_G_K, PERTB_RATE_G_K)
+!$OMP PARALLEL DO PRIVATE(PTB, FLOWAREA_G_K, PERTB_RATE_G_K, I, J, ISFL, YLO, YHI, ETA, WD)
         do k = 1, n3m
           flowarea_g_k = 0.0d0
           pertb_rate_g_k = 0.0d0
           do i = 1, n1m
+            do j = 0, n2
+              isfl(j) = funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10
+            end do
             do j = 1, n2m
-              if (funcbody(xmp(i), ymp(j), z(k), time) .gt. 1.e-10) then
+              if (isfl(j)) then
                 flowarea_g_k = flowarea_g_k + f2fx(i) * f2fy(j)
-                if ((ymp(j) .gt. .5d0) .and. (ymp(j) .lt. .99d0)) then
+                call yfluidgap(isfl, j, ylo, yhi)
+                eta = (ymp(j) - 0.5d0 * (ylo + yhi)) / (0.5d0 * (yhi - ylo))
+                wd = (yhi - ymp(j)) / (0.5d0 * (yhi - ylo))
+                if ((eta .gt. .5d0) .and. (eta .lt. .99d0)) then
                   ptb = eps_ptr * sin(xmp(i)/xl*acos(-1.d0)) &
-                        * abs(y(n2 - 2) - ymp(j)) * ret                &
-                        * exp(-.01d0*(abs(y(n2 - 2) - ymp(j))*ret)**2.d0)
+                        * wd * ret                           &
+                        * exp(-.01d0*(wd*ret)**2.d0)
                   w(i, j, k) = w(i, j, k) + ptb
                   pertb_rate_g_k = pertb_rate_g_k + ptb * f2fx(i) * f2fy(j)
                 end if
