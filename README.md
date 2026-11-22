@@ -111,6 +111,9 @@ Outputs:
 - instantaneous fields in `output/field/`
 - averaged fields in `output/field_avg/` (if enabled in solver settings)
 
+The solver stops with a message and a nonzero exit code when the solution blows up: a velocity that is
+not finite (NaN or infinite), or a CFL number above 100 with the last time step.
+
 ## Parallel runs (OpenMP)
 
 The solver runs on one shared-memory node. `02_solver/run_solver.sh` sets the thread count from
