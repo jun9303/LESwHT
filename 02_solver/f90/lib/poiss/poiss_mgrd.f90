@@ -301,6 +301,19 @@
         integer(8) :: iold, icyc, ilev
         real(8) :: resm
 
+!       GI IS A WORK ARRAY ON THE STACK: START FROM ZERO. THE FIRST SWEEPS MULTIPLY IT BY IOLD = 0 AND THE
+!       BOUNDARY NEIGHBOURS (I = 0, K = 0, ENDS OF THE COARSE LEVELS) BY ZERO COEFFICIENTS, AND 0 TIMES
+!       UNSET MEMORY CAN BE NAN (OR CHANGE WITH THE THREAD COUNT).
+!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I)
+        do k = 0, n3md
+          do j = 0, n2
+            do i = 0, n1md
+              gi(i, j, k) = 0.0_8
+            end do
+          end do
+        end do
+!$OMP END PARALLEL DO
+
         call toplevel(gi, resid, rhs, resm, iold)
 
         if (nlev == 0) goto 777
@@ -854,18 +867,25 @@
           end do
 
 !------ CALCULATE POISSON COEFFICIENTS FOR COARSE GRIDS
+!       AT THE ENDS OF A LEVEL THE NEIGHBOUR CENTRE (I - 1, I + 1, K - 1, K + 1) BELONGS TO ANOTHER LEVEL OR
+!       WAS NEVER SET (PAST THE COARSEST LEVEL), SO THE COEFFICIENT IS ONLY EVALUATED WHERE ITS FLAG IS 1;
+!       0 TIMES A NUMBER BUILT FROM UNSET MEMORY COULD GIVE NAN.
           ic = 0
           do i = ibg, iend
             ic = ic + 1
-            aw(i) = iwest(i) * 1.0_8 / ((xmpm(i) - xmpm(i - 1)) * (x(ic * isp + 1) - x((ic - 1) * isp + 1)))
-            ae(i) = ieast(i) * 1.0_8 / ((xmpm(i + 1) - xmpm(i)) * (x(ic * isp + 1) - x((ic - 1) * isp + 1)))
+            aw(i) = 0.0_8
+            ae(i) = 0.0_8
+            if (iwest(i) .eq. 1) aw(i) = 1.0_8 / ((xmpm(i) - xmpm(i - 1)) * (x(ic * isp + 1) - x((ic - 1) * isp + 1)))
+            if (ieast(i) .eq. 1) ae(i) = 1.0_8 / ((xmpm(i + 1) - xmpm(i)) * (x(ic * isp + 1) - x((ic - 1) * isp + 1)))
           end do
 
           kc = 0
           do k = kbg, kend
             kc = kc + 1
-            ab(k) = kback(k) * 1.0_8 / ((zmpm(k) - zmpm(k - 1)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
-            af(k) = kforw(k) * 1.0_8 / ((zmpm(k + 1) - zmpm(k)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
+            ab(k) = 0.0_8
+            af(k) = 0.0_8
+            if (kback(k) .eq. 1) ab(k) = 1.0_8 / ((zmpm(k) - zmpm(k - 1)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
+            if (kforw(k) .eq. 1) af(k) = 1.0_8 / ((zmpm(k + 1) - zmpm(k)) * (z(kc * ksp + 1) - z((kc - 1) * ksp + 1)))
           end do
 
         end do
@@ -897,7 +917,9 @@
           ibgl = iimg(ilev - 1, 1)             ! AT LOWER LEVEL
           do i = iimg(ilev, 1), iimg(ilev, 2), 2
             fiup(i) = (xmpm(i) - xmpm(ibgl - 1)) / (xmpm(ibgl) - xmpm(ibgl - 1))
-            fiup(i + 1) = (xmpm(i + 1) - xmpm(ibgl)) / (xmpm(ibgl + 1) - xmpm(ibgl))
+            fiup(i + 1) = 0.0_8                ! LAST PAIR: SET BELOW (NEUMANN), XMPM(IBGL + 1) IS NOT SET THERE
+            if (ibgl + 1 .le. iimg(ilev - 1, 2)) &
+              fiup(i + 1) = (xmpm(i + 1) - xmpm(ibgl)) / (xmpm(ibgl + 1) - xmpm(ibgl))
             il1(i) = ibgl - 1
             il2(i) = ibgl
             il1(i + 1) = ibgl
@@ -912,7 +934,9 @@
           kbgl = kkmg(ilev - 1, 1)             ! AT LOWER LEVEL
           do k = kkmg(ilev, 1), kkmg(ilev, 2), 2
             fkup(k) = (zmpm(k) - zmpm(kbgl - 1)) / (zmpm(kbgl) - zmpm(kbgl - 1))
-            fkup(k + 1) = (zmpm(k + 1) - zmpm(kbgl)) / (zmpm(kbgl + 1) - zmpm(kbgl))
+            fkup(k + 1) = 0.0_8                ! LAST PAIR: SET BELOW (NEUMANN), ZMPM(KBGL + 1) IS NOT SET THERE
+            if (kbgl + 1 .le. kkmg(ilev - 1, 2)) &
+              fkup(k + 1) = (zmpm(k + 1) - zmpm(kbgl)) / (zmpm(kbgl + 1) - zmpm(kbgl))
             kl1(k) = kbgl - 1
             kl2(k) = kbgl
             kl1(k + 1) = kbgl
