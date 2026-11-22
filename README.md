@@ -95,7 +95,8 @@ Topologies: 0 cylinder, 1 spherical, 2 teardrop down, 3 teardrop up, 4 diamond, 
    bash run_solver.sh
    ```
 
-   Inputs: `settings.input` and `boundary.input`. The thread count is `SLURM_CPUS_PER_TASK` under Slurm and 64
+   Inputs: `settings.input` and `boundary.input`. The script reads `output/running_case.env` as well, and the
+   solver stops with a message if it cannot read the STL named there. The thread count is `SLURM_CPUS_PER_TASK` under Slurm and 64
    otherwise (set `OMP_NUM_THREADS` in the script to change it). `POISS=poiss_fd bash run_solver.sh` builds
    with another Poisson solver; the default `poiss_ftft` fits the x- and z-periodic slab.
 
