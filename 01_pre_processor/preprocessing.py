@@ -112,6 +112,13 @@ for k in range(0,N_z+1):
     Z.append(grid['grid_info_z'][k]['coord'])
     ZM.append(grid['grid_info_z'][k]['center'])
 
+# In a periodic direction the ghost cells 0 and N lie half a cell outside the end faces (one period
+# away from the last and the first cell). grid.bin keeps its own values; this only affects the IBM data.
+if XPRDIC == 'ON' and N_x > 2:
+    XM[0] = 0.5*(X[0] + X[1]); XM[N_x] = X[N_x] + 0.5*(X[2] - X[1])
+if ZPRDIC == 'ON' and N_z > 2:
+    ZM[0] = 0.5*(Z[0] + Z[1]); ZM[N_z] = Z[N_z] + 0.5*(Z[2] - Z[1])
+
 # Find inner body pts
 X = np.array(X, order='F'); Y = np.array(Y, order='F'); Z = np.array(Z, order='F');
 XM = np.array(XM, order='F'); YM = np.array(YM, order='F'); ZM = np.array(ZM, order='F');

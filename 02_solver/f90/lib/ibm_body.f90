@@ -74,6 +74,10 @@ subroutine findbdy_intp(dir, nx, ny, nz, nbody, inout, ufix_x, &
   if (dir .eq. 1) istart = 2
   if (dir .eq. 2) jstart = 2
   if (dir .eq. 3) kstart = 2
+  ! IN A PERIODIC DIRECTION (LFIX = 0 AT ITS FIRST CELL) THE FACE AT INDEX 1 IS SOLVED FOR (IT IS ALSO
+  ! THE FACE AT INDEX N), SO IT IS SEARCHED TOO. WITH ONE CELL (2D) THAT DIRECTION HAS NOTHING TO SOLVE.
+  if ((dir .eq. 1) .and. (lfix_x(1) .eq. 0) .and. (nx .gt. 2)) istart = 1
+  if ((dir .eq. 3) .and. (lfix_z(1) .eq. 0) .and. (nz .gt. 2)) kstart = 1
 
   nintp = 0
   ninner = 0
@@ -148,6 +152,7 @@ subroutine geomfac_preset(ni, icoord, im, prdic, i_adj)
   character(*), intent(in) :: prdic
   real(8), intent(out) :: i_adj(-1:ni + 1, 3)
   integer(8) :: l
+  real(8) :: w1, w2, wl, wl2
 
   i_adj = 0.0d0
 
@@ -157,17 +162,28 @@ subroutine geomfac_preset(ni, icoord, im, prdic, i_adj)
     i_adj(l, 3) = im(l)
   end do
 
-  if (prdic .eq. 'on') then
-    i_adj(-1, 1)   = icoord(0) - (icoord(ni) - icoord(ni-1))
-    i_adj(ni+1, 1) = icoord(ni) + (icoord(1) - icoord(0))
+  ! PERIODIC GHOSTS. CELL L (L = 1 .. NI-1) SPANS ICOORD(L) .. ICOORD(L+1), AND ICOORD(0) IS THE FACE
+  ! ONE PERIOD BEFORE ICOORD(NI-1). INDEX 0 IS CELL NI-1 AND INDEX -1 CELL NI-2, ONE PERIOD BACK;
+  ! INDEX NI IS CELL 1 AND INDEX NI+1 CELL 2, ONE PERIOD ON. (THE PREPROCESSOR PASSES 'ON' OR 'OFF'.)
+  if ((prdic .eq. 'ON') .or. (prdic .eq. 'on')) then
+    w1 = icoord(2) - icoord(1)
+    w2 = w1
+    if (ni .ge. 3) w2 = icoord(3) - icoord(2)
+    wl = icoord(ni) - icoord(ni - 1)
+    wl2 = wl
+    if (ni .ge. 3) wl2 = icoord(ni - 1) - icoord(ni - 2)
 
-    i_adj(0, 2)    = icoord(0) - 0.5d0*(icoord(ni) - icoord(ni-1))
-    i_adj(-1, 2)   = i_adj(-1, 1) - 0.5d0*(icoord(ni-1) - icoord(ni-2))
-        
-    i_adj(ni+1, 2) = icoord(ni) + 0.5d0*(icoord(1) - icoord(0))
+    i_adj(-1, 1)   = icoord(0) - wl2
+    i_adj(ni+1, 1) = icoord(ni) + w1
 
-    i_adj(0, 3)    = i_adj(0, 2)
+    i_adj(-1, 2)   = icoord(0) - 0.5d0 * wl2
+    i_adj(0, 2)    = icoord(0) + 0.5d0 * wl
+    i_adj(ni, 2)   = icoord(ni) + 0.5d0 * w1
+    i_adj(ni+1, 2) = icoord(ni) + w1 + 0.5d0 * w2
+
     i_adj(-1, 3)   = i_adj(-1, 2)
+    i_adj(0, 3)    = i_adj(0, 2)
+    i_adj(ni, 3)   = i_adj(ni, 2)
     i_adj(ni+1, 3) = i_adj(ni+1, 2)
   end if
 end subroutine geomfac_preset
