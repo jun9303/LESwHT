@@ -36,7 +36,9 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-`run.sh` uses `.venv/bin/python` when it exists.
+Activate the environment (`source .venv/bin/activate`) in each new shell before `run.sh` or a stage
+script. `run.sh` itself uses `.venv/bin/python` for the generator and the `UDRV_I` step, but the grid, IBM
+and post-processing scripts call `python3` from `PATH`.
 
 ## Run the full pipeline
 
