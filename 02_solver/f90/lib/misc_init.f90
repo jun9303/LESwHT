@@ -40,6 +40,13 @@
         read (10, *) iles, insmdl, itemdl, idvmon, csgsts, csgshf, filter
         read (10, *) dummy
         read (10, *) ibmon, masson, imovingon, ihtrans, idecomp
+!       THE MOVING-BODY PATH (FINDFORCING EACH STEP) IS NOT USABLE: IT PASSES ARRAYS WITH OTHER SHAPES
+!       THAN THE IBM ROUTINES DECLARE (COORDINATES WITHOUT THE -1:N+1 RANGE, FCP/INTPINDX/GEOMFAC LEADING
+!       DIMENSIONS) AND NO BODY-VELOCITY FUNCTIONS (UBD, VBD, WBD) ARE DEFINED. STOP HERE, NOT AT STEP 1.
+        if (imovingon .eq. 1) then
+          write (*, *) 'IMOVINGON = 1 IS NOT AVAILABLE IN THIS VERSION (SEE MISC_INIT.F90); SET IMOVINGON = 0.'
+          stop
+        end if
         read (10, *) dummy
         read (10, *) gridfile
         read (10, *) prev_fld

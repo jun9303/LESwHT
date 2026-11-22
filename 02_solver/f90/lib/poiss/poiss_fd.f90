@@ -75,7 +75,10 @@
         real(8), dimension(:, :), allocatable :: gm
         real(8) :: crref, phref
 
-        nbj = adi_nblk(n3m, n2m)
+!     THE COLUMN BLOCKS OF THE X TRANSFORMS DEPEND ON N2M ONLY (AT LEAST 16 COLUMNS EACH): GFORTRAN'S
+!     MATMUL CAN ROUND A COLUMN DIFFERENTLY WHEN THE NUMBER OF COLUMNS CHANGES, SO BLOCKS SET BY THE
+!     THREAD COUNT WOULD MAKE PHI DEPEND ON IT. THE Y SOLVES BELOW TREAT EACH LINE ON ITS OWN.
+        nbj = max(1_8, n2m / 16)
         nbx = adi_nblk(n3m, n1m)
 
 ! --- SCALE AND TRANSFORM IN X: B(KX,J,K) = SUM_I QFX(I,KX) * SFX(I) * SFZ(K) * DIVGSUM(I,J,K)

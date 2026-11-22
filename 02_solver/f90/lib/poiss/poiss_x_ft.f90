@@ -21,6 +21,16 @@
         use mod_poiss
         implicit none
         integer(8) :: i, j, k, ilev
+        integer(8) :: nlev0
+
+!     A NON-PERIODIC Z NEEDS AT LEAST TWO CELLS ON THE COARSEST MULTIGRID LEVEL: WITH ONE, THE MODE-1
+!     Y LINE THERE HAS NO Z COUPLING AND IS SINGULAR (DIVISION BY ZERO BELOW). USE FEWER LEVELS.
+        nlev0 = nlev
+        do while (nlev .gt. 1 .and. zprdic .ne. 1 .and. n3m / (2**nlev) .lt. 2)
+          nlev = nlev - 1
+        end do
+        if (nlev .ne. nlev0) write (*, '(A,I3,A,I3,A)') ' POISINIT: NLEV', nlev0, ' ->', nlev, &
+          ' (AT LEAST TWO CELLS ON THE COARSEST LEVEL)'
 
         call x_ft_allo
 
@@ -161,6 +171,7 @@
 !     THEN SHARE OUT THE OTHER MODES ONE BY ONE
         allocate (cp(0:n3, 0:n2))
         cp = 0.0_8
+        call rhsmean0(ccap(1, 1, 1))
         if (1 <= imgsor) then
           call mg2d(cp, ccap(1, 1, 1), 1_8, test, 0.0_8)
         else
@@ -250,6 +261,59 @@
 
         return
       end subroutine poisson
+!=======================================================================
+      subroutine rhsmean0(rhs)
+!=======================================================================
+!     MODE 1 IS A NEUMANN PROBLEM: ITS RIGHT-HAND SIDE MUST HAVE ZERO MEAN (WEIGHTED BY THE CELL AREAS
+!     F2FZ * F2FY), OR NO SOLUTION EXISTS AND THE MULTIGRID STALLS AT MGITR. A MEAN ABOVE ROUND-OFF
+!     (1E-10 OF THE WEIGHTED MEAN |RHS|) IS SUBTRACTED; AT ROUND-OFF THE RIGHT-HAND SIDE IS LEFT AS IT IS.
+!     ROW SUMS IN PARALLEL, ADDED IN ROW ORDER (THE SAME FOR ANY THREAD COUNT).
+        use mod_common
+        implicit none
+        complex(8) :: rhs(n3, n2)
+        integer(8) :: k, j
+        real(8) :: sw, swr, swa
+        real(8) :: sw_j(n2m), swr_j(n2m), swa_j(n2m)
+        logical, save :: said = .false.
+
+!$OMP PARALLEL DO PRIVATE(K)
+        do j = 1, n2m
+          sw_j(j) = 0.0_8
+          swr_j(j) = 0.0_8
+          swa_j(j) = 0.0_8
+          do k = 1, n3m
+            sw_j(j) = sw_j(j) + f2fz(k) * f2fy(j)
+            swr_j(j) = swr_j(j) + f2fz(k) * f2fy(j) * real(rhs(k, j), 8)
+            swa_j(j) = swa_j(j) + f2fz(k) * f2fy(j) * abs(rhs(k, j))
+          end do
+        end do
+!$OMP END PARALLEL DO
+        sw = 0.0_8
+        swr = 0.0_8
+        swa = 0.0_8
+        do j = 1, n2m
+          sw = sw + sw_j(j)
+          swr = swr + swr_j(j)
+          swa = swa + swa_j(j)
+        end do
+        if (abs(swr) .le. 1.0e-10_8 * swa) return
+
+        swr = swr / sw
+!$OMP PARALLEL DO PRIVATE(K)
+        do j = 1, n2m
+          do k = 1, n3m
+            rhs(k, j) = rhs(k, j) - swr
+          end do
+        end do
+!$OMP END PARALLEL DO
+        if (.not. said) then
+          write (*, '(A,ES11.3,A)') ' POISSON: MODE-1 RIGHT-HAND SIDE MEAN', swr, &
+            ' SUBTRACTED (ALSO IN LATER SOLVES WHEN ABOVE ROUND-OFF)'
+          said = .true.
+        end if
+
+        return
+      end subroutine rhsmean0
 
 !=======================================================================
       subroutine mg2d(pc, rhs, iv, test, oldv)

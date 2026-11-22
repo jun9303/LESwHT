@@ -29,6 +29,8 @@
         implicit none
         integer(8) :: i, j, k
         integer(8) :: i_cg, imax, jmax, kmax
+        integer(8) :: it, jt, kt
+        real(8) :: rt
         real(8) :: rho_cg, rho_ol, alp_cg, w_cg, bet_cg, rv_tmp, acc
         real(8) :: rho_cg_k, rho_cg_pln(n3m), rv_tmp_k, rv_tmp_pln(n3m), uppp_k, uppp_pln(n3m), bttt_k, bttt_pln(n3m)
         real(8) :: phiref, resm_cg, bttt, uppp
@@ -218,20 +220,40 @@
           end do
 
           resm_cg = 0.0_8
-!$OMP PARALLEL DO COLLAPSE(2) PRIVATE(I, J) REDUCTION(MAX:RESM_CG)
+          imax = 0
+          jmax = 0
+          kmax = 0
+!     EACH THREAD FINDS THE MAXIMUM OF ITS CELLS; THE MERGE KEEPS THE SERIAL PICK
+!     (LARGEST VALUE, AND THE LAST CELL IN K-J-I ORDER AMONG EQUAL VALUES).
+!$OMP PARALLEL PRIVATE(I, J, RT, IT, JT, KT)
+          rt = 0.0_8
+          it = 0
+          jt = 0
+          kt = 0
+!$OMP DO COLLAPSE(2)
           do k = 1, n3m
             do j = 1, n2m
               do i = 1, n1m
                 res_cg(i, j, k) = s_cg(i, j, k) - w_cg * t_cg(i, j, k)
-                resm_cg = max(resm_cg, abs(res_cg(i, j, k)))
-                if (resm_cg == abs(res_cg(i, j, k))) then
-                  imax = i
-                  jmax = j
-                  kmax = k
+                if (abs(res_cg(i, j, k)) .ge. rt) then
+                  rt = abs(res_cg(i, j, k))
+                  it = i
+                  jt = j
+                  kt = k
                 end if
               end do
             end do
           end do
+!$OMP END DO
+!$OMP CRITICAL(MGRD_RESM)
+          if (rt .gt. resm_cg .or. (rt .eq. resm_cg .and. ((kt - kmax) * n2m + (jt - jmax)) * n1m + (it - imax) .gt. 0)) then
+            resm_cg = rt
+            imax = it
+            jmax = jt
+            kmax = kt
+          end if
+!$OMP END CRITICAL(MGRD_RESM)
+!$OMP END PARALLEL
           rho_ol = rho_cg
 
           write (77, 102) i_cg, resm_cg * dtconst, imax, jmax, kmax

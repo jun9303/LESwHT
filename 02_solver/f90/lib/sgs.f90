@@ -24,6 +24,17 @@
         cfz1 = 0.
         cfz2 = 0.
 
+!     ONE Z-PLANE (2D LES): A Z TEST FILTER HAS NOTHING TO AVERAGE, CFZ1 IS NOT SET BELOW, AND THE
+!     Z-PERIODIC PASS IN TEST_FILTER WOULD ZERO THE FIELD. FILTER = 3 RUNS AS FILTER = 1 (X ONLY);
+!     FILTER = 2 (Z ONLY) LEAVES NO TEST FILTER AND STOPS.
+        if (n3m .eq. 1 .and. filter .eq. 3) then
+          filter = 1
+          write (*, *) 'SGSFILTERINIT: N3M = 1, FILTER = 3 RUNS AS FILTER = 1 (X ONLY).'
+        else if (n3m .eq. 1 .and. filter .eq. 2) then
+          write (*, *) 'SGSFILTERINIT: N3M = 1 AND FILTER = 2 (Z ONLY) LEAVE NO TEST FILTER; USE FILTER = 1.'
+          stop
+        end if
+
         if (xprdic .eq. 1) then
 
           if (n1m .eq. 1) goto 101
@@ -945,6 +956,8 @@
         integer(8) :: imax, jmax, kmax, l
         real(8) :: nusgsavg, nusgsmax, area
         real(8) :: funcbody
+        real(8) :: nusgst
+        integer(8) :: it, jt, kt
 
         imax = 0
         jmax = 0
@@ -959,22 +972,27 @@
         call body_values()
         nusgsavg = 0.
         area = 0.
-        nusgsmax = 0.
+        nusgsmax = -huge(1.0_8)
 
-!$OMP PARALLEL DO COLLAPSE(2) &
-!$OMP REDUCTION(+:NUSGSAVG, AREA) &
-!$OMP REDUCTION(MAX:NUSGSMAX)
+!     EACH THREAD FINDS THE MAXIMUM OF ITS FLUID CELLS; THE MERGE KEEPS THE SINGLE-THREAD PICK
+!     (LARGEST VALUE, AND THE FIRST CELL IN K-J-I ORDER AMONG EQUAL VALUES); THE VALUE IS AT LEAST 0.
+!$OMP PARALLEL PRIVATE(NUSGST, IT, JT, KT)
+        nusgst = -huge(1.0_8)
+        it = 0
+        jt = 0
+        kt = 0
+!$OMP DO COLLAPSE(2) REDUCTION(+:NUSGSAVG, AREA)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
               if (fbody_c(i, j, k) .ge. 1.e-10) then
                 nusgsavg = nusgsavg + nusgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
                 area = area + f2fx(i) * f2fy(j) * f2fz(k)
-                if (nusgs(i, j, k) .gt. nusgsmax) then
-                  nusgsmax = nusgs(i, j, k)
-                  imax = i
-                  jmax = j
-                  kmax = k
+                if (nusgs(i, j, k) .gt. nusgst) then
+                  nusgst = nusgs(i, j, k)
+                  it = i
+                  jt = j
+                  kt = k
                 end if
               else
                 nusgs(i, j, k) = 0.
@@ -982,7 +1000,18 @@
             end do
           end do
         end do
-!$OMP END PARALLEL DO
+!$OMP END DO
+!$OMP CRITICAL(NUT_MAX)
+        if (nusgst .gt. nusgsmax .or. (nusgst .eq. nusgsmax .and. it .gt. 0 .and. &
+            ((kt - kmax) * n2m + (jt - jmax)) * n1m + (it - imax) .lt. 0)) then
+          nusgsmax = nusgst
+          imax = it
+          jmax = jt
+          kmax = kt
+        end if
+!$OMP END CRITICAL(NUT_MAX)
+!$OMP END PARALLEL
+        nusgsmax = max(nusgsmax, 0.)
 
         nusgsavg = nusgsavg / area
 
@@ -1192,7 +1221,7 @@
                 nusgs1(i, j, n3, 3) = 0.
               else
                 nusgs1(i, j, n3, 2) = &
-                  c2cyi(k) * 0.5 * (f2fy(j) * nusgs(i, jm, n3m) + f2fy(jm) * nusgs(i, j, n3m))
+                  c2cyi(j) * 0.5 * (f2fy(j) * nusgs(i, jm, n3m) + f2fy(jm) * nusgs(i, j, n3m))
                 nusgs1(i, j, n3, 3) = &
                   c2cxi(i) * 0.5 * (f2fx(i) * nusgs(im, j, n3m) + f2fx(im) * nusgs(i, j, n3m))
               end if
@@ -1605,6 +1634,8 @@
         integer(8) :: imax, jmax, kmax, l
         real(8) :: alsgsavg, alsgsmax, area
         real(8) :: funcbody
+        real(8) :: alsgst
+        integer(8) :: it, jt, kt
 
         imax = 0
         jmax = 0
@@ -1619,22 +1650,27 @@
         call body_values()
         alsgsavg = 0.
         area = 0.
-        alsgsmax = 0.
+        alsgsmax = -huge(1.0_8)
 
-!$OMP PARALLEL DO COLLAPSE(2) &
-!$OMP REDUCTION(+:ALSGSAVG, AREA) &
-!$OMP REDUCTION(MAX:ALSGSMAX)
+!     EACH THREAD FINDS THE MAXIMUM OF ITS FLUID CELLS; THE MERGE KEEPS THE SINGLE-THREAD PICK
+!     (LARGEST VALUE, AND THE FIRST CELL IN K-J-I ORDER AMONG EQUAL VALUES); THE VALUE IS AT LEAST 0.
+!$OMP PARALLEL PRIVATE(ALSGST, IT, JT, KT)
+        alsgst = -huge(1.0_8)
+        it = 0
+        jt = 0
+        kt = 0
+!$OMP DO COLLAPSE(2) REDUCTION(+:ALSGSAVG, AREA)
         do k = 1, n3m
           do j = 1, n2m
             do i = 1, n1m
               if (fbody_c(i, j, k) .ge. 1.e-10) then
                 alsgsavg = alsgsavg + alsgs(i, j, k) * f2fx(i) * f2fy(j) * f2fz(k)
                 area = area + f2fx(i) * f2fy(j) * f2fz(k)
-                if (alsgs(i, j, k) .gt. alsgsmax) then
-                  alsgsmax = alsgs(i, j, k)
-                  imax = i
-                  jmax = j
-                  kmax = k
+                if (alsgs(i, j, k) .gt. alsgst) then
+                  alsgst = alsgs(i, j, k)
+                  it = i
+                  jt = j
+                  kt = k
                 end if
               else
                 alsgs(i, j, k) = 0.
@@ -1642,7 +1678,18 @@
             end do
           end do
         end do
-!$OMP END PARALLEL DO
+!$OMP END DO
+!$OMP CRITICAL(ALP_MAX)
+        if (alsgst .gt. alsgsmax .or. (alsgst .eq. alsgsmax .and. it .gt. 0 .and. &
+            ((kt - kmax) * n2m + (jt - jmax)) * n1m + (it - imax) .lt. 0)) then
+          alsgsmax = alsgst
+          imax = it
+          jmax = jt
+          kmax = kt
+        end if
+!$OMP END CRITICAL(ALP_MAX)
+!$OMP END PARALLEL
+        alsgsmax = max(alsgsmax, 0.)
 
         alsgsavg = alsgsavg / area
 
