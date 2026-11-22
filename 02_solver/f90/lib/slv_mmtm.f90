@@ -298,15 +298,19 @@
          if (iles .eq. 1) call rhssgs    ! SUBGRID-SCALE COMPUTATIONS (LES CASE)
          call rhs
          if (ibmon .ne. 0) call rhs_ibm    ! IB METHOD COMPUTATION
-         call convbc                     ! DEFINED IN LICA_[BODYNAME, E.G. CYLINDER].F90 FILE
-         if (ich .ne. 1) call rhsincorpbc
+         ! CONVECTIVE OUTLET ONLY WITH A NON-PERIODIC X; A PERIODIC X TAKES ITS GHOSTS FROM
+         ! PRDIC_ADJ_UVW (AS RHSNLHS_T DOES FOR THE TEMPERATURE)
+         if (xprdic .eq. 0) then
+           call convbc                     ! DEFINED IN LICA_[BODYNAME, E.G. CYLINDER].F90 FILE
+           if (ich .ne. 1) call rhsincorpbc
+         end if
 
          call lhsu
          call lhsv
          if (n3m .ne. 1) call lhsw
 
          ! WHEN DO BLOWING/SUCTION RETRV_UVW SHOULD BE TURNED ON
-         call retrv_uvw
+         if (xprdic .eq. 0) call retrv_uvw
          call prdic_adj_uvw(0)
 
          return
