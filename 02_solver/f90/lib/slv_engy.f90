@@ -323,73 +323,50 @@
           use mod_flowarray, only: u, v, w, t
           implicit none
           integer(8) :: i, j, k
-          real(8) :: qin, qout, qratio
-          real(8) :: ubar, ucoef, vwcoef
+          real(8) :: ubar, vwcoef, afluid
+          integer(8) :: nsolid
           real(8), parameter :: eps_denom = 1.0d-14
           real(8) :: funcbody
 
           if (ich .ne. 1) then
 
-!-----CALCULATE INFLUX
             call body_values()
-            ! Plane sums stay serial, so the result is the same for any number of threads.
-            qin = 0.
-            do k = 1, n3m
-              do j = 1, n2m
-                qin = u(1, j, k) * f2fy(j) * f2fz(k) + qin
-              end do
-            end do
-            do k = 1, n3m
-              do i = 1, n1m
-                qin = (v(i, 1, k) - v(i, n2, k)) * f2fx(i) * f2fz(k) + qin
-              end do
-            end do
-            do j = 1, n2m
-              do i = 1, n1m
-                qin = (w(i, j, 1) - w(i, j, n3)) * f2fx(i) * f2fy(j) + qin
-              end do
-            end do
 
-!-----CALCULATE CONVECTIVE VELOCITY UC
+!-----CALCULATE CONVECTIVE VELOCITY UC (MEAN OVER THE FLUID PART OF THE OUTLET, AS IN CONVBC)
             ubar = 0.
+            afluid = 0.
+            nsolid = 0
             do k = 1, n3m
               do j = 1, n2m
-                ubar = u(n1, j, k) * f2fy(j) * f2fz(k) + ubar
+                if (fbody_c(n1m, j, k) .gt. 1.e-10 .or. imovingon .eq. 1) then
+                  ubar = u(n1, j, k) * f2fy(j) * f2fz(k) + ubar
+                  afluid = f2fy(j) * f2fz(k) + afluid
+                else
+                  nsolid = nsolid + 1
+                end if
               end do
             end do
-            ubar = ubar / (yl * zl)
-            ucoef = ubar * dtconst * f2fxi(n1m)
+            if (nsolid .eq. 0) then
+              ubar = ubar / (yl * zl)
+            else if (afluid .gt. eps_denom) then
+              ubar = ubar / afluid
+            else
+              ubar = 0.
+            end if
             vwcoef = ubar * dtconst * c2cxi(n1)
 
-            qout = 0.
+!     T: CONVECTIVE OUTFLOW IN FLUID CELLS, ZERO-GRADIENT CONDUCTION IN SOLID CELLS. THE TEMPERATURE IS
+!     NOT SCALED BY THE MASS-FLUX RATIO OF CONVBC: THAT WOULD MAKE THE RESULT DEPEND ON THE TEMPERATURE
+!     ORIGIN (T AND T + CONST WOULD GIVE DIFFERENT FIELDS).
+!$OMP PARALLEL DO
             do k = 1, n3m
               do j = 1, n2m
-                uout(j, k) = u(n1, j, k) - ucoef * (u(n1, j, k) - u(n1m, j, k))
-
                 if (fbody_c(n1m, j, k) .le. 1.e-10 .and. imovingon .eq. 0) then
                   ! SOLID PHASE: ZERO-GRADIENT CONDUCTION BOUNDARY
                   tout(j, k) = t(n1m, j, k)
                 else
                   ! FLUID PHASE: CONVECTIVE ADVECTION
                   tout(j, k) = t(n1, j, k) - vwcoef * (t(n1, j, k) - t(n1m, j, k))
-                end if
-
-                qout = uout(j, k) * f2fy(j) * f2fz(k) + qout
-              end do
-            end do
-            if (dabs(qout) .gt. eps_denom) then
-              qratio = qin / qout
-            else
-              qratio = 1.0d0
-            end if
-
-!-----ADJUST BOUNDARY VELOCITY TO SATISFY GLOBAL MASS CONSERVATION
-!$OMP PARALLEL DO
-            do k = 1, n3m
-              do j = 1, n2m
-                ! ONLY SCALE THE FLUID PHASE BY THE MASS FLUX ERROR
-                if (fbody_c(n1m, j, k) .gt. 1.e-10) then
-                  tout(j, k) = tout(j, k) * qratio
                 end if
                 dtout(j, k) = tout(j, k) - t(n1, j, k)
               end do
