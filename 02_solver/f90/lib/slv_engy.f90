@@ -401,26 +401,22 @@
         subroutine rhsincorpbc_t
 !=======================================================================
           use mod_common
-          use mod_flowarray, only: u, v, w, t, rhs1, alsgs, cstar, kstar, omega_dvm
+          use mod_flowarray, only: u, v, w, t, rhs1, alsgs1, cstar, kstar, omega_dvm
           implicit none
           integer(8) :: i, j, k
-          real(8) :: cre, cre2, cs, ks, omc
+          real(8) :: cre, cs, ks, omc
 
-          if (iles .eq. 1) then
-            cre = re * pr
-            cre2 = 2.*re * pr
-          else
-            cre = 0.
-            cre2 = 0.
-          end if
+!     THE OUTLET GHOST CHANGES BY DTOUT; ITS IMPLICIT COUPLING TO CELL N1M IS MOVED TO THE RIGHT-HAND
+!     SIDE WITH THE SAME COEFFICIENT AS THE X SWEEP OF LHS_T (CIVW, EAST-FACE KSTAR, ALSGS1 AT N1),
+!     DIVIDED BY THE DIAGONAL SCALE ACOEFI * PR (AS RHSINCORPBC DOES FOR V AND W).
+          cre = float(iles) * re * pr
 
 !$OMP PARALLEL DO PRIVATE(CS,KS,OMC)
           do k = 1, n3m
             do j = 1, n2m
               if (iconjg .eq. 1) then
                 cs = cstar(n1m, j, k)
-                ks = (kstar(n1m, j, k, 1) + kstar(n1m, j, k, 2) + kstar(n1m, j, k, 3) &
-                      + kstar(n1m, j, k, 4) + kstar(n1m, j, k, 5) + kstar(n1m, j, k, 6)) / 6.
+                ks = kstar(n1m, j, k, 1)
                 if (imovingon .eq. 0) then
                   omc = dble(omega_dvm(n1m, j, k))
                 else
@@ -433,8 +429,7 @@
               end if
 
               rhs1(n1m, j, k, 4) = rhs1(n1m, j, k, 4) &
-                                   - acoef * cs * ks &
-                                   * ciu(n1m) * (1.+cre2 * omc * alsgs(n1m, j, k)) * dtout(j, k)
+                                   - acoef / pr * civw(n1m) * (cs * ks + cre * omc * alsgs1(n1, j, k, 1)) * dtout(j, k)
             end do
           end do
 
