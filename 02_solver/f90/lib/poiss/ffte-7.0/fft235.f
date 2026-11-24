@@ -17,6 +17,12 @@ C     FORTRAN77 SOURCE PROGRAM
 C
 C     WRITTEN BY DAISUKE TAKAHASHI
 C
+C     LESWHT CHANGE (2026): THE LAST STAGE USED TO CALL ITS KERNEL WITH A AS
+C     BOTH THE INPUT AND THE OUTPUT, E.G. FFT3(A,A,...). FORTRAN LETS THE
+C     COMPILER ASSUME THAT TWO DUMMY ARGUMENTS DO NOT OVERLAP, AND GFORTRAN
+C     11 WITH -O3 -MARCH=ZNVER3 GAVE WRONG TRANSFORMS (FOR EXAMPLE N = 96).
+C     THE KERNEL NOW WRITES TO THE WORK ARRAY B, WHICH IS COPIED BACK TO A.
+C
       SUBROUTINE FFT235(A,B,W,N,IP)
       IMPLICIT REAL*8 (A-H,O-Z)
       COMPLEX*16 A(*),B(*),W(*)
@@ -45,7 +51,8 @@ C
           KEY=-KEY
         ELSE
           IF (KEY .GE. 0) THEN
-            CALL FFT8(A,A,W(J),M,L)
+            CALL FFT8(A,B,W(J),M,L)
+            CALL FFTCPY(B,A,N)
           ELSE
             CALL FFT8(B,A,W(J),M,L)
           END IF
@@ -64,7 +71,8 @@ C
           KEY=-KEY
         ELSE
           IF (KEY .GE. 0) THEN
-            CALL FFT5(A,A,W(J),M,L)
+            CALL FFT5(A,B,W(J),M,L)
+            CALL FFTCPY(B,A,N)
           ELSE
             CALL FFT5(B,A,W(J),M,L)
           END IF
@@ -83,7 +91,8 @@ C
           KEY=-KEY
         ELSE
           IF (KEY .GE. 0) THEN
-            CALL FFT4(A,A,W(J),M,L)
+            CALL FFT4(A,B,W(J),M,L)
+            CALL FFTCPY(B,A,N)
           ELSE
             CALL FFT4(B,A,W(J),M,L)
           END IF
@@ -102,7 +111,8 @@ C
           KEY=-KEY
         ELSE
           IF (KEY .GE. 0) THEN
-            CALL FFT3(A,A,W(J),M,L)
+            CALL FFT3(A,B,W(J),M,L)
+            CALL FFTCPY(B,A,N)
           ELSE
             CALL FFT3(B,A,W(J),M,L)
           END IF
@@ -112,11 +122,21 @@ C
    40 CONTINUE
       IF (IP(1) .EQ. 1) THEN
         IF (KEY .GE. 0) THEN
-          CALL FFT2(A,A,M)
+          CALL FFT2(A,B,M)
+          CALL FFTCPY(B,A,N)
         ELSE
           CALL FFT2(B,A,M)
         END IF
       END IF
+      RETURN
+      END
+      SUBROUTINE FFTCPY(B,A,N)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      COMPLEX*16 A(*),B(*)
+C
+      DO 10 I=1,N
+        A(I)=B(I)
+   10 CONTINUE
       RETURN
       END
       SUBROUTINE FFT3(A,B,W,M,L)
