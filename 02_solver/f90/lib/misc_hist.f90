@@ -347,7 +347,10 @@
            avg_started = .true.
            npriavg_count = 0
            ihistavg_start = ihist
-           timeinit = avg_tst
+           ! THE FIRST INCREMENT ADDED BELOW COVERS THIS STEP, TIME - DT TO TIME. IN A FRESH RUN THAT STEP
+           ! STARTS AT AVG_TST; AFTER A RESTART PAST AVG_TST (IRESET = 0) IT STARTS AT THE RESTART TIME, AND
+           ! AVG_TST WOULD OVERSTATE THE SEGMENT DURATION THAT COMBINE/POST-PROCESSING DIVIDE BY.
+           timeinit = time - dt
            ihistinit = ihist
            uavg = 0.
            vavg = 0.
